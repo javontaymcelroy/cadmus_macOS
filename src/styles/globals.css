@@ -1,0 +1,1519 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ======================================
+   Theme Tokens (CSS Custom Properties)
+   ====================================== */
+
+:root {
+  /* Background tokens - Dark mode (default) */
+  --bg-primary: #050505;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #121212;
+  --bg-elevated: #1a1a1a;
+  --bg-panel: rgba(18, 18, 18, 0.95);
+  --bg-panel-solid: #121212;
+  --bg-header: rgba(255, 255, 255, 0.02);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-active: rgba(255, 255, 255, 0.08);
+  
+  /* Text tokens */
+  --text-primary: rgba(255, 255, 255, 0.85);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --text-inverted: #050505;
+  
+  /* Border tokens */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  
+  /* Shadow tokens */
+  --shadow-color: rgba(0, 0, 0, 0.5);
+  --shadow-panel: 0 4px 24px var(--shadow-color);
+  
+  /* Scrollbar tokens */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.15);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+  
+  /* Accent - same for both themes */
+  --accent-gold: #fbbf24;
+  --accent-gold-hover: #f59e0b;
+  --accent-gold-muted: rgba(251, 191, 36, 0.1);
+  --accent-gold-border: rgba(251, 191, 36, 0.2);
+  --accent-gold-glow: rgba(251, 191, 36, 0.05);
+}
+
+[data-theme="light"] {
+  /* Background tokens - Light mode with warm yellow tint */
+  --bg-primary: #fdfcf9;
+  --bg-secondary: #fffefa;
+  --bg-tertiary: #f9f7f2;
+  --bg-elevated: #fffef9;
+  --bg-panel: rgba(255, 254, 250, 0.98);
+  --bg-panel-solid: #fffef9;
+  --bg-header: #f5f3ed;
+  --bg-hover: rgba(0, 0, 0, 0.03);
+  --bg-active: rgba(0, 0, 0, 0.06);
+  
+  /* Text tokens - black for accessibility */
+  --text-primary: #000000;
+  --text-secondary: #1a1a1a;
+  --text-muted: #4a4a4a;
+  --text-inverted: #ffffff;
+  
+  /* Border tokens - solid 1px visible borders */
+  --border-subtle: rgba(0, 0, 0, 0.12);
+  --border-default: rgba(0, 0, 0, 0.15);
+  --border-strong: rgba(0, 0, 0, 0.25);
+  
+  /* Shadow tokens - no extra border outline in light mode */
+  --shadow-color: rgba(0, 0, 0, 0.06);
+  --shadow-panel: 0 1px 3px var(--shadow-color);
+  
+  /* Scrollbar tokens */
+  --scrollbar-thumb: rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
+  
+  /* Accent adjustments for light mode - darker gold/amber for accessibility */
+  --accent-gold: #92400e;
+  --accent-gold-hover: #78350f;
+  --accent-gold-muted: rgba(146, 64, 14, 0.12);
+  --accent-gold-border: rgba(146, 64, 14, 0.3);
+  --accent-gold-glow: rgba(146, 64, 14, 0.1);
+}
+
+/* Light mode panel overrides - clean 1px border only */
+[data-theme="light"] .panel-floating,
+[data-theme="light"] .floating-editor-area {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .menu-modern {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ======================================
+   Theme-Aware Utility Classes
+   ====================================== */
+
+/* Text colors */
+.text-theme-primary { color: var(--text-primary); }
+.text-theme-secondary { color: var(--text-secondary); }
+.text-theme-muted { color: var(--text-muted); }
+.text-theme-accent { color: var(--accent-gold); }
+
+/* Background colors */
+.bg-theme-primary { background-color: var(--bg-primary); }
+.bg-theme-secondary { background-color: var(--bg-secondary); }
+.bg-theme-tertiary { background-color: var(--bg-tertiary); }
+.bg-theme-elevated { background-color: var(--bg-elevated); }
+.bg-theme-panel { background-color: var(--bg-panel-solid); }
+.bg-theme-header { background-color: var(--bg-header); }
+.bg-theme-hover { background-color: var(--bg-hover); }
+.bg-theme-active { background-color: var(--bg-active); }
+
+/* Border colors */
+.border-theme-subtle { border-color: var(--border-subtle); }
+.border-theme-default { border-color: var(--border-default); }
+.border-theme-strong { border-color: var(--border-strong); }
+
+/* Hover utilities - use with group-hover or direct hover */
+.hover\:bg-theme-hover:hover { background-color: var(--bg-hover); }
+.hover\:bg-theme-active:hover { background-color: var(--bg-active); }
+.hover\:text-theme-primary:hover { color: var(--text-primary); }
+.hover\:text-theme-accent:hover { color: var(--accent-gold); }
+
+/* Group hover variants */
+.group:hover .group-hover\:text-theme-primary { color: var(--text-primary); }
+.group:hover .group-hover\:bg-theme-hover { background-color: var(--bg-hover); }
+
+/* Global text selection highlight - brand gold */
+::selection {
+  background: rgba(251, 191, 36, 0.4);
+  color: inherit;
+}
+
+::-moz-selection {
+  background: rgba(251, 191, 36, 0.4);
+  color: inherit;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
+}
+
+/* Editor styles */
+.ProseMirror {
+  outline: none;
+  min-height: 100%;
+  padding: 2rem;
+  font-family: 'Carlito', 'Calibri', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.75;
+  color: var(--text-primary);
+}
+
+/* Screenplay mode - use Courier New for entire editor */
+.screenplay-mode .ProseMirror {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 500;
+  font-size: 14pt;
+}
+
+/* Note editor mode - Calibri 14pt for all notes across workspaces */
+/* Higher specificity to override screenplay-mode when viewing notes */
+.note-editor .ProseMirror,
+.screenplay-mode.note-editor .ProseMirror {
+  font-family: 'Calibri', 'Carlito', sans-serif;
+  font-weight: 400;
+  font-size: 14pt;
+  line-height: 1.6;
+}
+
+/* Notes Journal workspace - Beth Ellen font, 16pt body text for all documents */
+.notes-journal-mode .ProseMirror {
+  font-family: 'Beth Ellen', cursive;
+  font-size: 16pt;
+  line-height: 1.75;
+}
+
+.notes-journal-mode .ProseMirror h1 {
+  font-family: 'Beth Ellen', cursive;
+}
+
+.notes-journal-mode .ProseMirror h2 {
+  font-family: 'Beth Ellen', cursive;
+}
+
+.notes-journal-mode .ProseMirror h3 {
+  font-family: 'Beth Ellen', cursive;
+}
+
+.ProseMirror p {
+  margin-bottom: 1em;
+}
+
+.ProseMirror h1 {
+  font-family: inherit;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.ProseMirror h2 {
+  font-family: inherit;
+  font-size: 1.875rem;
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.ProseMirror h3 {
+  font-family: inherit;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid var(--accent-gold);
+  padding-left: 1.5rem;
+  margin: 1.5rem 0;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.ProseMirror code {
+  font-family: 'JetBrains Mono', Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--bg-active);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+}
+
+.ProseMirror pre {
+  font-family: 'JetBrains Mono', Menlo, monospace;
+  background: var(--bg-tertiary);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.ProseMirror pre code {
+  background: none;
+  padding: 0;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
+.ProseMirror li {
+  margin-bottom: 0.5rem;
+}
+
+/* Task List / Todo List styles */
+.ProseMirror ul.task-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 1rem 0;
+}
+
+.ProseMirror ul.task-list li.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.ProseMirror ul.task-list li.task-item > label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  user-select: none;
+  height: 1.6em;
+  line-height: 1.6;
+}
+
+.ProseMirror ul.task-list li.task-item > label input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--text-muted);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.ProseMirror ul.task-list li.task-item > label input[type="checkbox"]:hover {
+  border-color: var(--accent-gold);
+  background: var(--accent-gold-muted);
+}
+
+.ProseMirror ul.task-list li.task-item > label input[type="checkbox"]:checked {
+  background: var(--accent-gold);
+  border-color: var(--accent-gold);
+}
+
+.ProseMirror ul.task-list li.task-item > label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 5px;
+  height: 9px;
+  border: solid #000;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.ProseMirror ul.task-list li.task-item[data-checked="true"] > div {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.ProseMirror ul.task-list li.task-item > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.ProseMirror ul.task-list li.task-item > div p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* Don't show placeholder on task-list ul or task-item li - only show on paragraph inside */
+.ProseMirror ul.task-list.is-empty::before,
+.ProseMirror ul.task-list li.task-item.is-empty::before {
+  content: none;
+}
+
+/* Fix placeholder inside task items - don't use float in flex context */
+.ProseMirror ul.task-list li.task-item > div p.is-empty::before {
+  float: none;
+  display: block;
+}
+
+/* Hide placeholder when the block is active/focused */
+.ProseMirror ul.task-list li.task-item > div p.is-empty:focus::before,
+.ProseMirror ul.task-list li.task-item > div:focus-within p.is-empty::before {
+  content: none;
+}
+
+/* Nested task lists */
+.ProseMirror ul.task-list ul.task-list {
+  margin-top: 0.5rem;
+  margin-left: 1.5rem;
+}
+
+.ProseMirror mark {
+  background: rgba(251, 191, 36, 0.3);
+  color: inherit;
+  padding: 0.1em 0.2em;
+  border-radius: 2px;
+}
+
+.ProseMirror a {
+  color: var(--accent-gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ProseMirror a:hover {
+  color: var(--accent-gold-hover);
+}
+
+/* Citation styles - linked/cited text from other documents */
+.ProseMirror .citation {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 4px;
+  color: var(--accent-gold);
+  font-size: 10px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  vertical-align: middle;
+}
+
+/* Hide the arrow character and show "Source" text instead */
+.ProseMirror .citation {
+  font-size: 0; /* Hide the arrow */
+}
+
+.ProseMirror .citation::before {
+  content: 'Source';
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+.ProseMirror .citation:hover {
+  background: rgba(251, 191, 36, 0.2);
+  border-color: rgba(251, 191, 36, 0.4);
+  color: var(--accent-gold-hover);
+}
+
+.ProseMirror .citation:active {
+  background: rgba(251, 191, 36, 0.25);
+  transform: scale(0.98);
+}
+
+/* Citation tooltip showing source document */
+.ProseMirror .citation[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-elevated);
+  color: var(--accent-gold);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 100;
+  border: 1px solid var(--accent-gold-border);
+  margin-bottom: 4px;
+  pointer-events: none;
+}
+
+/* Target block highlight animation when navigating from citation */
+.citation-target-highlight {
+  animation: citationHighlight 2s ease-out;
+}
+
+@keyframes citationHighlight {
+  0% {
+    background-color: rgba(251, 191, 36, 0.3);
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.2);
+    border-radius: 4px;
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+/* Asset images in editor */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1.5rem 0;
+  display: block;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 3px solid var(--accent-gold);
+  outline-offset: 2px;
+}
+
+/* Image within paragraph - inline display */
+.ProseMirror p img {
+  display: inline-block;
+  margin: 0.25rem 0.5rem;
+  vertical-align: middle;
+  max-height: 1.5em;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+/* Placeholder */
+.ProseMirror .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #5c5c5c;
+  pointer-events: none;
+  height: 0;
+}
+
+.ProseMirror > .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #5c5c5c;
+  pointer-events: none;
+  height: 0;
+}
+
+/* Diagnostic highlights */
+.diagnostic-error {
+  background: rgba(239, 68, 68, 0.2);
+  border-bottom: 2px wavy #ef4444;
+}
+
+.diagnostic-warning {
+  background: rgba(234, 179, 8, 0.2);
+  border-bottom: 2px wavy #eab308;
+}
+
+.diagnostic-info {
+  background: rgba(59, 130, 246, 0.2);
+  border-bottom: 2px dashed #3b82f6;
+}
+
+/* Frameless window drag region */
+.titlebar-drag-region {
+  -webkit-app-region: drag;
+}
+
+.titlebar-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Transitions */
+.sidebar-transition {
+  transition: width 0.2s ease-out, transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+
+/* Focus rings */
+*:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 2px;
+}
+
+/* Drag handle styles */
+.editor-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: grab;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  transform: translateY(8px);
+}
+
+.editor-drag-handle:hover {
+  background-color: var(--accent-gold-muted);
+  color: var(--accent-gold);
+}
+
+.editor-drag-handle:active {
+  cursor: grabbing;
+  background-color: var(--accent-gold-border);
+  color: var(--accent-gold);
+}
+
+/* Dragging state for blocks */
+.ProseMirror .ProseMirror-selectednode {
+  outline: 2px solid rgba(251, 191, 36, 0.4);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Drop cursor indicator */
+.ProseMirror-dropcursor {
+  border-left: 2px solid var(--accent-gold) !important;
+}
+
+/* ======================================
+   Screenplay Element Styles
+   Industry-standard formatting based on scriptwriting conventions
+   ====================================== */
+
+/* Base screenplay element styles */
+.ProseMirror .screenplay-element {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 14pt;
+  line-height: 1.5;
+  margin-bottom: 1em;
+}
+
+/* Scene Heading (Slug Line) - ALL CAPS, left-aligned */
+.ProseMirror .screenplay-scene-heading {
+  text-transform: uppercase;
+  text-align: left;
+  font-weight: bold;
+  margin-top: 2em;
+  margin-bottom: 1em;
+  color: var(--accent-gold); /* Gold accent for visibility */
+}
+
+/* Action - Regular case, left-aligned, full width, italic */
+.ProseMirror .screenplay-action {
+  text-align: left;
+  margin-bottom: 1em;
+  font-weight: 500;
+  font-style: italic;
+}
+
+/* Character Name - ALL CAPS, centered (industry standard ~4 inches from left) */
+/* Note: When a character has an assigned color from the character bank, 
+   the color and font-weight: bold are applied via inline styles in the ScreenplayElement extension */
+.ProseMirror .screenplay-character {
+  text-transform: uppercase;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 0;
+  max-width: 60%;
+  font-weight: 500;
+}
+
+/* Mention chips inside character blocks should be centered and display inline */
+.ProseMirror .screenplay-character .mention {
+  display: inline;
+  text-transform: uppercase;
+}
+
+/* Character with assigned color from character bank - inline styles override these */
+.ProseMirror .screenplay-character[data-character-id] {
+  /* Color and bold are applied inline */
+  cursor: pointer;
+  transition: text-decoration 0.15s ease;
+}
+
+/* Hover effect for linked character names - underline and pointer cursor */
+.ProseMirror .screenplay-character[data-character-id]:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* Prop elements - elements with assigned prop from prop bank */
+/* Note: When an element has an assigned prop, the color (brand gold) and font-weight: bold 
+   are applied via inline styles in the ScreenplayElement extension */
+.ProseMirror [data-prop-id] {
+  /* Color and bold are applied inline */
+  cursor: pointer;
+  transition: text-decoration 0.15s ease;
+}
+
+/* Hover effect for linked prop names - underline and pointer cursor */
+.ProseMirror [data-prop-id]:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--accent-gold);
+}
+
+/* @ Mention styles - clickable mentions for characters and props */
+.ProseMirror .mention {
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin: 0 1px;
+  cursor: pointer !important;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  user-select: none;
+  /* Background and color are set inline via the Mention extension */
+}
+
+.ProseMirror .mention:hover {
+  filter: brightness(0.9);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.ProseMirror .mention:active {
+  filter: brightness(0.8);
+}
+
+/* Character mentions - background color comes from inline style */
+.ProseMirror .mention[data-mention-type="character"] {
+  /* Background color is set inline based on character color */
+}
+
+/* Prop mentions - background color comes from inline style */
+.ProseMirror .mention[data-mention-type="prop"] {
+  /* Background color is set inline (amber) */
+}
+
+/* Tippy theme for mention suggestions */
+.tippy-box[data-theme~='mention'] {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.tippy-box[data-theme~='mention'] > .tippy-content {
+  padding: 0;
+}
+
+/* Tippy theme for slash command suggestions */
+.tippy-box[data-theme~='slash-command'] {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.tippy-box[data-theme~='slash-command'] > .tippy-content {
+  padding: 0;
+}
+
+/* AI thinking placeholder animation */
+.ai-thinking-placeholder {
+  animation: thinking-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes thinking-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Dialogue - Regular case, centered under character name (narrower than action) */
+.ProseMirror .screenplay-dialogue {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 60%;
+  margin-bottom: 1em;
+  font-weight: bold;
+}
+
+/* Parenthetical - In parentheses, centered, before dialogue (narrower than dialogue) */
+.ProseMirror .screenplay-parenthetical {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 40%;
+  font-style: italic;
+  font-weight: 500;
+  margin-bottom: 0.25em;
+  color: var(--text-secondary);
+}
+
+/* Add parentheses if not already present */
+.ProseMirror .screenplay-parenthetical::before {
+  content: '(';
+}
+
+.ProseMirror .screenplay-parenthetical::after {
+  content: ')';
+}
+
+/* Don't double up parentheses if text already has them */
+.ProseMirror .screenplay-parenthetical:has(> :first-child:empty)::before,
+.ProseMirror .screenplay-parenthetical:has(> :first-child:empty)::after {
+  content: '';
+}
+
+/* Transition - ALL CAPS, right-aligned */
+.ProseMirror .screenplay-transition {
+  text-transform: uppercase;
+  text-align: right;
+  margin-top: 2em;
+  margin-bottom: 1em;
+  font-weight: 500;
+}
+
+/* Shot - ALL CAPS, left-aligned, bold (camera directions) */
+.ProseMirror .screenplay-shot {
+  text-transform: uppercase;
+  text-align: left;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  font-weight: bold;
+}
+
+/* Screenplay element placeholder styling */
+.ProseMirror .screenplay-element.is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #5c5c5c;
+  pointer-events: none;
+  height: 0;
+  font-style: italic;
+}
+
+/* Scene heading placeholder centered */
+.ProseMirror .screenplay-scene-heading.is-empty::before {
+  text-transform: none;
+}
+
+/* Character placeholder */
+.ProseMirror .screenplay-character.is-empty::before {
+  text-transform: none;
+  float: none;
+  text-align: center;
+  display: block;
+}
+
+/* Button base styles */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-all duration-200;
+  }
+  
+  .btn-primary {
+    @apply bg-gold-400 text-ink-950 font-semibold hover:bg-gold-300 active:scale-[0.98];
+  }
+  
+  .btn-secondary {
+    @apply bg-ink-700 text-ink-100 hover:bg-ink-600 active:scale-[0.98];
+  }
+  
+  .btn-ghost {
+    @apply bg-transparent text-ink-300 hover:bg-ink-700 hover:text-ink-100;
+  }
+  
+  .btn-icon {
+    @apply p-2 rounded-lg transition-colors duration-200 hover:bg-ink-700;
+  }
+  
+  .input {
+    @apply bg-ink-800 border border-ink-600 rounded-lg px-3 py-2 text-ink-50 placeholder-ink-400 focus:border-gold-400 focus:ring-1 focus:ring-gold-400;
+  }
+  
+  .panel {
+    @apply bg-ink-800 border border-ink-700 rounded-xl shadow-panel;
+  }
+}
+
+/* ======================================
+   Template Card Glow Effects
+   Modern glassmorphic cards with soft glow borders
+   ====================================== */
+
+/* Base template card - solid background */
+.template-card {
+  position: relative;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hover state */
+.template-card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-active);
+  box-shadow: var(--shadow-panel);
+  transform: translateY(-2px);
+}
+
+/* Active/pressed state */
+.template-card:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* Icon container - circular with subtle styling */
+.template-icon-container {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.template-card:hover .template-icon-container {
+  background: var(--bg-secondary);
+  border-color: var(--border-strong);
+  box-shadow: 0 0 20px var(--shadow-color);
+}
+
+/* Project card top portion - matching template card hover */
+.project-card-top {
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.project-card-top:hover {
+  background: var(--bg-active);
+  box-shadow: inset 0 0 0 1px var(--border-default);
+}
+
+.project-card-top:active {
+  background: var(--bg-hover);
+  transform: scale(0.995);
+}
+
+/* Glow animation keyframes */
+@keyframes subtleGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 0 15px rgba(255, 255, 255, 0.06);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.15),
+      0 0 25px rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ======================================
+   Modern UI Components
+   Glassmorphic panels, sidebars, menus with soft glows
+   ====================================== */
+
+/* Modern sidebar with gradient background */
+.sidebar-modern {
+  background: var(--bg-panel);
+  border-color: var(--border-subtle);
+}
+
+/* Modern panel with glass effect */
+.panel-modern {
+  position: relative;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.panel-modern::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    var(--bg-hover) 0%,
+    transparent 50%
+  );
+  pointer-events: none;
+}
+
+/* Modern header/toolbar */
+.toolbar-modern {
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Modern context menu / dropdown */
+.menu-modern {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px var(--border-subtle),
+    var(--shadow-panel);
+  backdrop-filter: blur(20px);
+}
+
+.menu-modern-item {
+  transition: all 0.2s ease;
+}
+
+.menu-modern-item:hover {
+  background: var(--bg-hover);
+}
+
+/* Modern icon button with brand color hover */
+.btn-icon-modern {
+  position: relative;
+  padding: 6px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+
+.btn-icon-modern:hover {
+  color: var(--accent-gold);
+}
+
+.btn-icon-modern:active {
+  color: var(--accent-gold-hover);
+}
+
+.btn-icon-modern.active {
+  color: var(--accent-gold);
+}
+
+/* Modern list item with glow on active/hover */
+.list-item-modern {
+  position: relative;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  margin-bottom: 4px;
+}
+
+.list-item-modern:hover {
+  background: var(--bg-hover);
+}
+
+.list-item-modern.active {
+  background: var(--accent-gold-muted);
+  font-weight: 500;
+  box-shadow:
+    inset 0 0 0 1px var(--accent-gold-border),
+    0 0 20px var(--accent-gold-glow);
+}
+
+/* Modern input with softer styling */
+.input-modern {
+  background: var(--bg-hover);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.input-modern::placeholder {
+  color: var(--text-muted);
+}
+
+.input-modern:focus {
+  outline: none;
+  border-color: var(--accent-gold-border);
+  box-shadow:
+    0 0 0 3px var(--accent-gold-muted),
+    0 0 20px var(--accent-gold-glow);
+}
+
+/* Modern primary button with glow */
+.btn-primary-modern {
+  background: linear-gradient(
+    135deg,
+    var(--accent-gold) 0%,
+    var(--accent-gold-hover) 100%
+  );
+  color: var(--text-inverted);
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 10px var(--accent-gold-border);
+}
+
+.btn-primary-modern:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 20px rgba(251, 191, 36, 0.3),
+    0 0 40px rgba(251, 191, 36, 0.1);
+}
+
+.btn-primary-modern:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Modern secondary button */
+.btn-secondary-modern {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  transition: all 0.3s ease;
+}
+
+.btn-secondary-modern:hover {
+  background: var(--bg-active);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+/* Modern divider/border */
+.divider-modern {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border-default) 50%,
+    transparent 100%
+  );
+}
+
+/* Modern status bar */
+.statusbar-modern {
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Modern tab/filter button */
+.tab-modern {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.tab-modern:hover {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+.tab-modern.active {
+  color: var(--text-primary);
+  background: var(--bg-active);
+}
+
+/* Modern badge */
+.badge-modern {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--accent-gold-muted);
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold-border);
+}
+
+/* Modern dropzone */
+.dropzone-modern {
+  border: 2px dashed var(--border-default);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.dropzone-modern:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+.dropzone-modern.active {
+  border-color: var(--accent-gold);
+  background: var(--accent-gold-glow);
+  box-shadow: 0 0 30px var(--accent-gold-muted);
+}
+
+/* Modern resize handle */
+.resize-handle-modern {
+  background: transparent;
+  transition: background 0.2s ease;
+}
+
+.resize-handle-modern:hover {
+  background: var(--border-default);
+}
+
+.resize-handle-modern.active {
+  background: var(--accent-gold-border);
+}
+
+/* ======================================
+   Floating Island Panels
+   Distinct floating cards with rounded corners and shadows
+   ====================================== */
+
+/* Floating panel - used for sidebars and bottom panel */
+.panel-floating {
+  position: relative;
+  background: var(--bg-panel-solid);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px var(--border-subtle),
+    var(--shadow-panel);
+  overflow: hidden;
+}
+
+/* Floating toolbar - transparent, no card styling */
+.toolbar-floating {
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Floating status bar - transparent, no card styling */
+.statusbar-floating {
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Floating resize handle - positioned in gap area */
+.resize-handle-floating {
+  position: relative;
+  background: transparent;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.resize-handle-floating::after {
+  content: '';
+  position: absolute;
+  background: var(--border-default);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Horizontal resize handle (for left/right sidebars) */
+.resize-handle-floating.horizontal::after {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 40px;
+}
+
+/* Vertical resize handle (for bottom panel) */
+.resize-handle-floating.vertical::after {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 4px;
+}
+
+.resize-handle-floating:hover::after {
+  opacity: 1;
+  background: var(--border-strong);
+}
+
+.resize-handle-floating.active::after {
+  opacity: 1;
+  background: var(--accent-gold);
+  box-shadow: 0 0 12px var(--accent-gold-border);
+}
+
+/* App shell floating layout container */
+.floating-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: var(--bg-primary);
+  padding: 0;
+  gap: 0;
+}
+
+/* Main content area with floating panels */
+.floating-content {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  padding: 8px 12px 12px 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Bottom panel wrapper for floating layout */
+.floating-bottom-wrapper {
+  padding: 0 12px 12px 12px;
+}
+
+/* Editor area in floating layout - subtle floating card */
+.floating-editor-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px var(--border-subtle),
+    var(--shadow-panel);
+  overflow: hidden;
+}
+
+/* ============================================
+   STORYBOARD PANEL STYLES
+   ============================================ */
+
+/* Storyboard panel container */
+.storyboard-panel {
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border-subtle);
+}
+
+/* Shot thumbnail card */
+.shot-thumbnail {
+  position: relative;
+  user-select: none;
+}
+
+.shot-thumbnail::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: box-shadow 0.2s ease;
+}
+
+.shot-thumbnail.is-playing::before {
+  box-shadow: inset 0 0 0 2px rgba(251, 191, 36, 0.5);
+}
+
+/* Playback preview aspect ratio container */
+.playback-preview {
+  position: relative;
+  background: var(--bg-secondary);
+}
+
+/* Timeline scrubber */
+.timeline-scrubber {
+  position: relative;
+}
+
+.timeline-scrubber::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Transport control buttons */
+.transport-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transport-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.2);
+}
+
+/* ============================================
+   STORYBOARD PLAYBACK HIGHLIGHTING
+   ============================================ */
+
+/* When playback is active, dim all blocks with data-block-id that are not highlighted */
+.storyboard-playback-active [data-block-id]:not(.storyboard-highlight) {
+  opacity: 0.35 !important;
+  transition: opacity 0.3s ease;
+}
+
+/* Keep highlighted blocks at full opacity */
+.storyboard-playback-active [data-block-id].storyboard-highlight {
+  opacity: 1 !important;
+  transition: opacity 0.3s ease;
+}
+
+/* Highlighted block during playback - visual styling */
+.storyboard-playback-active [data-block-id].storyboard-highlight {
+  position: relative;
+  background: linear-gradient(
+    90deg,
+    rgba(251, 191, 36, 0.12) 0%,
+    rgba(251, 191, 36, 0.18) 50%,
+    rgba(251, 191, 36, 0.12) 100%
+  ) !important;
+  border-radius: 4px;
+  margin-left: -8px;
+  margin-right: -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  box-shadow:
+    inset 4px 0 0 rgba(251, 191, 36, 0.8),
+    0 0 30px rgba(251, 191, 36, 0.15) !important;
+  animation: storyboard-pulse 2s ease-in-out infinite;
+}
+
+@keyframes storyboard-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 3px 0 0 rgba(251, 191, 36, 0.6),
+      0 0 20px rgba(251, 191, 36, 0.1);
+  }
+  50% {
+    box-shadow:
+      inset 3px 0 0 rgba(251, 191, 36, 0.8),
+      0 0 30px rgba(251, 191, 36, 0.15);
+  }
+}
+
+/* Link mode cursor when hovering blocks */
+.cursor-crosshair .ProseMirror [data-block-id]:hover {
+  cursor: crosshair !important;
+  background: rgba(251, 191, 36, 0.05);
+  outline: 1px dashed rgba(251, 191, 36, 0.3);
+  outline-offset: 2px;
+}
+
+/* Asset picker modal */
+.asset-picker-modal {
+  animation: modal-enter 0.2s ease-out;
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Shot drag and drop visual feedback */
+.shot-thumbnail[draggable="true"] {
+  cursor: grab;
+}
+
+.shot-thumbnail[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* Storyboard panel header */
+.storyboard-header {
+  backdrop-filter: blur(8px);
+  background: var(--bg-panel);
+}
+
+/* Transport controls container */
+.storyboard-transport {
+  backdrop-filter: blur(8px);
+  background: var(--bg-panel);
+}
+
+/* Agenda stack styles */
+.agenda-stack {
+  position: relative;
+}
+
+.agenda-stack-layer {
+  pointer-events: none;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.agenda-stack.expanded {
+  animation: stack-expand 0.3s ease-out;
+}
+
+@keyframes stack-expand {
+  from {
+    opacity: 0.8;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Slide up animation for cards */
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out both;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Project Stack - cards stacked behind */
+.project-stack {
+  position: relative;
+}
+
+.project-stack-layer {
+  pointer-events: auto;
+  transition: height 0.2s ease, opacity 0.2s ease;
+}
+
+.project-stack.has-stack:hover .project-stack-layer {
+  opacity: 1;
+}
+
+.project-stack.expanded {
+  animation: stack-expand 0.3s ease-out;
+}

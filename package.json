@@ -1,0 +1,122 @@
+{
+  "name": "cadmus",
+  "version": "0.1.0",
+  "description": "An IDE for writing that compiles your draft and surfaces errors like a linter",
+  "main": "out/main/index.js",
+  "type": "module",
+  "author": "Cadmus Team",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:full": "npm run languagetool:start; electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "postinstall": "electron-builder install-app-deps",
+    "build:mac": "npm run build && electron-builder --mac",
+    "lint": "eslint . --ext .ts,.tsx",
+    "languagetool:start": "(/Applications/Docker.app/Contents/Resources/bin/docker start languagetool 2>/dev/null || /Applications/Docker.app/Contents/Resources/bin/docker run -d --name languagetool -p 8010:8010 erikvl87/languagetool) || echo 'Note: Docker not found. Spelling check will be skipped. Install Docker Desktop to enable.'",
+    "languagetool:stop": "/Applications/Docker.app/Contents/Resources/bin/docker stop languagetool 2>/dev/null || docker stop languagetool 2>/dev/null || echo 'Docker not found'",
+    "languagetool:status": "curl -s http://localhost:8010/v2/languages > /dev/null && echo 'LanguageTool is running' || echo 'LanguageTool is not running'",
+    "start": "electron-forge start",
+    "package": "npm run build && electron-forge package",
+    "make": "npm run build && electron-forge make"
+  },
+  "config": {
+    "forge": "./forge.config.cjs"
+  },
+  "dependencies": {
+    "@fluentui/react-components": "^9.72.10",
+    "@fluentui/react-icons": "^2.0.317",
+    "@tiptap/extension-color": "^3.17.1",
+    "@tiptap/extension-drag-handle": "^3.17.1",
+    "@tiptap/extension-highlight": "^3.17.1",
+    "@tiptap/extension-image": "^3.17.1",
+    "@tiptap/extension-mention": "^3.18.0",
+    "@tiptap/extension-placeholder": "^3.17.1",
+    "@tiptap/extension-task-item": "^3.18.0",
+    "@tiptap/extension-task-list": "^3.18.0",
+    "@tiptap/extension-text-align": "^3.17.1",
+    "@tiptap/extension-text-style": "^3.17.1",
+    "@tiptap/extension-underline": "^3.17.1",
+    "@tiptap/pm": "^3.17.1",
+    "@tiptap/react": "^3.17.1",
+    "@tiptap/starter-kit": "^3.17.1",
+    "@tiptap/suggestion": "^3.18.0",
+    "clsx": "^2.1.0",
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-store": "^8.1.0",
+    "p-limit": "^6.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.2.3",
+    "react-rnd": "^10.5.2",
+    "tippy.js": "^6.3.7",
+    "uuid": "^9.0.1",
+    "zustand": "^4.4.7"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-deb": "^7.11.1",
+    "@electron-forge/maker-rpm": "^7.11.1",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.1",
+    "@electron-forge/plugin-fuses": "^7.11.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@electron/fuses": "^1.8.0",
+    "@electron/notarize": "^2.5.0",
+    "@types/node": "^20.10.5",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@types/uuid": "^9.0.7",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "electron": "^28.1.0",
+    "electron-vite": "^2.0.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
+  },
+  "build": {
+    "appId": "com.cadmus.app",
+    "productName": "Cadmus",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "resources/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist"
+    },
+    "afterSign": "scripts/notarize.cjs",
+    "directories": {
+      "output": "dist",
+      "buildResources": "resources"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "src/workspaces/screenplay/assets/defaults",
+        "to": "assets/storyboard-references",
+        "filter": [
+          "*.png",
+          "*.jpg",
+          "*.jpeg"
+        ]
+      }
+    ]
+  }
+}
