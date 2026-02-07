@@ -1252,6 +1252,15 @@ export class ProjectStore {
     this.store.set('theme', theme)
   }
 
+  // Zoom methods
+  getZoom(): number {
+    return this.store.get('viewZoom') || 100
+  }
+
+  setZoom(zoom: number): void {
+    this.store.set('viewZoom', zoom)
+  }
+
   private getAssetType(ext: string): AssetType {
     const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']
     const pdfExts = ['.pdf']

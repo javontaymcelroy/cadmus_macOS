@@ -35,6 +35,7 @@ import {
 import { createSlashCommandSuggestion } from './slashCommandConfig'
 import { SelectionSlashMenu } from './SelectionSlashMenu'
 import { VersionHistoryPanel } from './VersionHistoryPanel'
+import { useProjectEditorStyles } from '../hooks/useProjectEditorStyles'
 
 // MIME type for citation metadata in clipboard
 const CITATION_MIME_TYPE = 'application/x-cadmus-citation'
@@ -146,7 +147,9 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
     documentVersions,
     setVersionHistoryMode,
   } = useProjectStore()
-  
+
+  const { hasOverrides, style: overrideStyle, maxWidth: overrideMaxWidth } = useProjectEditorStyles()
+
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const titleSyncRef = useRef(false)
   const editorContainerRef = useRef<HTMLDivElement>(null)
@@ -371,6 +374,12 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
       },
       handleDrop: (view, event, _slice, moved) => {
         if (moved) return false
+
+        // Ignore sticker drops — they're handled by StickerOverlay
+        if (event.dataTransfer?.getData('application/x-cadmus-sticker')) {
+          event.preventDefault()
+          return true
+        }
 
         const assetData = event.dataTransfer?.getData('application/x-cadmus-asset')
         if (!assetData) return false
@@ -1002,14 +1011,19 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
                 maxWidth: `${(768 * 100) / ui.viewZoom}%`,
               }}
             >
-              <div 
+              <div
                 className={clsx(
                   'max-w-3xl mx-auto',
-                  hierarchyInfo.type === 'note' && 'note-editor'
+                  hierarchyInfo.type === 'note' && 'note-editor',
+                  hasOverrides && 'project-settings-active'
                 )}
+                style={{
+                  ...overrideStyle,
+                  ...(overrideMaxWidth ? { maxWidth: overrideMaxWidth } : {})
+                }}
               >
-                <EditorContent 
-                  editor={editor} 
+                <EditorContent
+                  editor={editor}
                   className="max-w-none"
                 />
               </div>

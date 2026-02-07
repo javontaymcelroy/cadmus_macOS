@@ -36,10 +36,12 @@ import {
 import { createSlashCommandSuggestion } from '../../shared/components/slashCommandConfig'
 import { SelectionSlashMenu } from '../../shared/components/SelectionSlashMenu'
 import { VersionHistoryPanel } from '../../shared/components'
+import { useProjectEditorStyles } from '../../shared/hooks/useProjectEditorStyles'
 
 // Journal-specific
 import { JournalToolbar } from './JournalToolbar'
 import { StickerOverlay } from './StickerOverlay'
+import { DrawingOverlay } from './DrawingOverlay'
 
 // MIME type for citation metadata in clipboard
 const CITATION_MIME_TYPE = 'application/x-cadmus-citation'
@@ -144,10 +146,13 @@ export function JournalEditor() {
     documentVersions,
     setVersionHistoryMode,
   } = useProjectStore()
-  
+
+  const { hasOverrides, style: overrideStyle, maxWidth: overrideMaxWidth } = useProjectEditorStyles()
+
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const titleSyncRef = useRef(false)
   const editorContainerRef = useRef<HTMLDivElement>(null)
+  const contentAreaRef = useRef<HTMLDivElement>(null)
   const activeDoc = currentProject?.documents.find(d => d.id === activeDocumentId)
   const docState = activeDocumentId ? documents[activeDocumentId] : null
   
@@ -373,6 +378,12 @@ export function JournalEditor() {
       },
       handleDrop: (view, event, _slice, moved) => {
         if (moved) return false
+
+        // Ignore sticker drops — they're handled by StickerOverlay
+        if (event.dataTransfer?.getData('application/x-cadmus-sticker')) {
+          event.preventDefault()
+          return true
+        }
 
         const assetData = event.dataTransfer?.getData('application/x-cadmus-asset')
         if (!assetData) return false
@@ -960,18 +971,10 @@ export function JournalEditor() {
           </div>
 
           {/* Editor content */}
-          <div 
-            className="flex-1 overflow-auto relative" 
+          <div
+            className="flex-1 overflow-auto relative"
             ref={editorContainerRef}
           >
-            {/* Sticker overlay for draggable stickers */}
-            {activeDocumentId && (
-              <StickerOverlay 
-                documentId={activeDocumentId}
-                containerRef={editorContainerRef}
-              />
-            )}
-            
             {(batchFixState?.active || activeFixPreviewCount > 0) && (
               <div className="sticky top-4 z-50 flex justify-end px-4 pointer-events-none">
                 <div className="pointer-events-auto flex items-center gap-2 bg-ink-800/95 backdrop-blur-sm border border-ink-600 rounded-lg px-3 py-2 shadow-xl">
@@ -995,8 +998,8 @@ export function JournalEditor() {
                 </div>
               </div>
             )}
-            
-            <div 
+
+            <div
               className="mx-auto py-8 transition-transform duration-150 ease-out"
               style={{
                 transform: `scale(${ui.viewZoom / 100})`,
@@ -1005,21 +1008,42 @@ export function JournalEditor() {
                 maxWidth: `${(768 * 100) / ui.viewZoom}%`,
               }}
             >
-              <div 
+              <div
+                ref={contentAreaRef}
                 className={clsx(
-                  'max-w-3xl mx-auto notes-journal-mode',
-                  hierarchyInfo.type === 'note' && 'note-editor'
+                  'max-w-3xl mx-auto notes-journal-mode relative',
+                  hierarchyInfo.type === 'note' && 'note-editor',
+                  hasOverrides && 'project-settings-active'
                 )}
+                style={{
+                  ...overrideStyle,
+                  ...(overrideMaxWidth ? { maxWidth: overrideMaxWidth } : {})
+                }}
               >
-                <EditorContent 
-                  editor={editor} 
+                {/* Sticker overlay - positioned relative to content wrapper so stickers move with text */}
+                {activeDocumentId && (
+                  <StickerOverlay
+                    documentId={activeDocumentId}
+                    containerRef={contentAreaRef}
+                    dropZoneRef={editorContainerRef}
+                  />
+                )}
+                {/* Drawing overlay - anchored to content area for stable coordinates */}
+                {activeDocumentId && (
+                  <DrawingOverlay
+                    documentId={activeDocumentId}
+                    containerRef={contentAreaRef}
+                  />
+                )}
+                <EditorContent
+                  editor={editor}
                   className="max-w-none"
                 />
               </div>
             </div>
           </div>
         </div>
-        
+
         {/* Version History Panel */}
         {versionHistoryMode.active && (
           <div className="w-1/2 flex">

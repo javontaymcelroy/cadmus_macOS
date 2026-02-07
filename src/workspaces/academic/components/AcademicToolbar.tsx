@@ -13,7 +13,7 @@ import {
   BookOpenRegular,
   DismissRegular,
 } from '@fluentui/react-icons'
-import { ToolbarButton, ToolbarDivider, TextColorDropdown, FontFamilyDropdown, RunBuildButton, ReaderModeButton } from '../../shared/components'
+import { ToolbarButton, ToolbarDivider, TextColorDropdown, FontFamilyDropdown, RunBuildButton, ReaderModeButton, OverflowToolbar } from '../../shared/components'
 import { useProjectStore } from '../../../stores/projectStore'
 
 // Inline SVG icons for lists (not available in Fluent UI)
@@ -82,7 +82,7 @@ export function AcademicToolbar({ editor }: AcademicToolbarProps) {
   }
 
   return (
-    <div className="flex items-center gap-1 px-4 py-2 bg-theme-header border-b border-theme-subtle overflow-x-auto scrollbar-hide">
+    <OverflowToolbar rightContent={<><RunBuildButton /><ReaderModeButton /></>}>
       {/* Undo/Redo */}
       <ToolbarButton
         onClick={() => editor.chain().focus().undo().run()}
@@ -234,13 +234,6 @@ export function AcademicToolbar({ editor }: AcademicToolbarProps) {
       >
         <ImageRegular className="w-4 h-4" />
       </ToolbarButton>
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Build */}
-      <RunBuildButton />
-      <ReaderModeButton />
-    </div>
+    </OverflowToolbar>
   )
 }

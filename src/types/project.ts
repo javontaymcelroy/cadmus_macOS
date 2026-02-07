@@ -47,6 +47,7 @@ export interface Project {
   props: Prop[] // For screenplay prop bank
   storyboard?: Storyboard // For screenplay storyboard playback
   stickers?: Sticker[] // For NotesJournal overlay stickers
+  drawings?: DocumentDrawing[] // For NotesJournal freehand drawing
   settings: ProjectSettings
   buildProfiles: BuildProfile[]
 }
@@ -357,6 +358,19 @@ export interface DocumentStickers {
   [documentId: string]: Sticker[]
 }
 
+// Drawing types (for NotesJournal freehand drawing overlay)
+export interface DrawingPath {
+  paths: { x: number; y: number }[]
+  strokeWidth: number
+  strokeColor: string
+  drawMode: boolean  // true = pen, false = eraser
+}
+
+export interface DocumentDrawing {
+  documentId: string
+  paths: DrawingPath[]
+}
+
 // Version history types
 export interface DocumentVersion {
   id: string
@@ -378,12 +392,32 @@ export interface ProjectSettings {
   customImageInstructions?: string
 }
 
+export interface HeadingTypography {
+  fontFamily?: string   // font family override for this heading level
+  fontSize?: number     // rem, range 1.0-4.0
+  color?: string        // hex color override
+}
+
 export interface FormattingRules {
   headingStyle: 'sentence' | 'title' | 'none'
   quotationStyle: 'straight' | 'curly'
   enforceDoubleSpacing: boolean
   maxLineLength?: number
   defaultFontFamily?: string
+  // Typography
+  defaultFontSize?: number       // px, range 12-24
+  defaultLineHeight?: number     // unitless, range 1.0-3.0
+  paragraphSpacing?: number      // rem, range 0-2
+  // Per-heading typography
+  h1?: HeadingTypography
+  h2?: HeadingTypography
+  h3?: HeadingTypography
+  // Layout
+  editorPaddingX?: number        // rem, range 1-6
+  editorMaxWidth?: number | null // px (600-1200) or null for full width
+  // Colors
+  textColor?: string             // hex color
+  headingColor?: string          // hex color
 }
 
 // Build types
@@ -563,11 +597,12 @@ export interface SurroundingScriptContext {
 }
 
 // AI Writing types (slash command generative and revision tools)
-type AIWritingCommand = 
+type AIWritingCommand =
   | 'continue' | 'dialogue' | 'setting' | 'expand' | 'pov' | 'negativeSpace'
   | 'rework' | 'adjustTone' | 'shorten' | 'clearer' | 'elaborate'
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   | 'scriptDoctor'
+  | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
 
 type ScreenplayElementType = 
   | 'scene-heading'

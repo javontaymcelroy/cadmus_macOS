@@ -11,11 +11,12 @@ interface AssetReferenceAPI {
 }
 
 // AI Writing types for slash commands (generative and revision)
-type AIWritingCommand = 
+type AIWritingCommand =
   | 'continue' | 'dialogue' | 'setting' | 'expand' | 'pov' | 'negativeSpace'
   | 'rework' | 'adjustTone' | 'shorten' | 'clearer' | 'elaborate'
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   | 'scriptDoctor'
+  | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
 
 type ScreenplayElementType = 
   | 'scene-heading'

@@ -10,11 +10,12 @@
  * - Generative: continue, dialogue, setting, expand, pov (create new content)
  * - Revision: rework, adjustTone, shorten, clearer, elaborate, tension, soften, imagery, pacing, voice, contradiction
  */
-export type AIWritingCommand = 
+export type AIWritingCommand =
   | 'continue' | 'dialogue' | 'setting' | 'expand' | 'pov' | 'negativeSpace'
   | 'rework' | 'adjustTone' | 'shorten' | 'clearer' | 'elaborate'
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   | 'scriptDoctor'
+  | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
 
 /**
  * Screenplay element types for formatted output

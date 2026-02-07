@@ -1572,6 +1572,8 @@ interface UIState {
   readerMode: boolean // Reader mode preview
   writingPartnerPanelOpen: boolean // Writing Partner panel
   isRunningCritique: boolean // Running dramatic critique analysis
+  settingsPanelOpen: boolean // Project settings panel
+  drawingMode: boolean // Freehand drawing overlay active
 }
 
 // Citation navigation state
@@ -1763,9 +1765,17 @@ interface ProjectState {
   addSticker: (documentId: string, assetId: string, x: number, y: number, width: number, height: number) => Promise<void>
   updateStickerPosition: (stickerId: string, x: number, y: number) => Promise<void>
   updateStickerSize: (stickerId: string, width: number, height: number) => Promise<void>
+  updateStickerRotation: (stickerId: string, rotation: number) => Promise<void>
   removeSticker: (stickerId: string) => Promise<void>
   getStickersForDocument: (documentId: string) => Sticker[]
-  
+
+  // Drawing actions (NotesJournal freehand drawing)
+  saveDrawingPaths: (documentId: string, paths: import('../types/project').DrawingPath[]) => Promise<void>
+  getDrawingForDocument: (documentId: string) => import('../types/project').DrawingPath[]
+  clearDrawing: (documentId: string) => Promise<void>
+  toggleDrawingMode: () => void
+  setDrawingMode: (mode: boolean) => void
+
   // UI actions
   toggleLeftSidebar: () => void
   toggleRightSidebar: () => void
@@ -1781,10 +1791,15 @@ interface ProjectState {
   zoomIn: () => void
   zoomOut: () => void
   resetZoom: () => void
-  
+  initializeZoom: () => Promise<void>
+
   // Reader mode actions
   toggleReaderMode: () => void
   setReaderMode: (mode: boolean) => void
+
+  // Settings panel actions
+  toggleSettingsPanel: () => void
+  setSettingsPanelOpen: (open: boolean) => void
   
   // Theme actions
   setTheme: (theme: 'dark' | 'light') => void
@@ -1939,7 +1954,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     theme: 'dark',
     readerMode: false,
     writingPartnerPanelOpen: false,
-    isRunningCritique: false
+    isRunningCritique: false,
+    settingsPanelOpen: false,
+    drawingMode: false
   },
   isLoading: true,
   error: null,
@@ -2836,6 +2853,25 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
+  updateStickerRotation: async (stickerId, rotation) => {
+    const { currentProject } = get()
+    if (!currentProject?.stickers) return
+
+    const updatedProject = {
+      ...currentProject,
+      stickers: currentProject.stickers.map(s =>
+        s.id === stickerId ? { ...s, rotation } : s
+      )
+    }
+
+    try {
+      await window.api.project.save(updatedProject)
+      set({ currentProject: updatedProject })
+    } catch (error) {
+      console.error('Failed to update sticker rotation:', error)
+    }
+  },
+
   removeSticker: async (stickerId) => {
     const { currentProject } = get()
     if (!currentProject?.stickers) return
@@ -2858,6 +2894,69 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const { currentProject } = get()
     if (!currentProject?.stickers) return []
     return currentProject.stickers.filter(s => s.documentId === documentId)
+  },
+
+  // Drawing actions (NotesJournal freehand drawing)
+  saveDrawingPaths: async (documentId, paths) => {
+    const { currentProject } = get()
+    if (!currentProject) return
+
+    const existingDrawings = currentProject.drawings || []
+    const existingIndex = existingDrawings.findIndex(d => d.documentId === documentId)
+
+    let updatedDrawings
+    if (existingIndex >= 0) {
+      updatedDrawings = existingDrawings.map((d, i) =>
+        i === existingIndex ? { ...d, paths } : d
+      )
+    } else {
+      updatedDrawings = [...existingDrawings, { documentId, paths }]
+    }
+
+    const updatedProject = { ...currentProject, drawings: updatedDrawings }
+
+    try {
+      await window.api.project.save(updatedProject)
+      set({ currentProject: updatedProject })
+    } catch (error) {
+      console.error('[ProjectStore] Failed to save drawing paths:', error)
+    }
+  },
+
+  getDrawingForDocument: (documentId) => {
+    const { currentProject } = get()
+    if (!currentProject?.drawings) return []
+    const drawing = currentProject.drawings.find(d => d.documentId === documentId)
+    return drawing?.paths || []
+  },
+
+  clearDrawing: async (documentId) => {
+    const { currentProject } = get()
+    if (!currentProject?.drawings) return
+
+    const updatedProject = {
+      ...currentProject,
+      drawings: currentProject.drawings.filter(d => d.documentId !== documentId)
+    }
+
+    try {
+      await window.api.project.save(updatedProject)
+      set({ currentProject: updatedProject })
+    } catch (error) {
+      console.error('[ProjectStore] Failed to clear drawing:', error)
+    }
+  },
+
+  toggleDrawingMode: () => {
+    set(state => ({
+      ui: { ...state.ui, drawingMode: !state.ui.drawingMode }
+    }))
+  },
+
+  setDrawingMode: (mode) => {
+    set(state => ({
+      ui: { ...state.ui, drawingMode: mode }
+    }))
   },
 
   // Toggle left sidebar
@@ -2923,6 +3022,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, viewZoom: clampedZoom }
     }))
+    window.api.zoom?.set(clampedZoom)
   },
 
   zoomIn: () => {
@@ -2930,9 +3030,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const ZOOM_STEPS = [50, 75, 100, 125, 150, 200]
     const currentIndex = ZOOM_STEPS.findIndex(z => z >= ui.viewZoom)
     const nextIndex = Math.min(currentIndex + 1, ZOOM_STEPS.length - 1)
+    const newZoom = ZOOM_STEPS[nextIndex]
     set(state => ({
-      ui: { ...state.ui, viewZoom: ZOOM_STEPS[nextIndex] }
+      ui: { ...state.ui, viewZoom: newZoom }
     }))
+    window.api.zoom?.set(newZoom)
   },
 
   zoomOut: () => {
@@ -2940,15 +3042,31 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const ZOOM_STEPS = [50, 75, 100, 125, 150, 200]
     const currentIndex = ZOOM_STEPS.findIndex(z => z >= ui.viewZoom)
     const prevIndex = Math.max(currentIndex - 1, 0)
+    const newZoom = ZOOM_STEPS[prevIndex]
     set(state => ({
-      ui: { ...state.ui, viewZoom: ZOOM_STEPS[prevIndex] }
+      ui: { ...state.ui, viewZoom: newZoom }
     }))
+    window.api.zoom?.set(newZoom)
   },
 
   resetZoom: () => {
     set(state => ({
       ui: { ...state.ui, viewZoom: 100 }
     }))
+    window.api.zoom?.set(100)
+  },
+
+  initializeZoom: async () => {
+    try {
+      const savedZoom = await window.api.zoom?.get()
+      if (savedZoom && savedZoom >= 50 && savedZoom <= 200) {
+        set(state => ({
+          ui: { ...state.ui, viewZoom: savedZoom }
+        }))
+      }
+    } catch (error) {
+      console.error('[ProjectStore] Failed to initialize zoom:', error)
+    }
   },
 
   // Reader mode actions
@@ -2961,6 +3079,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setReaderMode: (mode) => {
     set(state => ({
       ui: { ...state.ui, readerMode: mode }
+    }))
+  },
+
+  // Settings panel actions
+  toggleSettingsPanel: () => {
+    set(state => ({
+      ui: { ...state.ui, settingsPanelOpen: !state.ui.settingsPanelOpen }
+    }))
+  },
+
+  setSettingsPanelOpen: (open) => {
+    set(state => ({
+      ui: { ...state.ui, settingsPanelOpen: open }
     }))
   },
 

@@ -15,10 +15,13 @@ import {
   DismissRegular,
   DividerTallRegular,
   PersonRegular,
-  BoxRegular
+  BoxRegular,
+  SettingsRegular,
+  ArrowLeftRegular
 } from '@fluentui/react-icons'
 import { getPropIconComponent } from '../PropsPanel'
 import { SaveVersionButton } from '../../workspaces/shared/components'
+import { SETTINGS_SECTIONS } from '../ProjectSettingsPanel'
 
 interface ContextMenuState {
   x: number
@@ -117,7 +120,9 @@ export function ProjectExplorer() {
     renameProject,
     sceneHeadings,
     characterReferences,
-    propReferences
+    propReferences,
+    ui,
+    toggleSettingsPanel
   } = useProjectStore()
   
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -707,125 +712,161 @@ export function ProjectExplorer() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-theme-subtle bg-theme-header">
         <h2 className="text-xs font-ui font-medium uppercase tracking-wider text-theme-muted">
-          Project
+          {ui.settingsPanelOpen ? 'Settings' : 'Project'}
         </h2>
         <div className="flex items-center gap-1">
-          <SaveVersionButton />
-          <div className="relative" ref={addMenuRef}>
-            <button
-              onClick={() => setShowAddMenu(!showAddMenu)}
-              className={clsx(
-                'btn-icon-modern p-1.5',
-                showAddMenu && 'bg-theme-active text-theme-accent'
-              )}
-              title={`Add ${workspaceConfig.hierarchy.documentLabel}`}
-            >
-              <AddRegular className="w-4 h-4" />
-            </button>
-          
-          {/* Add menu dropdown */}
-          {showAddMenu && (
-            <div className="menu-modern absolute right-0 top-full mt-1 py-1.5 z-50 min-w-[200px]">
-              {isScreenplayProject ? (
-                <>
-                  <button
-                    onClick={() => {
-                      createDocument('Title Page', undefined, 'title-page')
-                      setShowAddMenu(false)
-                    }}
-                    className="menu-modern-item w-full px-3 py-2 text-left text-sm font-ui text-theme-primary flex items-center gap-2"
-                  >
-                    <VideoRegular className="w-4 h-4 text-theme-accent" />
-                    <div>
-                      <div>New Screenplay Project</div>
-                      <div className="text-[10px] text-theme-muted">Title page format</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Find the first top-level document (title page) to use as parent
-                      const titlePage = topLevelDocs.find(d => d.type === 'document' && !d.parentId)
-                      if (!titlePage) {
-                        console.warn('Cannot create screenplay page: no title page found')
+          <button
+            onClick={toggleSettingsPanel}
+            className={clsx(
+              'btn-icon-modern w-7 h-7 flex items-center justify-center',
+              ui.settingsPanelOpen && 'bg-theme-active text-theme-accent'
+            )}
+            title={ui.settingsPanelOpen ? 'Back to Editor' : 'Project Settings'}
+          >
+            {ui.settingsPanelOpen
+              ? <ArrowLeftRegular className="w-4 h-4" />
+              : <SettingsRegular className="w-4 h-4" />}
+          </button>
+          {!ui.settingsPanelOpen && <SaveVersionButton />}
+          {!ui.settingsPanelOpen && (
+            <div className="relative" ref={addMenuRef}>
+              <button
+                onClick={() => setShowAddMenu(!showAddMenu)}
+                className={clsx(
+                  'btn-icon-modern p-1.5',
+                  showAddMenu && 'bg-theme-active text-theme-accent'
+                )}
+                title={`Add ${workspaceConfig.hierarchy.documentLabel}`}
+              >
+                <AddRegular className="w-4 h-4" />
+              </button>
+
+              {/* Add menu dropdown */}
+              {showAddMenu && (
+                <div className="menu-modern absolute right-0 top-full mt-1 py-1.5 z-50 min-w-[200px]">
+                  {isScreenplayProject ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          createDocument('Title Page', undefined, 'title-page')
+                          setShowAddMenu(false)
+                        }}
+                        className="menu-modern-item w-full px-3 py-2 text-left text-sm font-ui text-theme-primary flex items-center gap-2"
+                      >
+                        <VideoRegular className="w-4 h-4 text-theme-accent" />
+                        <div>
+                          <div>New Screenplay Project</div>
+                          <div className="text-[10px] text-theme-muted">Title page format</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Find the first top-level document (title page) to use as parent
+                          const titlePage = topLevelDocs.find(d => d.type === 'document' && !d.parentId)
+                          if (!titlePage) {
+                            console.warn('Cannot create screenplay page: no title page found')
+                            setShowAddMenu(false)
+                            return
+                          }
+                          createDocument(
+                            workspaceConfig.hierarchy.defaultPageTitle,
+                            titlePage.id,
+                            workspaceConfig.hierarchy.documentChildType
+                          )
+                          setShowAddMenu(false)
+                        }}
+                        className="menu-modern-item w-full px-3 py-2 text-left text-sm font-ui text-theme-primary flex items-center gap-2"
+                      >
+                        <DocumentRegular className="w-4 h-4 text-theme-secondary" />
+                        <div>
+                          <div>{workspaceConfig.hierarchy.documentChildLabel}</div>
+                          <div className="text-[10px] text-theme-muted">Scene heading format</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Find the first top-level document (title page) to use as parent
+                          const titlePage = topLevelDocs.find(d => d.type === 'document' && !d.parentId)
+                          if (!titlePage) {
+                            console.warn('Cannot create Act break: no title page found')
+                            setShowAddMenu(false)
+                            return
+                          }
+
+                          // Count existing act breaks to determine the next act number
+                          const existingActBreaks = regularDocs.filter(d =>
+                            d.parentId === titlePage.id &&
+                            d.title.toLowerCase().startsWith('act')
+                          )
+                          const nextActNumber = existingActBreaks.length + 1
+
+                          createDocument(`Act ${nextActNumber}`, titlePage.id, 'break')
+                          setShowAddMenu(false)
+                        }}
+                        className="menu-modern-item w-full px-3 py-2 text-left text-sm font-ui text-theme-primary flex items-center gap-2"
+                      >
+                        <DividerTallRegular className="w-4 h-4 text-theme-secondary" />
+                        <div>
+                          <div>New Act Break</div>
+                          <div className="text-[10px] text-theme-muted">Act divider with description</div>
+                        </div>
+                      </button>
+                      <div className="divider-modern my-1" />
+                      <button
+                        onClick={() => {
+                          createDocument('New Document', undefined, undefined, false, true)
+                          setShowAddMenu(false)
+                        }}
+                        className="menu-modern-item w-full px-3 py-2 text-left text-sm font-ui text-theme-primary flex items-center gap-2"
+                      >
+                        <DocumentRegular className="w-4 h-4 text-theme-secondary" />
+                        <div>
+                          <div>New Document</div>
+                          <div className="text-[10px] text-theme-muted">Blank document with notes</div>
+                        </div>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        createDocument(workspaceConfig.hierarchy.defaultDocumentTitle)
                         setShowAddMenu(false)
-                        return
-                      }
-                      createDocument(
-                        workspaceConfig.hierarchy.defaultPageTitle,
-                        titlePage.id,
-                        workspaceConfig.hierarchy.documentChildType
-                      )
-                      setShowAddMenu(false)
-                    }}
-                    className="menu-modern-item w-full px-3 py-2 text-left text-sm font-ui text-theme-primary flex items-center gap-2"
-                  >
-                    <DocumentRegular className="w-4 h-4 text-theme-secondary" />
-                    <div>
-                      <div>{workspaceConfig.hierarchy.documentChildLabel}</div>
-                      <div className="text-[10px] text-theme-muted">Scene heading format</div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Find the first top-level document (title page) to use as parent
-                      const titlePage = topLevelDocs.find(d => d.type === 'document' && !d.parentId)
-                      if (!titlePage) {
-                        console.warn('Cannot create Act break: no title page found')
-                        setShowAddMenu(false)
-                        return
-                      }
-                      
-                      // Count existing act breaks to determine the next act number
-                      const existingActBreaks = regularDocs.filter(d => 
-                        d.parentId === titlePage.id && 
-                        d.title.toLowerCase().startsWith('act')
-                      )
-                      const nextActNumber = existingActBreaks.length + 1
-                      
-                      createDocument(`Act ${nextActNumber}`, titlePage.id, 'break')
-                      setShowAddMenu(false)
-                    }}
-                    className="menu-modern-item w-full px-3 py-2 text-left text-sm font-ui text-theme-primary flex items-center gap-2"
-                  >
-                    <DividerTallRegular className="w-4 h-4 text-theme-secondary" />
-                    <div>
-                      <div>New Act Break</div>
-                      <div className="text-[10px] text-theme-muted">Act divider with description</div>
-                    </div>
-                  </button>
-                  <div className="divider-modern my-1" />
-                  <button
-                    onClick={() => {
-                      createDocument('New Document', undefined, undefined, false, true)
-                      setShowAddMenu(false)
-                    }}
-                    className="menu-modern-item w-full px-3 py-2 text-left text-sm font-ui text-theme-primary flex items-center gap-2"
-                  >
-                    <DocumentRegular className="w-4 h-4 text-theme-secondary" />
-                    <div>
-                      <div>New Document</div>
-                      <div className="text-[10px] text-theme-muted">Blank document with notes</div>
-                    </div>
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => {
-                    createDocument(workspaceConfig.hierarchy.defaultDocumentTitle)
-                    setShowAddMenu(false)
-                  }}
-                  className="menu-modern-item w-full px-3 py-2 text-left text-sm font-ui text-theme-primary flex items-center gap-2"
-                >
-                  <DocumentRegular className="w-4 h-4 text-theme-secondary" />
-                  {workspaceConfig.hierarchy.defaultDocumentTitle}
-                </button>
+                      }}
+                      className="menu-modern-item w-full px-3 py-2 text-left text-sm font-ui text-theme-primary flex items-center gap-2"
+                    >
+                      <DocumentRegular className="w-4 h-4 text-theme-secondary" />
+                      {workspaceConfig.hierarchy.defaultDocumentTitle}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
-          </div>
         </div>
       </div>
 
+      {/* Settings section navigation - shown when settings panel is open */}
+      {ui.settingsPanelOpen ? (
+        <div className="flex-1 overflow-auto p-2">
+          <nav className="space-y-1">
+            {SETTINGS_SECTIONS.map((section) => (
+              <button
+                key={section.id}
+                onClick={() => {
+                  const el = document.getElementById(`settings-${section.id}`)
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
+                className="list-item-modern flex items-center gap-2 px-3 py-2 w-full text-left group"
+              >
+                <span className="text-sm font-ui font-medium text-theme-secondary group-hover:text-theme-primary transition-colors">
+                  {section.label}
+                </span>
+              </button>
+            ))}
+          </nav>
+        </div>
+      ) : (
+      <>
       {/* Project name */}
       <div className="px-4 py-3 border-b border-theme-subtle bg-theme-header">
         {editingProjectName ? (
@@ -1078,6 +1119,9 @@ export function ProjectExplorer() {
             })}
           </div>
         </div>
+      )}
+
+      </>
       )}
 
       {/* Context menu */}

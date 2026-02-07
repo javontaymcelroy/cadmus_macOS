@@ -16,7 +16,7 @@ import {
   VideoClipRegular,
 } from '@fluentui/react-icons'
 import { useProjectStore } from '../../../stores/projectStore'
-import { ToolbarButton, ToolbarDivider, TextColorDropdown, RunBuildButton, ReaderModeButton } from '../../shared/components'
+import { ToolbarButton, ToolbarDivider, TextColorDropdown, RunBuildButton, ReaderModeButton, OverflowToolbar } from '../../shared/components'
 import { BookOpenRegular, DismissRegular } from '@fluentui/react-icons'
 import { SCREENPLAY_ELEMENTS, type ScreenplayElementType } from '../extensions/ScreenplayElement'
 import { hasSelection, getSelectionInfo, extractSurroundingContextWithPronouns } from '../../../utils/selectionUtils'
@@ -146,7 +146,30 @@ export function ScreenplayToolbar({ editor, isNote = false }: ScreenplayToolbarP
   }
 
   return (
-    <div className="flex items-center gap-1 px-4 py-2 bg-theme-header border-b border-theme-subtle overflow-x-auto scrollbar-hide">
+    <OverflowToolbar
+      rightContent={
+        <>
+          <button
+            onClick={handleGenerateStoryboard}
+            disabled={!hasTextSelection}
+            className={clsx(
+              'flex items-center justify-center w-8 h-8 shrink-0 self-center rounded-md transition-colors border',
+              hasTextSelection
+                ? 'bg-theme-tertiary text-theme-primary hover:bg-theme-active border-theme-default'
+                : 'bg-theme-tertiary/50 text-theme-muted border-theme-subtle cursor-not-allowed'
+            )}
+            title={hasTextSelection ? "Generate Storyboard Image from Selection" : "Select text to generate storyboard image"}
+          >
+            <ImageSparkleRegular className="w-4 h-4" />
+          </button>
+          <StoryboardToggleButton />
+          <WritingPartnerToggleButton />
+          <ReaderModeButton />
+          <ToolbarDivider />
+          <RunBuildButton />
+        </>
+      }
+    >
       {/* Undo/Redo */}
       <ToolbarButton
         onClick={() => editor.chain().focus().undo().run()}
@@ -187,7 +210,7 @@ export function ScreenplayToolbar({ editor, isNote = false }: ScreenplayToolbarP
         >
           Body
         </button>
-        
+
         {SCREENPLAY_ELEMENTS.map((element) => (
           <button
             key={element.type}
@@ -279,38 +302,6 @@ export function ScreenplayToolbar({ editor, isNote = false }: ScreenplayToolbarP
           <ToolbarDivider />
         </>
       )}
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Generate Storyboard Image - only enabled when text is selected */}
-      <button
-        onClick={handleGenerateStoryboard}
-        disabled={!hasTextSelection}
-        className={clsx(
-          'flex items-center justify-center w-8 h-8 shrink-0 self-center rounded-md transition-colors border',
-          hasTextSelection
-            ? 'bg-theme-tertiary text-theme-primary hover:bg-theme-active border-theme-default'
-            : 'bg-theme-tertiary/50 text-theme-muted border-theme-subtle cursor-not-allowed'
-        )}
-        title={hasTextSelection ? "Generate Storyboard Image from Selection" : "Select text to generate storyboard image"}
-      >
-        <ImageSparkleRegular className="w-4 h-4" />
-      </button>
-
-      {/* Storyboard toggle */}
-      <StoryboardToggleButton />
-
-      {/* AI Writing Partner toggle */}
-      <WritingPartnerToggleButton />
-
-      {/* Reader Mode toggle */}
-      <ReaderModeButton />
-
-      <ToolbarDivider />
-
-      {/* Build */}
-      <RunBuildButton />
-    </div>
+    </OverflowToolbar>
   )
 }

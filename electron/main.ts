@@ -260,6 +260,15 @@ function setupIpcHandlers(): void {
     return projectStore.setTheme(theme)
   })
 
+  // Zoom operations
+  ipcMain.handle('zoom:get', async () => {
+    return projectStore.getZoom()
+  })
+
+  ipcMain.handle('zoom:set', async (_, zoom: number) => {
+    return projectStore.setZoom(zoom)
+  })
+
   // Image Generation operations
   ipcMain.handle('imageGeneration:generate', async (_, prompt: string, options: ImageGenOptions) => {
     console.log('[Main] Image generation requested')

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { useProjectStore } from '../../stores/projectStore'
+import { useWorkspace } from '../../workspaces/useWorkspace'
 import { clsx } from 'clsx'
 import type { Asset, AssetCategory } from '../../types/project'
 import {
@@ -61,6 +62,7 @@ type AssetSection = 'general' | 'storyboard'
 
 export function AssetsPanel() {
   const { currentProject, assets, addAsset, addAssetFromBuffer, removeAsset, updateAssetCategory } = useProjectStore()
+  const { showStoryboardPanel } = useWorkspace()
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
   const [menuOpenAssetId, setMenuOpenAssetId] = useState<string | null>(null)
   const [deleteDialogAssetId, setDeleteDialogAssetId] = useState<string | null>(null)
@@ -512,8 +514,9 @@ export function AssetsPanel() {
           )}
         </div>
 
-        {/* Storyboard Assets Section */}
-        <div 
+        {/* Storyboard Assets Section - only shown for screenplay projects */}
+        {showStoryboardPanel && (
+        <div
           className={clsx(
             "border-b border-theme-subtle transition-all",
             dropTargetSection === 'storyboard' && "bg-amber-500/10"
@@ -543,13 +546,13 @@ export function AssetsPanel() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-theme-muted font-ui">{storyboardAssets.length}</span>
-              <svg 
+              <svg
                 className={clsx(
                   "w-4 h-4 text-theme-muted transition-transform",
                   expandedSection === 'storyboard' && "rotate-180"
-                )} 
-                fill="none" 
-                viewBox="0 0 24 24" 
+                )}
+                fill="none"
+                viewBox="0 0 24 24"
                 stroke="currentColor"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -559,7 +562,7 @@ export function AssetsPanel() {
           {expandedSection === 'storyboard' && (
             <div className="px-3 pb-3">
               {renderAssetList(
-                storyboardAssets, 
+                storyboardAssets,
                 'storyboard',
                 getStoryboardRootProps,
                 getStoryboardInputProps,
@@ -568,6 +571,7 @@ export function AssetsPanel() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Selected asset details */}

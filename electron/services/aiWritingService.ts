@@ -23,11 +23,12 @@ import Store from 'electron-store'
 // Types for AI Writing commands
 // Generative: continue, dialogue, setting, expand, pov
 // Revision: rework, adjustTone, shorten, clearer, elaborate, tension, soften, imagery, pacing, voice, contradiction
-export type AIWritingCommand = 
+export type AIWritingCommand =
   | 'continue' | 'dialogue' | 'setting' | 'expand' | 'pov' | 'negativeSpace'
   | 'rework' | 'adjustTone' | 'shorten' | 'clearer' | 'elaborate'
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   | 'scriptDoctor'
+  | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
 
 // Screenplay element types
 export type ScreenplayElementType = 
@@ -659,9 +660,17 @@ Your corrections must serve the dramatic purpose you've identified. Do NOT apply
 - If something works, leave it alone. Script doctoring is surgery, not a rewrite
 - When you fix dialogue, think about what THIS character would actually say given who they are, what just happened, and what they want
 
-Output JSON with corrected screenplay elements.`
+Output JSON with corrected screenplay elements.`,
+
+    // General document commands (not typically used in screenplay mode, but included for type completeness)
+    fixGrammar: `${formatGuide}\n\nYour task is to fix grammar, spelling, and punctuation errors in the selected text. Only fix actual errors — do not rephrase or change style. Output JSON with screenplay elements.`,
+    makeLonger: `${formatGuide}\n\nYour task is to expand the selected text with more detail and depth while maintaining the writer's style. Output JSON with screenplay elements.`,
+    makeConcise: `${formatGuide}\n\nYour task is to make the selected text more concise by removing redundancy while preserving all key information. Output JSON with screenplay elements.`,
+    actionItems: `${formatGuide}\n\nYour task is to extract actionable tasks from the selected text. Output as action elements in JSON format.`,
+    extractQuestions: `${formatGuide}\n\nYour task is to extract questions and unknowns from the selected text. Output as action elements in JSON format.`,
+    summarize: `${formatGuide}\n\nYour task is to synthesize and summarize the selected text. Output as action elements in JSON format.`
   }
-  
+
   return commandPrompts[command]
 }
 
@@ -917,7 +926,90 @@ APPROACH:
 - Every fix must have a reason. Don't apply rules mechanically.
 - Match the writer's style — sparse stays sparse, dense stays dense
 - If it's already strong, say so. Don't fix what isn't broken.
-- Output the suggested version only, no explanations`
+- Output the suggested version only, no explanations`,
+
+  // GENERAL DOCUMENT COMMANDS (non-creative writing)
+
+  fixGrammar: `${WRITING_PARTNER_PHILOSOPHY}
+
+Your task is to fix GRAMMAR, SPELLING, and PUNCTUATION errors in the selected text.
+
+APPROACH:
+- Fix spelling mistakes, typos, and grammatical errors
+- Correct punctuation (commas, periods, semicolons, apostrophes, etc.)
+- Fix subject-verb agreement, tense consistency, and pronoun references
+- Do NOT change the writer's style, word choice, or sentence structure
+- Do NOT rephrase or "improve" — only fix actual errors
+- If the text is already correct, return it unchanged
+- Output the corrected version only, no explanations`,
+
+  makeLonger: `${WRITING_PARTNER_PHILOSOPHY}
+
+Your task is to EXPAND the selected text with more detail and depth.
+
+APPROACH:
+- Add supporting details, examples, or elaboration
+- Flesh out ideas that are mentioned briefly
+- Maintain the writer's voice and style exactly
+- Don't add tangential information — stay on topic
+- Don't pad with filler or redundant phrasing
+- Roughly double the length while keeping quality high
+- Output the expanded version only, no explanations`,
+
+  makeConcise: `${WRITING_PARTNER_PHILOSOPHY}
+
+Your task is to make the selected text MORE CONCISE.
+
+APPROACH:
+- Remove redundancy and repetition
+- Tighten wordy phrases ("in order to" → "to", "due to the fact that" → "because")
+- Eliminate filler words and unnecessary qualifiers
+- Preserve ALL key information and meaning
+- Maintain the writer's voice — don't strip personality
+- Aim for roughly half the length while keeping all substance
+- Output the concise version only, no explanations`,
+
+  actionItems: `You are a helpful assistant that extracts actionable tasks from text.
+
+Your task is to generate a clear list of ACTION ITEMS from the selected text.
+
+APPROACH:
+- Identify concrete tasks, decisions needed, and follow-ups
+- Write each action item as a clear, actionable statement starting with a verb
+- Use bullet points (- ) for each item
+- Group related items if there are many
+- Include who is responsible if mentioned in the text
+- Include deadlines or timeframes if mentioned
+- Only extract items that are genuinely actionable — skip background info
+- Output ONLY the action items list, no explanations or preamble`,
+
+  extractQuestions: `You are a helpful assistant that identifies questions and unknowns in text.
+
+Your task is to EXTRACT QUESTIONS and unknowns from the selected text.
+
+APPROACH:
+- Identify explicit questions asked in the text
+- Surface implicit questions — things left unresolved or unclear
+- Note assumptions that should be validated
+- Flag decisions that still need to be made
+- Use bullet points (- ) for each question
+- Phrase each as a clear question ending with ?
+- Order from most important/urgent to least
+- Output ONLY the questions list, no explanations or preamble`,
+
+  summarize: `You are a helpful assistant that synthesizes and summarizes text.
+
+Your task is to SYNTHESIZE AND SUMMARIZE the selected text.
+
+APPROACH:
+- Distill the key points and main takeaways
+- Preserve the most important information
+- Use clear, direct language
+- Structure with bullet points if there are multiple distinct points
+- Include any conclusions or decisions mentioned
+- Keep the summary to roughly 20-30% of the original length
+- Don't add interpretation — stick to what's actually in the text
+- Output ONLY the summary, no explanations or preamble`
 }
 
 // User prompt builders
@@ -1118,9 +1210,24 @@ function buildScreenplayUserPrompt(request: AIWritingRequest): string {
       prompt += `7. FORMATTING — scene headings, ALL-CAPS introductions, present tense, one beat per line\n\n`
       prompt += `Preserve ALL story beats. Match the writer's voice. ACTIVELY implement shots and transitions — don't be passive. Output JSON with screenplay elements.`
       break
+
+    // General document commands (fallback for screenplay context)
+    case 'fixGrammar':
+    case 'makeLonger':
+    case 'makeConcise':
+    case 'actionItems':
+    case 'extractQuestions':
+    case 'summarize':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
+      prompt += `=== YOUR TASK ===\nProcess the selected text according to the system instructions. Output JSON with screenplay elements.`
+      break
   }
-  
-  prompt += `\n\nRemember: 
+
+  prompt += `\n\nRemember:
 - Output ONLY valid JSON with "elements" array, no other text.
 - ONLY use characters from the CONTEXT TEXT - not from the character list!
 - FOLLOW THE THREAD: Continue what just happened, don't create a montage.
@@ -1128,7 +1235,7 @@ function buildScreenplayUserPrompt(request: AIWritingRequest): string {
 - ONE ACTION PER LINE: One thing happens, then the next.
 - NO CAMERA DIRECTIONS in action lines.
 - Use @NAME syntax for characters/props that appear.`
-  
+
   return prompt
 }
 
@@ -1304,10 +1411,65 @@ function buildProseUserPrompt(request: AIWritingRequest): string {
       prompt += `5. POV / STAGE DIRECTION — consistency, grounding the reader in space and behavior\n\n`
       prompt += `Preserve ALL story beats. Match the writer's voice. Every fix must have a reason. If it's already strong, leave it alone.`
       break
+
+    // GENERAL DOCUMENT COMMANDS
+    case 'fixGrammar':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
+      prompt += `=== YOUR TASK ===\nFix all grammar, spelling, and punctuation errors. Do NOT change the writer's style, word choice, or sentence structure. Only fix actual errors. If the text is already correct, return it unchanged.`
+      break
+
+    case 'makeLonger':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
+      prompt += `=== YOUR TASK ===\nExpand this text with more detail and depth. Add supporting details, examples, or elaboration. Stay on topic. Match the writer's voice and style. Roughly double the length while keeping quality high.`
+      break
+
+    case 'makeConcise':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
+      prompt += `=== YOUR TASK ===\nMake this text more concise. Remove redundancy, tighten wordy phrases, eliminate filler. Preserve ALL key information and meaning. Maintain the writer's voice.`
+      break
+
+    case 'actionItems':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
+      prompt += `=== YOUR TASK ===\nExtract a clear list of action items from this text. Write each as a concrete, actionable statement starting with a verb. Use bullet points (- ). Include who is responsible and deadlines if mentioned. Only extract genuinely actionable items.`
+      break
+
+    case 'extractQuestions':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
+      prompt += `=== YOUR TASK ===\nExtract all questions and unknowns from this text. Include explicit questions, implicit unknowns, assumptions to validate, and decisions still needed. Use bullet points (- ). Phrase each as a clear question ending with ?`
+      break
+
+    case 'summarize':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
+      prompt += `=== YOUR TASK ===\nSynthesize and summarize this text. Distill the key points and main takeaways. Use bullet points if there are multiple distinct points. Keep to roughly 20-30% of the original length. Stick to what's actually in the text.`
+      break
   }
-  
+
   prompt += `\n\nRemember: MATCH THE WRITER'S STYLE - your output should feel like THEY wrote it.`
-  
+
   return prompt
 }
 

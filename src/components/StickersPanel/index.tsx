@@ -22,27 +22,12 @@ import {
 import type { BrandVariants } from '@fluentui/react-components'
 import { DeleteRegular } from '@fluentui/react-icons'
 
-// Import default stickers
-import balloonAnimalSticker from '../../workspaces/notes-journal/assets/stickers/balloonanimal.svg'
-import cactusSticker from '../../workspaces/notes-journal/assets/stickers/cactus.svg'
-import catSticker from '../../workspaces/notes-journal/assets/stickers/cat.svg'
-import deerSticker from '../../workspaces/notes-journal/assets/stickers/deer.svg'
-import fishSticker from '../../workspaces/notes-journal/assets/stickers/fish.svg'
-import foxSticker from '../../workspaces/notes-journal/assets/stickers/fox.svg'
-import frappeSticker from '../../workspaces/notes-journal/assets/stickers/frappe.svg'
-import groupSticker from '../../workspaces/notes-journal/assets/stickers/Group.svg'
-import heySticker from '../../workspaces/notes-journal/assets/stickers/hey.svg'
-import leafSticker from '../../workspaces/notes-journal/assets/stickers/leaf.svg'
-import lipsSticker from '../../workspaces/notes-journal/assets/stickers/lips.svg'
-import lips2Sticker from '../../workspaces/notes-journal/assets/stickers/lips2.svg'
-import pizzaSticker from '../../workspaces/notes-journal/assets/stickers/pizza.svg'
-import powerSticker from '../../workspaces/notes-journal/assets/stickers/power.svg'
-import skullSticker from '../../workspaces/notes-journal/assets/stickers/skull.svg'
-import thumbsUpSticker from '../../workspaces/notes-journal/assets/stickers/thumbsUp.svg'
-import unicornSticker from '../../workspaces/notes-journal/assets/stickers/unicorn.svg'
-import vibesSticker from '../../workspaces/notes-journal/assets/stickers/vibes.svg'
-import watermelonSticker from '../../workspaces/notes-journal/assets/stickers/watermelon.svg'
-import yeeSticker from '../../workspaces/notes-journal/assets/stickers/yee.svg'
+// Auto-discover all sticker SVGs from the stickers directory
+// Just drop new .svg files into the folder and they'll be picked up automatically
+const stickerModules = import.meta.glob<string>(
+  '../../workspaces/notes-journal/assets/stickers/*.svg',
+  { eager: true, import: 'default' }
+)
 
 // Default stickers bundled with the app
 interface DefaultSticker {
@@ -51,28 +36,26 @@ interface DefaultSticker {
   src: string
 }
 
-const DEFAULT_STICKERS: DefaultSticker[] = [
-  { id: 'default:balloonAnimal', name: 'Balloon Animal', src: balloonAnimalSticker },
-  { id: 'default:cactus', name: 'Cactus', src: cactusSticker },
-  { id: 'default:cat', name: 'Cat', src: catSticker },
-  { id: 'default:deer', name: 'Deer', src: deerSticker },
-  { id: 'default:fish', name: 'Fish', src: fishSticker },
-  { id: 'default:fox', name: 'Fox', src: foxSticker },
-  { id: 'default:frappe', name: 'Frappe', src: frappeSticker },
-  { id: 'default:group', name: 'Group', src: groupSticker },
-  { id: 'default:hey', name: 'Hey', src: heySticker },
-  { id: 'default:leaf', name: 'Leaf', src: leafSticker },
-  { id: 'default:lips', name: 'Lips', src: lipsSticker },
-  { id: 'default:lips2', name: 'Lips 2', src: lips2Sticker },
-  { id: 'default:pizza', name: 'Pizza', src: pizzaSticker },
-  { id: 'default:power', name: 'Power', src: powerSticker },
-  { id: 'default:skull', name: 'Skull', src: skullSticker },
-  { id: 'default:thumbsUp', name: 'Thumbs Up', src: thumbsUpSticker },
-  { id: 'default:unicorn', name: 'Unicorn', src: unicornSticker },
-  { id: 'default:vibes', name: 'Vibes', src: vibesSticker },
-  { id: 'default:watermelon', name: 'Watermelon', src: watermelonSticker },
-  { id: 'default:yee', name: 'Yee', src: yeeSticker },
-]
+function formatStickerName(filename: string): string {
+  return filename
+    // Insert space before uppercase letters (camelCase → Camel Case)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    // Insert space before numbers (lips2 → lips 2)
+    .replace(/([a-zA-Z])(\d)/g, '$1 $2')
+    // Capitalize first letter
+    .replace(/^\w/, c => c.toUpperCase())
+}
+
+const DEFAULT_STICKERS: DefaultSticker[] = Object.entries(stickerModules)
+  .map(([path, src]) => {
+    const filename = path.split('/').pop()!.replace('.svg', '')
+    return {
+      id: `default:${filename}`,
+      name: formatStickerName(filename),
+      src,
+    }
+  })
+  .sort((a, b) => a.name.localeCompare(b.name))
 
 // Export for use in StickerOverlay
 export { DEFAULT_STICKERS }
@@ -289,23 +272,18 @@ export function StickersPanel() {
                   selectedAsset === sticker.id && 'ring-2 ring-gold-400',
                   draggingAssetId === sticker.id && 'opacity-50'
                 )}
-                style={{
-                  filter: selectedAsset === sticker.id 
-                    ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.6))' 
-                    : undefined
-                }}
                 title={`${sticker.name} - Drag to place on page`}
               >
-                <div 
+                <div
                   className="aspect-square p-2 flex items-center justify-center transition-all duration-200 group-hover:scale-105"
                   style={{
                     filter: 'drop-shadow(2px 2px 0px rgba(0,0,0,0.5))'
                   }}
                 >
-                  <img 
-                    src={sticker.src} 
+                  <img
+                    src={sticker.src}
                     alt={sticker.name}
-                    className="w-full h-full object-contain transition-all duration-200 group-hover:drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]"
+                    className="w-full h-full object-contain transition-all duration-200"
                   />
                 </div>
               </div>
@@ -332,16 +310,11 @@ export function StickersPanel() {
                     selectedAsset === asset.id && 'ring-2 ring-gold-400',
                     draggingAssetId === asset.id && 'opacity-50'
                   )}
-                  style={{
-                    filter: selectedAsset === asset.id 
-                      ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.6))' 
-                      : undefined
-                  }}
                   title="Drag to place on page"
                 >
                   {/* Preview */}
                   <div className="aspect-square p-2 flex items-center justify-center transition-all duration-200 group-hover:scale-105">
-                    <div className="w-full h-full transition-all duration-200 group-hover:drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]">
+                    <div className="w-full h-full transition-all duration-200">
                       {renderStickerPreview(asset)}
                     </div>
                   </div>

@@ -41,6 +41,7 @@ import {
 import { createSlashCommandSuggestion } from '../../shared/components/slashCommandConfig'
 import { SelectionSlashMenu } from '../../shared/components/SelectionSlashMenu'
 import { VersionHistoryPanel } from '../../shared/components'
+import { useProjectEditorStyles } from '../../shared/hooks/useProjectEditorStyles'
 
 // Screenplay-specific
 import { ScreenplayElement, getScreenplayElementDef } from '../extensions/ScreenplayElement'
@@ -159,7 +160,9 @@ export function ScreenplayEditor() {
     addCharacter,
     addProp
   } = useProjectStore()
-  
+
+  const { hasOverrides, style: overrideStyle, maxWidth: overrideMaxWidth } = useProjectEditorStyles()
+
   useStoryboardPlayback()
   
   const [isResizingStoryboard, setIsResizingStoryboard] = useState(false)
@@ -490,6 +493,12 @@ export function ScreenplayEditor() {
       },
       handleDrop: (view, event, _slice, moved) => {
         if (moved) return false
+
+        // Ignore sticker drops — they're handled by StickerOverlay
+        if (event.dataTransfer?.getData('application/x-cadmus-sticker')) {
+          event.preventDefault()
+          return true
+        }
 
         const assetData = event.dataTransfer?.getData('application/x-cadmus-asset')
         if (!assetData) return false
@@ -1782,14 +1791,19 @@ export function ScreenplayEditor() {
                 maxWidth: `${(768 * 100) / ui.viewZoom}%`,
               }}
             >
-              <div 
+              <div
                 className={clsx(
                   'max-w-3xl mx-auto screenplay-mode',
-                  hierarchyInfo.type === 'note' && 'note-editor'
+                  hierarchyInfo.type === 'note' && 'note-editor',
+                  hasOverrides && 'project-settings-active'
                 )}
+                style={{
+                  ...overrideStyle,
+                  ...(overrideMaxWidth ? { maxWidth: overrideMaxWidth } : {})
+                }}
               >
-                <EditorContent 
-                  editor={editor} 
+                <EditorContent
+                  editor={editor}
                   className="max-w-none"
                 />
               </div>

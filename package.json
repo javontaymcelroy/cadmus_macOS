@@ -50,6 +50,7 @@
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.2.3",
     "react-rnd": "^10.5.2",
+    "react-sketch-canvas": "^6.2.0",
     "tippy.js": "^6.3.7",
     "uuid": "^9.0.1",
     "zustand": "^4.4.7"
@@ -74,6 +75,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "electron": "^28.1.0",
+    "electron-builder": "^26.7.0",
     "electron-vite": "^2.0.0",
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.33.2",

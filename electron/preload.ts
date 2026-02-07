@@ -273,11 +273,12 @@ interface EntityDoc {
 }
 
 // AI Writing types (slash command generative and revision tools)
-type AIWritingCommand = 
+type AIWritingCommand =
   | 'continue' | 'dialogue' | 'setting' | 'expand' | 'pov' | 'negativeSpace'
   | 'rework' | 'adjustTone' | 'shorten' | 'clearer' | 'elaborate'
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   | 'scriptDoctor'
+  | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
 
 type ScreenplayElementType = 
   | 'scene-heading'
@@ -609,9 +610,18 @@ const api = {
   theme: {
     get: (): Promise<'dark' | 'light'> =>
       ipcRenderer.invoke('theme:get'),
-    
+
     set: (theme: 'dark' | 'light'): Promise<void> =>
       ipcRenderer.invoke('theme:set', theme)
+  },
+
+  // Zoom operations
+  zoom: {
+    get: (): Promise<number> =>
+      ipcRenderer.invoke('zoom:get'),
+
+    set: (zoom: number): Promise<void> =>
+      ipcRenderer.invoke('zoom:set', zoom)
   },
 
   // Image Generation operations

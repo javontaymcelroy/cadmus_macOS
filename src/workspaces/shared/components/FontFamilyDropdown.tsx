@@ -5,10 +5,18 @@ import { ChevronDownRegular } from '@fluentui/react-icons'
 import type { Editor } from '@tiptap/react'
 import { useProjectStore, getDocumentHierarchyType } from '../../../stores/projectStore'
 import { FONT_FAMILIES, getAvailableFonts } from '../extensions/FontFamily'
+import { useProjectEditorStyles } from '../hooks/useProjectEditorStyles'
 
 interface FontFamilyDropdownProps {
   editor: Editor
 }
+
+// Workspace CSS defaults - mirrors the font-family cascade in globals.css
+const WORKSPACE_CSS_FONTS: Record<string, string> = {
+  'notes-journal': 'Beth Ellen, cursive',
+  'screenplay': 'Courier New, Courier, monospace',
+}
+const DEFAULT_CSS_FONT = 'Carlito, Calibri, sans-serif'
 
 export function FontFamilyDropdown({ editor }: FontFamilyDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -16,18 +24,19 @@ export function FontFamilyDropdown({ editor }: FontFamilyDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
   const { currentProject, activeDocumentId } = useProjectStore()
-  
+  const { style: overrideStyle } = useProjectEditorStyles()
+
   // Force re-render when editor selection changes to update displayed font
   const [, setSelectionUpdate] = useState(0)
-  
+
   useEffect(() => {
     const updateHandler = () => {
       setSelectionUpdate(prev => prev + 1)
     }
-    
+
     editor.on('selectionUpdate', updateHandler)
     editor.on('transaction', updateHandler)
-    
+
     return () => {
       editor.off('selectionUpdate', updateHandler)
       editor.off('transaction', updateHandler)
@@ -51,15 +60,41 @@ export function FontFamilyDropdown({ editor }: FontFamilyDropdownProps) {
     return getAvailableFonts(isNotesJournalWorkspace, isNote)
   }, [isNotesJournalWorkspace, isNote])
 
-  // Get the template's default font based on workspace
-  const templateDefaultFont = currentProject?.settings.formattingRules.defaultFontFamily
-  
-  // For notes-journal workspace, default to Beth Ellen; otherwise use template default or Calibri
-  const workspaceDefaultFontValue = isNotesJournalWorkspace 
-    ? 'Beth Ellen, cursive'
-    : (templateDefaultFont || 'Carlito, Calibri, sans-serif')
-  
-  const defaultFontEntry = FONT_FAMILIES.find(f => f.value === workspaceDefaultFontValue)
+  // Determine the effective default font following the actual CSS cascade:
+  // 1. Project override (--project-font-family CSS variable) if set
+  // 2. Workspace CSS default based on templateId
+  // 3. Global default (Calibri)
+  const effectiveDefaultFontValue = useMemo(() => {
+    // Check if the project override CSS variable is actually being set
+    const projectOverrideFont = overrideStyle['--project-font-family']
+    if (projectOverrideFont) return projectOverrideFont
+
+    // Workspace CSS defaults (mirrors globals.css cascade)
+    const templateId = currentProject?.templateId
+    if (templateId && WORKSPACE_CSS_FONTS[templateId]) {
+      return WORKSPACE_CSS_FONTS[templateId]
+    }
+
+    return DEFAULT_CSS_FONT
+  }, [overrideStyle, currentProject?.templateId])
+
+  // Find font entry with exact + fuzzy matching
+  const findFontEntry = (fontValue: string) => {
+    // Try exact match first
+    const exactMatch = FONT_FAMILIES.find(f => f.value === fontValue)
+    if (exactMatch) return exactMatch
+
+    // Try partial match (the fontValue might be just the primary font name)
+    const partialMatch = FONT_FAMILIES.find(f =>
+      f.value.toLowerCase().startsWith(fontValue.toLowerCase()) ||
+      fontValue.toLowerCase().startsWith(f.value.split(',')[0].trim().toLowerCase())
+    )
+    if (partialMatch) return partialMatch
+
+    return null
+  }
+
+  const defaultFontEntry = findFontEntry(effectiveDefaultFontValue)
   const defaultFontName = defaultFontEntry?.name || 'Calibri'
 
   // Get current font family from the current block (check all block types)
@@ -67,28 +102,11 @@ export function FontFamilyDropdown({ editor }: FontFamilyDropdownProps) {
   const headingFont = editor.getAttributes('heading').fontFamily
   const screenplayFont = editor.getAttributes('screenplayElement').fontFamily
   const explicitFont = paragraphFont || headingFont || screenplayFont
-  
-  // Find the font entry - check both exact match and partial match (font family can have fallbacks)
-  const findFontEntry = (fontValue: string | undefined) => {
-    if (!fontValue) return defaultFontEntry
-    
-    // Try exact match first
-    const exactMatch = FONT_FAMILIES.find(f => f.value === fontValue)
-    if (exactMatch) return exactMatch
-    
-    // Try partial match (the fontValue might be just the primary font name)
-    const partialMatch = FONT_FAMILIES.find(f => 
-      f.value.toLowerCase().startsWith(fontValue.toLowerCase()) ||
-      fontValue.toLowerCase().startsWith(f.value.split(',')[0].trim().toLowerCase())
-    )
-    if (partialMatch) return partialMatch
-    
-    return defaultFontEntry
-  }
-  
-  const currentFontEntry = findFontEntry(explicitFont)
+
+  // Resolve the currently displayed font: explicit block attribute > effective default
+  const currentFontEntry = explicitFont ? findFontEntry(explicitFont) || defaultFontEntry : defaultFontEntry
   const currentFontName = currentFontEntry?.name || defaultFontName
-  const currentFontValue = currentFontEntry?.value || workspaceDefaultFontValue
+  const currentFontValue = currentFontEntry?.value || effectiveDefaultFontValue
 
   // Update dropdown position when opened
   useEffect(() => {

@@ -15,6 +15,7 @@ interface StickerDropData {
 interface StickerOverlayProps {
   documentId: string
   containerRef: RefObject<HTMLDivElement | null>
+  dropZoneRef?: RefObject<HTMLDivElement | null>
 }
 
 // Local transform state for smooth dragging/resizing
@@ -23,24 +24,32 @@ interface LocalTransform {
   y: number
   width: number
   height: number
+  rotation: number
 }
 
 const DEFAULT_STICKER_SIZE = 100
 
-export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps) {
-  const { 
-    currentProject, 
-    addSticker, 
-    updateStickerPosition, 
+export function StickerOverlay({ documentId, containerRef, dropZoneRef }: StickerOverlayProps) {
+  const {
+    currentProject,
+    addSticker,
+    updateStickerPosition,
     updateStickerSize,
+    updateStickerRotation,
     removeSticker,
-    getStickersForDocument 
+    getStickersForDocument,
+    ui
   } = useProjectStore()
+
+  const zoomScale = ui.viewZoom / 100
   
   const [selectedStickerId, setSelectedStickerId] = useState<string | null>(null)
   const [hoveredStickerId, setHoveredStickerId] = useState<string | null>(null)
   const [draggingStickerId, setDraggingStickerId] = useState<string | null>(null)
-  
+  const [rotatingStickerId, setRotatingStickerId] = useState<string | null>(null)
+  const [localRotations, setLocalRotations] = useState<Record<string, number>>({})
+  const rotationRef = useRef<number>(0) // Track latest rotation during drag (avoids stale closure)
+
   // Track local transforms during drag/resize to avoid glitchy updates
   const [localTransforms, setLocalTransforms] = useState<Record<string, LocalTransform>>({})
   const isSavingRef = useRef<Record<string, boolean>>({})
@@ -53,9 +62,16 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
       x: sticker.x,
       y: sticker.y,
       width: sticker.width,
-      height: sticker.height
+      height: sticker.height,
+      rotation: sticker.rotation || 0
     }
   }, [localTransforms])
+
+  // Get effective rotation (local during drag, or from store)
+  const getEffectiveRotation = useCallback((sticker: Sticker): number => {
+    if (localRotations[sticker.id] !== undefined) return localRotations[sticker.id]
+    return sticker.rotation || 0
+  }, [localRotations])
 
   // Handle sticker drop from the StickersPanel
   const handleDrop = useCallback((e: DragEvent) => {
@@ -67,14 +83,15 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
 
     try {
       const stickerData: StickerDropData = JSON.parse(stickerDataStr)
-      
-      // Calculate drop position relative to the container
-      const containerRect = containerRef.current.getBoundingClientRect()
-      const scrollTop = containerRef.current.scrollTop
-      const scrollLeft = containerRef.current.scrollLeft
-      
-      const x = e.clientX - containerRect.left + scrollLeft - DEFAULT_STICKER_SIZE / 2
-      const y = e.clientY - containerRect.top + scrollTop - DEFAULT_STICKER_SIZE / 2
+
+      // Calculate drop position relative to the content wrapper
+      // getBoundingClientRect accounts for scroll position of parent containers
+      const contentRect = containerRef.current.getBoundingClientRect()
+      // Calculate scale from visual vs layout size to account for CSS transforms
+      const scale = contentRect.width / containerRef.current.offsetWidth || 1
+
+      const x = (e.clientX - contentRect.left) / scale - DEFAULT_STICKER_SIZE / 2
+      const y = (e.clientY - contentRect.top) / scale - DEFAULT_STICKER_SIZE / 2
 
       // Add the sticker at the drop position
       addSticker(
@@ -98,19 +115,19 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
     }
   }, [])
 
-  // Set up drop handlers on the container
+  // Set up drop handlers on the drop zone (outer scrollable container if provided)
   useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
+    const dropTarget = (dropZoneRef || containerRef).current
+    if (!dropTarget) return
 
-    container.addEventListener('drop', handleDrop)
-    container.addEventListener('dragover', handleDragOver)
+    dropTarget.addEventListener('drop', handleDrop)
+    dropTarget.addEventListener('dragover', handleDragOver)
 
     return () => {
-      container.removeEventListener('drop', handleDrop)
-      container.removeEventListener('dragover', handleDragOver)
+      dropTarget.removeEventListener('drop', handleDrop)
+      dropTarget.removeEventListener('dragover', handleDragOver)
     }
-  }, [containerRef, handleDrop, handleDragOver])
+  }, [dropZoneRef, containerRef, handleDrop, handleDragOver])
 
   // Handle keyboard shortcuts for selected sticker
   useEffect(() => {
@@ -129,9 +146,9 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [selectedStickerId, removeSticker])
 
-  // Click outside to deselect - listen on container
+  // Click outside to deselect - listen on outer container for full coverage
   useEffect(() => {
-    const container = containerRef.current
+    const container = (dropZoneRef || containerRef).current
     if (!container || !selectedStickerId) return
 
     const handleClickOutside = (e: MouseEvent) => {
@@ -146,7 +163,7 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
     // Use mousedown to deselect before other handlers
     container.addEventListener('mousedown', handleClickOutside)
     return () => container.removeEventListener('mousedown', handleClickOutside)
-  }, [containerRef, selectedStickerId])
+  }, [dropZoneRef, containerRef, selectedStickerId])
 
   // Handle drag during movement (update local state only)
   const handleDrag = useCallback((stickerId: string, x: number, y: number) => {
@@ -192,7 +209,7 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
   const handleResize = useCallback((stickerId: string, width: number, height: number, x: number, y: number) => {
     setLocalTransforms(prev => ({
       ...prev,
-      [stickerId]: { x, y, width, height }
+      [stickerId]: { x, y, width, height, rotation: prev[stickerId]?.rotation || 0 }
     }))
   }, [])
 
@@ -201,16 +218,16 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
     // Update local state immediately
     setLocalTransforms(prev => ({
       ...prev,
-      [stickerId]: { x, y, width, height }
+      [stickerId]: { x, y, width, height, rotation: prev[stickerId]?.rotation || 0 }
     }))
-    
+
     // Mark as saving
     isSavingRef.current[stickerId] = true
-    
+
     // Persist to store
     await updateStickerSize(stickerId, width, height)
     await updateStickerPosition(stickerId, x, y)
-    
+
     // Clear saving flag and local transform after save completes
     isSavingRef.current[stickerId] = false
     setLocalTransforms(prev => {
@@ -218,6 +235,62 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
       return rest
     })
   }, [updateStickerSize, updateStickerPosition])
+
+  // Handle rotation via mouse drag on the rotation handle
+  const handleRotationStart = useCallback((e: React.MouseEvent, stickerId: string, sticker: Sticker) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setRotatingStickerId(stickerId)
+
+    const initialRotation = sticker.rotation ?? 0
+    rotationRef.current = initialRotation
+
+    // Calculate the initial angle from center to mouse so we can compute deltas
+    const stickerEl = document.querySelector(`[data-sticker-id="${stickerId}"]`)?.closest('.react-draggable') as HTMLElement
+    if (!stickerEl) return
+
+    const rect = stickerEl.getBoundingClientRect()
+    const centerX = rect.left + rect.width / 2
+    const centerY = rect.top + rect.height / 2
+    const startAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * 180 / Math.PI
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      // Calculate angle from center to current mouse position
+      const angle = Math.atan2(moveEvent.clientY - centerY, moveEvent.clientX - centerX) * 180 / Math.PI
+      let degrees = initialRotation + (angle - startAngle)
+
+      // Snap to 15-degree increments when holding Shift
+      if (moveEvent.shiftKey) {
+        degrees = Math.round(degrees / 15) * 15
+      }
+
+      rotationRef.current = degrees
+      setLocalRotations(prev => ({
+        ...prev,
+        [stickerId]: degrees
+      }))
+    }
+
+    const handleMouseUp = async () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+
+      const finalRotation = rotationRef.current
+      setRotatingStickerId(null)
+
+      // Persist to store
+      await updateStickerRotation(stickerId, finalRotation)
+
+      // Clear local rotation after save
+      setLocalRotations(prev => {
+        const { [stickerId]: _, ...rest } = prev
+        return rest
+      })
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [updateStickerRotation])
 
   if (!currentProject || stickers.length === 0) {
     // Still render an invisible overlay to handle drops
@@ -232,7 +305,7 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
   return (
     <div 
       className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 10, overflow: 'hidden' }}
+      style={{ zIndex: 10 }}
     >
       {stickers.map((sticker: Sticker) => {
         // Check if this is a default sticker
@@ -261,23 +334,15 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
         const isSelected = selectedStickerId === sticker.id
         const isHovered = hoveredStickerId === sticker.id
         const isDraggingThis = draggingStickerId === sticker.id
-        const isActive = isSelected || isHovered || isDraggingThis
+        const isRotatingThis = rotatingStickerId === sticker.id
 
         // Get the effective transform (local during drag/resize, or from store)
         const transform = getEffectiveTransform(sticker)
+        const rotation = getEffectiveRotation(sticker)
 
-        // Build the filter for drop shadows - matching StickersPanel hover effect
         const getImageFilter = () => {
           const baseShadow = isSvg ? 'drop-shadow(2px 2px 0px rgba(0,0,0,0.5))' : ''
-          // Gold glow effect on hover (matching StickersPanel)
-          const hoverGlow = isHovered && !isSelected
-            ? ' drop-shadow(0 0 6px rgba(251, 191, 36, 0.5))'
-            : ''
-          // Stronger glow when selected
-          const selectedGlow = isSelected
-            ? ' drop-shadow(0 0 8px rgba(251, 191, 36, 0.6))'
-            : ''
-          return (baseShadow + hoverGlow + selectedGlow) || undefined
+          return baseShadow || undefined
         }
 
         return (
@@ -295,7 +360,8 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
                   x: sticker.x,
                   y: sticker.y,
                   width: sticker.width,
-                  height: sticker.height
+                  height: sticker.height,
+                  rotation: sticker.rotation || 0
                 }
               }))
             }}
@@ -313,7 +379,8 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
                   x: sticker.x,
                   y: sticker.y,
                   width: sticker.width,
-                  height: sticker.height
+                  height: sticker.height,
+                  rotation: sticker.rotation || 0
                 }
               }))
             }}
@@ -335,13 +402,14 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
                 position.y
               )
             }}
+            scale={zoomScale}
             lockAspectRatio
             className="pointer-events-auto"
             style={{
               zIndex: isSelected ? 100 : (sticker.zIndex || 1),
               // Scale up on hover (matching StickersPanel)
               transform: isHovered && !isSelected && !isDraggingThis ? 'scale(1.05)' : undefined,
-              transition: 'transform 0.2s ease',
+              transition: isRotatingThis ? undefined : 'transform 0.2s ease',
             }}
             onMouseDown={(e) => {
               e.stopPropagation()
@@ -360,42 +428,42 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
               topLeft: true,
             } : false}
             resizeHandleStyles={{
-              topRight: { 
-                width: 14, 
-                height: 14, 
-                right: -7, 
-                top: -7, 
-                background: '#fbbf24', 
+              topRight: {
+                width: 14,
+                height: 14,
+                right: -7,
+                top: -7,
+                background: '#fbbf24',
                 borderRadius: '50%',
                 border: '2px solid #000',
                 cursor: 'ne-resize'
               },
-              bottomRight: { 
-                width: 14, 
-                height: 14, 
-                right: -7, 
-                bottom: -7, 
-                background: '#fbbf24', 
+              bottomRight: {
+                width: 14,
+                height: 14,
+                right: -7,
+                bottom: -7,
+                background: '#fbbf24',
                 borderRadius: '50%',
                 border: '2px solid #000',
                 cursor: 'se-resize'
               },
-              bottomLeft: { 
-                width: 14, 
-                height: 14, 
-                left: -7, 
-                bottom: -7, 
-                background: '#fbbf24', 
+              bottomLeft: {
+                width: 14,
+                height: 14,
+                left: -7,
+                bottom: -7,
+                background: '#fbbf24',
                 borderRadius: '50%',
                 border: '2px solid #000',
                 cursor: 'sw-resize'
               },
-              topLeft: { 
-                width: 14, 
-                height: 14, 
-                left: -7, 
-                top: -7, 
-                background: '#fbbf24', 
+              topLeft: {
+                width: 14,
+                height: 14,
+                left: -7,
+                top: -7,
+                background: '#fbbf24',
                 borderRadius: '50%',
                 border: '2px solid #000',
                 cursor: 'nw-resize'
@@ -404,18 +472,22 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
             minWidth={50}
             minHeight={50}
           >
-            <div 
-              className={`w-full h-full relative transition-all duration-200 ${isSelected ? 'ring-2 ring-gold-400 rounded' : ''}`}
+            <div
+              className={`w-full h-full relative ${isSelected ? 'ring-2 ring-gold-400 rounded' : ''}`}
               data-sticker-id={sticker.id}
+              style={{
+                transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                transition: isRotatingThis ? undefined : 'transform 0.2s ease',
+              }}
             >
               <img
                 src={assetUrl}
                 alt={assetName}
-                className="w-full h-full object-contain select-none transition-all duration-200"
+                className="w-full h-full object-contain select-none"
                 style={{ filter: getImageFilter() }}
                 draggable={false}
               />
-              {/* Delete button when selected - positioned at top center to avoid resize handles */}
+              {/* Delete button when selected */}
               {isSelected && (
                 <button
                   onMouseDown={(e) => {
@@ -430,6 +502,22 @@ export function StickerOverlay({ documentId, containerRef }: StickerOverlayProps
                 >
                   ×
                 </button>
+              )}
+              {/* Rotation handle when selected - positioned at bottom center */}
+              {isSelected && (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center"
+                  style={{ top: '100%', zIndex: 9999 }}
+                >
+                  {/* Connecting line */}
+                  <div className="w-px h-5 bg-gold-400" />
+                  {/* Rotation grab handle */}
+                  <div
+                    onMouseDown={(e) => handleRotationStart(e, sticker.id, sticker)}
+                    className="w-4 h-4 rounded-full bg-gold-400 border-2 border-black cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
+                    title="Drag to rotate (hold Shift to snap)"
+                  />
+                </div>
               )}
             </div>
           </Rnd>

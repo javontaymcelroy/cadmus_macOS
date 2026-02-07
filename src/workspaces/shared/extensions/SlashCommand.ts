@@ -16,7 +16,7 @@ import { PluginKey } from 'prosemirror-state'
 import Suggestion, { SuggestionOptions } from '@tiptap/suggestion'
 
 // Command types for AI writing tools
-export type AIWritingCommand = 
+export type AIWritingCommand =
   // Generative commands (no selection required)
   | 'continue' | 'dialogue' | 'setting' | 'expand' | 'pov' | 'negativeSpace'
   // Revision commands (selection required)
@@ -24,6 +24,8 @@ export type AIWritingCommand =
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   // Screenplay craft
   | 'scriptDoctor'
+  // General document commands
+  | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
 
 // Tone options for the "Adjust Tone" submenu
 export interface ToneOption {
@@ -253,6 +255,108 @@ export const SLASH_COMMANDS_SELECTION: SlashCommandItem[] = [
     requiresSelection: true,
     gated: true
   }
+]
+
+// Commands for REVISING selected text in general (non-screenplay) projects
+export const SLASH_COMMANDS_SELECTION_GENERAL: SlashCommandItem[] = [
+  // Grammar & mechanics
+  {
+    id: 'fixGrammar',
+    name: 'Fix Grammar & Spelling',
+    description: 'Correct grammar, spelling, and punctuation',
+    shortcut: 'G',
+    icon: 'checkmark',
+    requiresSelection: true
+  },
+  // General revision
+  {
+    id: 'rework',
+    name: 'Rework',
+    description: 'General revision, polish and refine',
+    shortcut: 'R',
+    icon: 'edit',
+    requiresSelection: true
+  },
+  // Tone adjustment with submenu
+  {
+    id: 'adjustTone',
+    name: 'Adjust Tone',
+    description: 'Shift emotional temperature',
+    shortcut: 'T',
+    icon: 'emoji',
+    requiresSelection: true,
+    submenu: TONE_OPTIONS
+  },
+  // Length & clarity
+  {
+    id: 'makeLonger',
+    name: 'Make Longer',
+    description: 'Expand with more detail and depth',
+    shortcut: 'L',
+    icon: 'expand',
+    requiresSelection: true,
+    separator: true
+  },
+  {
+    id: 'makeConcise',
+    name: 'Make Concise',
+    description: 'Tighten prose, remove redundancy',
+    shortcut: 'S',
+    icon: 'compress',
+    requiresSelection: true
+  },
+  {
+    id: 'clearer',
+    name: 'Make Clearer',
+    description: 'Sharpen unclear language',
+    shortcut: 'C',
+    icon: 'lightbulb',
+    requiresSelection: true
+  },
+  // Analysis & extraction
+  {
+    id: 'actionItems',
+    name: 'Generate Action Items',
+    description: 'Extract actionable tasks from text',
+    shortcut: 'A',
+    icon: 'timer',
+    requiresSelection: true,
+    separator: true
+  },
+  {
+    id: 'extractQuestions',
+    name: 'Extract Questions',
+    description: 'Pull out questions and unknowns',
+    shortcut: 'Q',
+    icon: 'lightbulb',
+    requiresSelection: true
+  },
+  {
+    id: 'summarize',
+    name: 'Synthesize & Summarize',
+    description: 'Distill key points and takeaways',
+    shortcut: 'Z',
+    icon: 'sparkle',
+    requiresSelection: true
+  },
+  // Technical fixes
+  {
+    id: 'pacing',
+    name: 'Fix Pacing',
+    description: 'Balance sentence rhythm and flow',
+    shortcut: 'P',
+    icon: 'timer',
+    requiresSelection: true,
+    separator: true
+  },
+  {
+    id: 'voice',
+    name: 'Align Voice',
+    description: 'Match surrounding paragraph style',
+    shortcut: 'V',
+    icon: 'textAlign',
+    requiresSelection: true
+  },
 ]
 
 // Legacy export for backwards compatibility

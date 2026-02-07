@@ -7,6 +7,7 @@ import { CharactersPanel } from '../CharactersPanel'
 import { PropsPanel } from '../PropsPanel'
 import { WebLinksPanel } from '../WebLinksPanel'
 import { ProblemsPanel } from '../ProblemsPanel'
+import { ProjectSettingsPanel } from '../ProjectSettingsPanel'
 import { StatusBar } from './StatusBar'
 import { useWorkspace } from '../../workspaces'
 import { clsx } from 'clsx'
@@ -203,7 +204,7 @@ export function AppShell() {
 
         {/* Editor area - subtle background, not a floating card */}
         <div className="floating-editor-area">
-          <WorkspaceRouter />
+          {ui.settingsPanelOpen ? <ProjectSettingsPanel /> : <WorkspaceRouter />}
         </div>
 
         {/* Right sidebar - Assets/Characters Panel + Web Links Panel (Floating) */}

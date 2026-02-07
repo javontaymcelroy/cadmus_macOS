@@ -119,6 +119,10 @@
 .border-theme-default { border-color: var(--border-default); }
 .border-theme-strong { border-color: var(--border-strong); }
 
+/* Divide colors (for Tailwind divide-y / divide-x) */
+.divide-theme-subtle > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-subtle); }
+.divide-theme-default > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-default); }
+
 /* Hover utilities - use with group-hover or direct hover */
 .hover\:bg-theme-hover:hover { background-color: var(--bg-hover); }
 .hover\:bg-theme-active:hover { background-color: var(--bg-active); }
@@ -169,7 +173,10 @@
   display: none;  /* Chrome, Safari, Opera */
 }
 
-/* Editor styles */
+/* Editor styles
+   --ws-* custom properties store workspace defaults so project overrides can
+   fall back to them. Without these, an undefined var() in a higher-specificity
+   rule resolves to 'inherit' instead of falling through to the workspace rule. */
 .ProseMirror {
   outline: none;
   min-height: 100%;
@@ -179,6 +186,9 @@
   font-weight: 500;
   line-height: 1.75;
   color: var(--text-primary);
+  --ws-font-family: 'Carlito', 'Calibri', sans-serif;
+  --ws-font-size: 16px;
+  --ws-line-height: 1.75;
 }
 
 /* Screenplay mode - use Courier New for entire editor */
@@ -186,6 +196,8 @@
   font-family: 'Courier New', Courier, monospace;
   font-weight: 500;
   font-size: 14pt;
+  --ws-font-family: 'Courier New', Courier, monospace;
+  --ws-font-size: 14pt;
 }
 
 /* Note editor mode - Calibri 14pt for all notes across workspaces */
@@ -196,6 +208,9 @@
   font-weight: 400;
   font-size: 14pt;
   line-height: 1.6;
+  --ws-font-family: 'Calibri', 'Carlito', sans-serif;
+  --ws-font-size: 14pt;
+  --ws-line-height: 1.6;
 }
 
 /* Notes Journal workspace - Beth Ellen font, 16pt body text for all documents */
@@ -203,6 +218,9 @@
   font-family: 'Beth Ellen', cursive;
   font-size: 16pt;
   line-height: 1.75;
+  --ws-font-family: 'Beth Ellen', cursive;
+  --ws-font-size: 16pt;
+  --ws-line-height: 1.75;
 }
 
 .notes-journal-mode .ProseMirror h1 {
@@ -215,6 +233,45 @@
 
 .notes-journal-mode .ProseMirror h3 {
   font-family: 'Beth Ellen', cursive;
+}
+
+/* Project Settings Overrides - per-project typography, layout, and color customization.
+   CSS custom properties are set inline on the editor container when a project has custom formatting rules.
+   Doubled-class selector raises specificity (0,3,0) to beat all workspace rules (0,2,0)
+   without using !important, so per-block inline font styles from TipTap still work.
+   Each var() falls back to --ws-* (workspace default) to prevent undefined vars
+   from resolving to 'inherit' and losing workspace styling. */
+.project-settings-active.project-settings-active .ProseMirror {
+  font-family: var(--project-font-family, var(--ws-font-family));
+  font-size: var(--project-font-size, var(--ws-font-size));
+  line-height: var(--project-line-height, var(--ws-line-height));
+  padding-left: var(--project-padding-x, 2rem);
+  padding-right: var(--project-padding-x, 2rem);
+  color: var(--project-text-color, var(--text-primary));
+}
+
+.project-settings-active.project-settings-active .ProseMirror p {
+  margin-bottom: var(--project-paragraph-spacing, 1em);
+}
+
+/* Per-heading project settings overrides.
+   Fallback chain: per-heading var -> body var -> workspace var / base size */
+.project-settings-active.project-settings-active .ProseMirror h1 {
+  font-family: var(--project-h1-font-family, var(--project-font-family, var(--ws-font-family)));
+  font-size: var(--project-h1-font-size, 2.5rem);
+  color: var(--project-h1-color, var(--project-heading-color, var(--text-primary)));
+}
+
+.project-settings-active.project-settings-active .ProseMirror h2 {
+  font-family: var(--project-h2-font-family, var(--project-font-family, var(--ws-font-family)));
+  font-size: var(--project-h2-font-size, 1.875rem);
+  color: var(--project-h2-color, var(--project-heading-color, var(--text-primary)));
+}
+
+.project-settings-active.project-settings-active .ProseMirror h3 {
+  font-family: var(--project-h3-font-family, var(--project-font-family, var(--ws-font-family)));
+  font-size: var(--project-h3-font-size, 1.5rem);
+  color: var(--project-h3-color, var(--project-heading-color, var(--text-primary)));
 }
 
 .ProseMirror p {
@@ -277,8 +334,14 @@
   padding: 0;
 }
 
-.ProseMirror ul,
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+}
+
 .ProseMirror ol {
+  list-style-type: decimal;
   padding-left: 1.5rem;
   margin: 1rem 0;
 }
@@ -745,6 +808,12 @@
   50% {
     opacity: 1;
   }
+}
+
+/* Apply pulse animation to gold loading placeholder text in the editor */
+.ProseMirror span[style*="color: #fbbf24"],
+.ProseMirror span[style*="color: rgb(251, 191, 36)"] {
+  animation: thinking-pulse 1.5s ease-in-out infinite;
 }
 
 /* Dialogue - Regular case, centered under character name (narrower than action) */

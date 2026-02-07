@@ -37,8 +37,9 @@ import {
   CloudRegular,
   BriefcaseMedicalRegular
 } from '@fluentui/react-icons'
-import { SLASH_COMMANDS_SELECTION, type SlashCommandItem } from '../extensions/SlashCommand'
+import { SLASH_COMMANDS_SELECTION, SLASH_COMMANDS_SELECTION_GENERAL, type SlashCommandItem } from '../extensions/SlashCommand'
 import { useProjectStore } from '../../../stores/projectStore'
+import { useWorkspace } from '../../../workspaces/useWorkspace'
 import { contentToPlainText } from '../../../utils/selectionUtils'
 
 // Icon mapping for all commands
@@ -91,6 +92,12 @@ const LOADING_TEXT: Record<string, string> = {
   dialogue: 'Generating dialogue (gated)...',
   setting: 'Describing setting (gated)...',
   negativeSpace: 'Creating texture (gated)...',
+  fixGrammar: 'Fixing grammar & spelling...',
+  makeLonger: 'Expanding...',
+  makeConcise: 'Making concise...',
+  actionItems: 'Extracting action items...',
+  extractQuestions: 'Extracting questions...',
+  summarize: 'Summarizing...',
 }
 
 // Get loading text for a command
@@ -129,7 +136,8 @@ export function SelectionSlashMenu({
   
   const currentProject = useProjectStore(state => state.currentProject)
   const setLastPipelineResult = useProjectStore(state => state.setLastPipelineResult)
-  const items = SLASH_COMMANDS_SELECTION
+  const { isScreenplay: isScreenplayProject } = useWorkspace()
+  const items = isScreenplayProject ? SLASH_COMMANDS_SELECTION : SLASH_COMMANDS_SELECTION_GENERAL
 
   // Calculate menu position based on selection, with viewport clamping
   useEffect(() => {
