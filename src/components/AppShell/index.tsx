@@ -50,7 +50,16 @@ export function AppShell() {
   
   // Right sidebar tab state
   const [rightSidebarTab, setRightSidebarTab] = useState<RightSidebarTab>('assets')
-  
+
+  // Fullscreen state - hide traffic light spacer when in fullscreen
+  const [isFullScreen, setIsFullScreen] = useState(false)
+
+  useEffect(() => {
+    if (window.api?.window?.onFullScreenChange) {
+      return window.api.window.onFullScreenChange(setIsFullScreen)
+    }
+  }, [])
+
   // Get workspace configuration
   const { showCharactersPanel } = useWorkspace()
 
@@ -114,9 +123,12 @@ export function AppShell() {
       {/* Title bar / Toolbar */}
       <div className="h-12 flex items-center justify-between px-4 toolbar-floating titlebar-drag-region">
         {/* Left controls */}
-        <div className="flex items-center gap-1 titlebar-no-drag">
-          {/* macOS traffic lights space */}
-          <div className="w-16" />
+        <div className="flex items-center gap-2 titlebar-no-drag">
+          {/* macOS traffic lights space - collapses smoothly in fullscreen */}
+          <div
+            className="shrink-0 transition-[width] duration-300 ease-in-out"
+            style={{ width: isFullScreen ? 0 : 64 }}
+          />
           
           {/* Back to projects */}
           <button
@@ -124,9 +136,9 @@ export function AppShell() {
             className="btn-icon-modern"
             title="Back to Projects"
           >
-            <ArrowLeftRegular className="w-4 h-4" />
+            <ArrowLeftRegular className="w-5 h-5" />
           </button>
-          
+
           {/* Toggle left sidebar */}
           <button
             onClick={toggleLeftSidebar}
@@ -136,7 +148,7 @@ export function AppShell() {
             )}
             title="Toggle Project Explorer"
           >
-            <PanelLeftRegular className="w-4 h-4" />
+            <PanelLeftRegular className="w-5 h-5" />
           </button>
         </div>
 
@@ -151,7 +163,7 @@ export function AppShell() {
         </div>
 
         {/* Right controls */}
-        <div className="flex items-center gap-1 titlebar-no-drag">
+        <div className="flex items-center gap-2 titlebar-no-drag">
           {/* Theme toggle */}
           <button
             onClick={toggleTheme}
@@ -159,12 +171,12 @@ export function AppShell() {
             title={ui.theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             {ui.theme === 'dark' ? (
-              <WeatherSunnyRegular className="w-4 h-4" />
+              <WeatherSunnyRegular className="w-5 h-5" />
             ) : (
-              <WeatherMoonRegular className="w-4 h-4" />
+              <WeatherMoonRegular className="w-5 h-5" />
             )}
           </button>
-          
+
           {/* Toggle right sidebar */}
           <button
             onClick={toggleRightSidebar}
@@ -174,7 +186,7 @@ export function AppShell() {
             )}
             title="Toggle Assets Panel"
           >
-            <PanelRightRegular className="w-4 h-4" />
+            <PanelRightRegular className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -264,10 +276,17 @@ export function AppShell() {
               
               {/* Panel content */}
               {currentProject.templateId === 'notes-journal' ? (
-                // Stickers panel takes full height for NotesJournal (no WebLinks)
-                <div className="flex-1 min-h-0 overflow-hidden">
-                  <StickersPanel />
-                </div>
+                // Assets panel + Stickers panel for NotesJournal
+                <>
+                  {/* Assets Panel - takes 40% */}
+                  <div className="flex-[2] min-h-0 overflow-hidden border-b border-theme-subtle">
+                    <AssetsPanel />
+                  </div>
+                  {/* Stickers Panel - takes 60% */}
+                  <div className="flex-[3] min-h-0 overflow-hidden">
+                    <StickersPanel />
+                  </div>
+                </>
               ) : (
                 <>
                   {/* Panel content - takes 60% */}

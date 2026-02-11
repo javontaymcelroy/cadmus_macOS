@@ -23,7 +23,8 @@ import {
   SettingsRegular,
   KeyRegular,
   CheckmarkCircleRegular,
-  ChevronUpRegular
+  ChevronUpRegular,
+  ArrowImportRegular
 } from '@fluentui/react-icons'
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -57,8 +58,9 @@ const statePriority: Record<DocumentLifecycleState, number> = {
 export function TemplatePicker() {
   const { 
     createProject, 
-    openProject, 
-    isLoading, 
+    openProject,
+    importProject,
+    isLoading,
     error,
     agendaItems,
     toggleAgendaTodo,
@@ -201,6 +203,19 @@ export function TemplatePicker() {
     if (path) {
       await openProject(path)
     }
+  }
+
+  const handleImportProject = async () => {
+    // Step 1: Select source project folder
+    const sourcePath = await window.api.dialog.selectFolder()
+    if (!sourcePath) return
+
+    // Step 2: Select destination folder
+    const destinationPath = await window.api.dialog.selectFolder()
+    if (!destinationPath) return
+
+    // Step 3: Import (copy and open)
+    await importProject(sourcePath, destinationPath)
   }
 
   const handleOpenLivingDocument = async (path: string) => {
@@ -358,9 +373,28 @@ export function TemplatePicker() {
               )}
 
               {/* Workspaces section header */}
-              <h2 className="text-base font-ui font-medium text-theme-primary uppercase tracking-wider mb-6">
-                Workspaces
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-base font-ui font-medium text-theme-primary uppercase tracking-wider">
+                  Workspaces
+                </h2>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleOpenProject}
+                    className="btn-secondary-modern inline-flex items-center gap-2 text-xs px-3 py-1.5"
+                  >
+                    <FolderOpenRegular className="w-3.5 h-3.5" />
+                    Open Project
+                  </button>
+                  <button
+                    onClick={handleImportProject}
+                    className="btn-secondary-modern inline-flex items-center gap-2 text-xs px-3 py-1.5"
+                    disabled={isLoading}
+                  >
+                    <ArrowImportRegular className="w-3.5 h-3.5" />
+                    {isLoading ? 'Importing...' : 'Import Project'}
+                  </button>
+                </div>
+              </div>
 
                 {/* Template grid - 3 columns max */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -373,19 +407,6 @@ export function TemplatePicker() {
                     />
                   ))}
                 </div>
-
-              {/* Open Project button when no living documents */}
-              {livingDocuments.length === 0 && (
-                <div className="mt-12 text-center">
-                  <button
-                    onClick={handleOpenProject}
-                    className="btn-secondary-modern inline-flex items-center gap-2 text-sm"
-                  >
-                    <FolderOpenRegular className="w-4 h-4" />
-                    Open Existing Project...
-                  </button>
-                </div>
-              )}
             </div>
             ) : (
               <div className="flex flex-col justify-center min-h-full">

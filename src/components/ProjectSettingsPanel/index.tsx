@@ -5,6 +5,9 @@ import { useProjectStore } from '../../stores/projectStore'
 import { FONT_FAMILIES } from '../../workspaces/shared/extensions/FontFamily'
 import type { FormattingRules, HeadingTypography } from '../../types/project'
 
+// Interface scale steps
+const INTERFACE_SCALE_STEPS = [75, 80, 90, 100, 110, 125, 150]
+
 // Color presets for the pickers
 const COLOR_PRESETS = [
   { name: 'Default', value: '' },
@@ -269,11 +272,36 @@ export function ProjectSettingsPanel() {
   const rules = currentProject?.settings?.formattingRules
   if (!currentProject || !rules) return null
 
+  const isScreenplay = currentProject.templateId === 'screenplay'
+
   // Local draft state - changes are buffered here until Save
   const [draft, setDraft] = useState<EditableFields>(() => getEditableFields(rules))
 
+  // Separate draft for target runtime (lives on ProjectSettings, not FormattingRules)
+  const [draftTargetRuntime, setDraftTargetRuntime] = useState<number | undefined>(
+    currentProject.settings.targetRuntimeMinutes
+  )
+
+  // Interface scale state (applied immediately, not part of the save/cancel flow)
+  const [interfaceScale, setInterfaceScale] = useState(100)
+
+  // Load interface scale on mount
+  useEffect(() => {
+    window.api.interfaceScale?.get().then((scale: number) => {
+      if (scale >= 75 && scale <= 150) {
+        setInterfaceScale(scale)
+      }
+    }).catch(() => {})
+  }, [])
+
+  const handleInterfaceScaleChange = (newScale: number) => {
+    setInterfaceScale(newScale)
+    window.api.interfaceScale?.set(newScale)
+  }
+
   // Track whether we have unsaved changes
   const dirty = hasChanges(draft, getEditableFields(rules))
+    || draftTargetRuntime !== currentProject.settings.targetRuntimeMinutes
 
   const updateDraft = (partial: Partial<EditableFields>) => {
     setDraft(prev => ({ ...prev, ...partial }))
@@ -288,7 +316,8 @@ export function ProjectSettingsPanel() {
 
   const handleSave = () => {
     updateProjectSettings({
-      formattingRules: { ...rules, ...draft }
+      formattingRules: { ...rules, ...draft },
+      targetRuntimeMinutes: draftTargetRuntime,
     })
     setSettingsPanelOpen(false)
   }
@@ -311,6 +340,7 @@ export function ProjectSettingsPanel() {
       h2: undefined,
       h3: undefined,
     })
+    setDraftTargetRuntime(undefined)
   }
 
   return (
@@ -348,37 +378,95 @@ export function ProjectSettingsPanel() {
       <div ref={scrollRef} className="flex-1 overflow-auto px-6 py-6">
         <div className="max-w-xl mx-auto space-y-8">
 
+          {/* Interface Scale Section (always shown, applied immediately) */}
+          <section id="settings-interface-scale">
+            <h3 className="text-xs font-ui font-semibold text-theme-accent uppercase tracking-wider mb-2">
+              Interface Scale
+            </h3>
+            <div className="divide-y divide-theme-subtle">
+              <SettingRow label="App Zoom" description="Scale the entire interface (toolbar, sidebar, editor)">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const idx = INTERFACE_SCALE_STEPS.findIndex(s => s >= interfaceScale)
+                      const prevIdx = Math.max((idx > 0 ? idx : INTERFACE_SCALE_STEPS.length) - 1, 0)
+                      handleInterfaceScaleChange(INTERFACE_SCALE_STEPS[prevIdx])
+                    }}
+                    disabled={interfaceScale <= INTERFACE_SCALE_STEPS[0]}
+                    className="btn-icon-modern p-1 text-xs"
+                    title="Zoom Out"
+                  >
+                    -
+                  </button>
+                  <select
+                    value={interfaceScale}
+                    onChange={(e) => handleInterfaceScaleChange(Number(e.target.value))}
+                    className="input-modern text-sm text-center py-1.5 px-2 w-24"
+                  >
+                    {INTERFACE_SCALE_STEPS.map((s) => (
+                      <option key={s} value={s}>{s}%</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => {
+                      const idx = INTERFACE_SCALE_STEPS.findIndex(s => s > interfaceScale)
+                      const nextIdx = idx >= 0 ? idx : INTERFACE_SCALE_STEPS.length - 1
+                      handleInterfaceScaleChange(INTERFACE_SCALE_STEPS[nextIdx])
+                    }}
+                    disabled={interfaceScale >= INTERFACE_SCALE_STEPS[INTERFACE_SCALE_STEPS.length - 1]}
+                    className="btn-icon-modern p-1 text-xs"
+                    title="Zoom In"
+                  >
+                    +
+                  </button>
+                  {interfaceScale !== 100 && (
+                    <button
+                      onClick={() => handleInterfaceScaleChange(100)}
+                      className="text-xs text-theme-muted hover:text-theme-accent transition-colors ml-1"
+                      title="Reset to 100%"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </SettingRow>
+            </div>
+          </section>
+
           {/* Body Text Section */}
           <section id="settings-body">
             <h3 className="text-xs font-ui font-semibold text-theme-accent uppercase tracking-wider mb-2">
               Body Text
             </h3>
             <div className="divide-y divide-theme-subtle">
-              <SettingRow label="Font Family" description="Default font for body text">
-                <select
-                  value={draft.defaultFontFamily ?? ''}
-                  onChange={(e) => updateDraft({
-                    defaultFontFamily: e.target.value || undefined
-                  })}
-                  className="input-modern text-sm py-1.5 px-3 w-48"
-                >
-                  <option value="">Workspace Default</option>
-                  {FONT_FAMILIES.map((font) => (
-                    <option key={font.value} value={font.value}>
-                      {font.name}
-                    </option>
-                  ))}
-                </select>
-              </SettingRow>
+              {/* Font Family - hidden for screenplay (locked to Courier) */}
+              {!isScreenplay && (
+                <SettingRow label="Font Family" description="Default font for body text">
+                  <select
+                    value={draft.defaultFontFamily ?? ''}
+                    onChange={(e) => updateDraft({
+                      defaultFontFamily: e.target.value || undefined
+                    })}
+                    className="input-modern text-sm py-1.5 px-3 w-48"
+                  >
+                    <option value="">Workspace Default</option>
+                    {FONT_FAMILIES.map((font) => (
+                      <option key={font.value} value={font.value}>
+                        {font.name}
+                      </option>
+                    ))}
+                  </select>
+                </SettingRow>
+              )}
 
-              <SettingRow label="Font Size" description="Base text size in pixels">
+              <SettingRow label="Font Size" description={isScreenplay ? 'Base text size in points' : 'Base text size in pixels'}>
                 <NumberStepper
                   value={draft.defaultFontSize}
                   onChange={(val) => updateDraft({ defaultFontSize: val })}
-                  min={12}
+                  min={10}
                   max={24}
                   step={1}
-                  unit="px"
+                  unit={isScreenplay ? 'pt' : 'px'}
                 />
               </SettingRow>
 
@@ -392,16 +480,18 @@ export function ProjectSettingsPanel() {
                 />
               </SettingRow>
 
-              <SettingRow label="Paragraph Spacing" description="Space between paragraphs">
-                <NumberStepper
-                  value={draft.paragraphSpacing}
-                  onChange={(val) => updateDraft({ paragraphSpacing: val })}
-                  min={0}
-                  max={2}
-                  step={0.25}
-                  unit="rem"
-                />
-              </SettingRow>
+              {!isScreenplay && (
+                <SettingRow label="Paragraph Spacing" description="Space between paragraphs">
+                  <NumberStepper
+                    value={draft.paragraphSpacing}
+                    onChange={(val) => updateDraft({ paragraphSpacing: val })}
+                    min={0}
+                    max={2}
+                    step={0.25}
+                    unit="rem"
+                  />
+                </SettingRow>
+              )}
 
               <SettingRow label="Color" description="Body text color">
                 <ColorPicker
@@ -413,25 +503,29 @@ export function ProjectSettingsPanel() {
             </div>
           </section>
 
-          {/* Heading Sections */}
-          <HeadingSection
-            level="h1"
-            label="Heading 1"
-            values={draft.h1}
-            onUpdate={(p) => updateHeadingDraft('h1', p)}
-          />
-          <HeadingSection
-            level="h2"
-            label="Heading 2"
-            values={draft.h2}
-            onUpdate={(p) => updateHeadingDraft('h2', p)}
-          />
-          <HeadingSection
-            level="h3"
-            label="Heading 3"
-            values={draft.h3}
-            onUpdate={(p) => updateHeadingDraft('h3', p)}
-          />
+          {/* Heading Sections - hidden for screenplay */}
+          {!isScreenplay && (
+            <>
+              <HeadingSection
+                level="h1"
+                label="Heading 1"
+                values={draft.h1}
+                onUpdate={(p) => updateHeadingDraft('h1', p)}
+              />
+              <HeadingSection
+                level="h2"
+                label="Heading 2"
+                values={draft.h2}
+                onUpdate={(p) => updateHeadingDraft('h2', p)}
+              />
+              <HeadingSection
+                level="h3"
+                label="Heading 3"
+                values={draft.h3}
+                onUpdate={(p) => updateHeadingDraft('h3', p)}
+              />
+            </>
+          )}
 
           {/* Layout Section */}
           <section id="settings-layout">
@@ -482,6 +576,27 @@ export function ProjectSettingsPanel() {
               </SettingRow>
             </div>
           </section>
+
+          {/* Screenplay Section - only for screenplay projects */}
+          {isScreenplay && (
+            <section id="settings-screenplay">
+              <h3 className="text-xs font-ui font-semibold text-theme-accent uppercase tracking-wider mb-2">
+                Screenplay
+              </h3>
+              <div className="divide-y divide-theme-subtle">
+                <SettingRow label="Target Runtime" description="Goal runtime for your screenplay">
+                  <NumberStepper
+                    value={draftTargetRuntime}
+                    onChange={(val) => setDraftTargetRuntime(val)}
+                    min={1}
+                    max={600}
+                    step={5}
+                    unit="min"
+                  />
+                </SettingRow>
+              </div>
+            </section>
+          )}
 
           {/* Reset */}
           <div className="pt-4 border-t border-theme-subtle">

@@ -12,16 +12,16 @@
   --bg-secondary: #0a0a0a;
   --bg-tertiary: #121212;
   --bg-elevated: #1a1a1a;
-  --bg-panel: rgba(18, 18, 18, 0.95);
-  --bg-panel-solid: #121212;
-  --bg-header: rgba(255, 255, 255, 0.02);
+  --bg-panel: rgba(18, 18, 18, 0.75);
+  --bg-panel-solid: rgba(18, 18, 18, 0.75);
+  --bg-header: rgba(10, 10, 10, 0.7);
   --bg-hover: rgba(255, 255, 255, 0.04);
   --bg-active: rgba(255, 255, 255, 0.08);
   
   /* Text tokens */
-  --text-primary: rgba(255, 255, 255, 0.85);
-  --text-secondary: rgba(255, 255, 255, 0.6);
-  --text-muted: rgba(255, 255, 255, 0.4);
+  --text-primary: rgba(255, 255, 255, 0.92);
+  --text-secondary: rgba(255, 255, 255, 0.72);
+  --text-muted: rgba(255, 255, 255, 0.5);
   --text-inverted: #050505;
   
   /* Border tokens */
@@ -51,9 +51,9 @@
   --bg-secondary: #fffefa;
   --bg-tertiary: #f9f7f2;
   --bg-elevated: #fffef9;
-  --bg-panel: rgba(255, 254, 250, 0.98);
-  --bg-panel-solid: #fffef9;
-  --bg-header: #f5f3ed;
+  --bg-panel: rgba(255, 254, 250, 0.75);
+  --bg-panel-solid: rgba(255, 254, 250, 0.75);
+  --bg-header: rgba(245, 243, 237, 0.7);
   --bg-hover: rgba(0, 0, 0, 0.03);
   --bg-active: rgba(0, 0, 0, 0.06);
   
@@ -110,7 +110,11 @@
 .bg-theme-tertiary { background-color: var(--bg-tertiary); }
 .bg-theme-elevated { background-color: var(--bg-elevated); }
 .bg-theme-panel { background-color: var(--bg-panel-solid); }
-.bg-theme-header { background-color: var(--bg-header); }
+.bg-theme-header {
+  background-color: var(--bg-header);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
 .bg-theme-hover { background-color: var(--bg-hover); }
 .bg-theme-active { background-color: var(--bg-active); }
 
@@ -272,6 +276,20 @@
   font-family: var(--project-h3-font-family, var(--project-font-family, var(--ws-font-family)));
   font-size: var(--project-h3-font-size, 1.5rem);
   color: var(--project-h3-color, var(--project-heading-color, var(--text-primary)));
+}
+
+/* Screenplay element overrides when project settings are active.
+   Allow font-size, line-height, and text color to be customized while
+   keeping Courier New font family and all other screenplay-specific formatting. */
+.project-settings-active.project-settings-active .ProseMirror .screenplay-element {
+  font-size: var(--project-font-size, 14pt);
+  line-height: var(--project-line-height, 1.5);
+  color: var(--project-text-color, var(--text-primary));
+}
+
+/* Preserve gold color for scene headings even with project text color overrides */
+.project-settings-active.project-settings-active .ProseMirror .screenplay-scene-heading {
+  color: var(--accent-gold);
 }
 
 .ProseMirror p {
@@ -468,9 +486,7 @@
 
 /* Citation styles - linked/cited text from other documents */
 .ProseMirror .citation {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
+  display: inline;
   padding: 1px 6px;
   margin-left: 4px;
   background: rgba(251, 191, 36, 0.1);
@@ -478,23 +494,15 @@
   border-radius: 4px;
   color: var(--accent-gold);
   font-size: 10px;
+  font-family: var(--font-ui, system-ui, sans-serif);
   font-weight: 500;
+  letter-spacing: 0.02em;
   text-decoration: none;
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
   vertical-align: middle;
-}
-
-/* Hide the arrow character and show "Source" text instead */
-.ProseMirror .citation {
-  font-size: 0; /* Hide the arrow */
-}
-
-.ProseMirror .citation::before {
-  content: 'Source';
-  font-size: 10px;
-  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .ProseMirror .citation:hover {
@@ -527,21 +535,16 @@
   pointer-events: none;
 }
 
-/* Target block highlight animation when navigating from citation */
+/* Target block highlight when navigating from citation or scene click */
 .citation-target-highlight {
-  animation: citationHighlight 2s ease-out;
+  background-color: rgba(251, 191, 36, 0.35) !important;
+  box-shadow: 0 0 0 6px rgba(251, 191, 36, 0.2);
+  border-radius: 4px;
+  transition: background-color 1s ease-out, box-shadow 1s ease-out;
 }
-
-@keyframes citationHighlight {
-  0% {
-    background-color: rgba(251, 191, 36, 0.3);
-    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.2);
-    border-radius: 4px;
-  }
-  100% {
-    background-color: transparent;
-    box-shadow: none;
-  }
+.citation-target-highlight.fade-out {
+  background-color: transparent !important;
+  box-shadow: none;
 }
 
 /* Asset images in editor */
@@ -698,7 +701,7 @@
   text-align: center;
   margin-left: auto;
   margin-right: auto;
-  margin-bottom: 0;
+  margin-bottom: 0.25em;
   max-width: 60%;
   font-weight: 500;
 }
@@ -750,6 +753,7 @@
   transition: all 0.15s ease;
   text-decoration: none;
   user-select: none;
+  border: 2px solid rgba(255, 255, 255, 0.2);
   /* Background and color are set inline via the Mention extension */
 }
 
@@ -810,11 +814,7 @@
   }
 }
 
-/* Apply pulse animation to gold loading placeholder text in the editor */
-.ProseMirror span[style*="color: #fbbf24"],
-.ProseMirror span[style*="color: rgb(251, 191, 36)"] {
-  animation: thinking-pulse 1.5s ease-in-out infinite;
-}
+/* AI loading placeholder text uses .ai-thinking-placeholder class for animation */
 
 /* Dialogue - Regular case, centered under character name (narrower than action) */
 .ProseMirror .screenplay-dialogue {
@@ -1063,7 +1063,11 @@
 /* Modern icon button with brand color hover */
 .btn-icon-modern {
   position: relative;
-  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
   color: var(--text-secondary);
   transition: color 0.2s ease;
@@ -1258,6 +1262,8 @@
 .panel-floating {
   position: relative;
   background: var(--bg-panel-solid);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
   box-shadow:
@@ -1269,7 +1275,9 @@
 /* Floating toolbar - transparent, no card styling */
 .toolbar-floating {
   position: relative;
-  background: transparent;
+  background: var(--bg-header);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
   border: none;
   border-radius: 0;
   box-shadow: none;

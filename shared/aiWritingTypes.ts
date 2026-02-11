@@ -16,6 +16,9 @@ export type AIWritingCommand =
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   | 'scriptDoctor'
   | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
+  | 'customPrompt'
+  | 'ask'
+  | 'makeConsistent'
 
 /**
  * Screenplay element types for formatted output
@@ -109,6 +112,8 @@ export interface AIWritingRequest {
   supplementaryContext?: SupplementaryWritingContext
   /** Structured scene context (current scene heading, characters in scene, etc.) */
   sceneContext?: SceneContext
+  /** User's freeform question for the 'ask' command */
+  userQuestion?: string
 }
 
 /**
@@ -183,5 +188,12 @@ export const DEFAULT_SLASH_COMMANDS: SlashCommandItem[] = [
     description: 'Organic moments: pauses, texture, behavior — nothing that advances plot',
     shortcut: 'N',
     icon: 'weather'
+  },
+  {
+    id: 'ask',
+    name: 'Ask',
+    description: 'Ask a question and get formatted content',
+    shortcut: 'A',
+    icon: 'chat-question'
   }
 ]

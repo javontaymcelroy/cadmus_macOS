@@ -140,32 +140,25 @@ export const Citation = Mark.create<CitationOptions>({
       new Plugin({
         key: new PluginKey('citationClickHandler'),
         props: {
-          handleClick: (view, pos, event) => {
-            if (!onCitationClick) {
-              return false
-            }
+          handleDOMEvents: {
+            click: (_view, event) => {
+              if (!onCitationClick) return false
 
-            const { state } = view
-            const { doc } = state
-            const $pos = doc.resolve(pos)
+              const target = (event.target as HTMLElement).closest('.citation')
+              if (!target) return false
 
-            // Check if we clicked on a citation mark
-            const marks = $pos.marks()
-            const citationMark = marks.find(mark => mark.type.name === 'citation')
+              const docId = target.getAttribute('data-source-document-id')
+              const blockId = target.getAttribute('data-source-block-id')
 
-            if (citationMark) {
-              const { sourceDocumentId, sourceBlockId } = citationMark.attrs
-
-              // Navigate if we have at least a document ID (blockId can be empty)
-              if (sourceDocumentId) {
+              if (docId) {
                 event.preventDefault()
                 event.stopPropagation()
-                onCitationClick(sourceDocumentId, sourceBlockId || '')
+                onCitationClick(docId, blockId || '')
                 return true
               }
-            }
 
-            return false
+              return false
+            },
           },
         },
       }),

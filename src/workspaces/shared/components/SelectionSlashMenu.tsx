@@ -98,6 +98,8 @@ const LOADING_TEXT: Record<string, string> = {
   actionItems: 'Extracting action items...',
   extractQuestions: 'Extracting questions...',
   summarize: 'Summarizing...',
+  customPrompt: 'Reading your notes and processing...',
+  makeConsistent: 'Harmonizing style...',
 }
 
 // Get loading text for a command
@@ -131,8 +133,11 @@ export function SelectionSlashMenu({
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null)
   const [submenuIndex, setSubmenuIndex] = useState(0)
+  const [customInputMode, setCustomInputMode] = useState(false)
+  const [customInputText, setCustomInputText] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
   const submenuRef = useRef<HTMLDivElement>(null)
+  const customInputRef = useRef<HTMLInputElement>(null)
   
   const currentProject = useProjectStore(state => state.currentProject)
   const setLastPipelineResult = useProjectStore(state => state.setLastPipelineResult)
@@ -216,6 +221,8 @@ export function SelectionSlashMenu({
       setSelectedIndex(0)
       setActiveSubmenu(null)
       setSubmenuIndex(0)
+      setCustomInputMode(false)
+      setCustomInputText('')
     }
   }, [isOpen])
 
@@ -228,6 +235,15 @@ export function SelectionSlashMenu({
     if (!isOpen) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // If custom input mode is active, let the input handle most keys
+      if (customInputMode) {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          setCustomInputMode(false)
+        }
+        return
+      }
+
       // If submenu is open, handle submenu navigation
       if (activeSubmenu && currentSubmenu) {
         switch (e.key) {
@@ -308,7 +324,7 @@ export function SelectionSlashMenu({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, selectedIndex, items, activeSubmenu, currentSubmenu, submenuIndex, currentItem])
+  }, [isOpen, selectedIndex, items, activeSubmenu, currentSubmenu, submenuIndex, currentItem, customInputMode])
 
   // Close on click outside
   useEffect(() => {
@@ -332,21 +348,27 @@ export function SelectionSlashMenu({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen, onClose])
 
-  // Execute command with optional tone parameter
-  const executeCommandWithTone = useCallback(async (item: SlashCommandItem, toneOption?: string) => {
+  // Execute command with optional tone parameter or custom prompt text
+  const executeCommandWithTone = useCallback(async (item: SlashCommandItem, toneOption?: string, customPromptText?: string) => {
     const { state } = editor
     const { from } = state.selection
     
     // Detect if we're in screenplay mode
     const isScreenplay = isScreenplayEditor(editor)
     
-    // Get text before selection (up to 8000 chars) for surrounding context
+    // Get surrounding context
     const textBefore = state.doc.textBetween(0, from, '\n', '\ufffc')
-    // If selection is near the start of the document, include the selected text
-    // as context so the AI always has something to work with
-    const context = textBefore.trim().length > 0
-      ? textBefore.slice(-8000)
-      : selectedText.slice(0, 8000)
+    let context: string
+    if (item.id === 'customPrompt' || item.id === 'makeConsistent') {
+      // For custom prompt and makeConsistent, include the FULL current document for richer context
+      const fullDocText = state.doc.textBetween(0, state.doc.content.size, '\n', '\ufffc')
+      context = fullDocText.slice(0, 16000)
+    } else {
+      // For other commands, use text before selection (up to 8000 chars)
+      context = textBefore.trim().length > 0
+        ? textBefore.slice(-8000)
+        : selectedText.slice(0, 8000)
+    }
 
     // Get document title from the first H1 if available
     let documentTitle: string | undefined
@@ -424,15 +446,23 @@ export function SelectionSlashMenu({
         supplementaryContext.propNotes = propNotes
       }
 
-      // Load other supplementary docs (notes, synopsis, etc. - not character/prop notes)
+      // For customPrompt: load ALL journal documents for broader context
+      // For makeConsistent: skip extra docs — pattern detection is scoped to selected text only
+      // For other commands: only load notes/synopsis/outline
+      const needsFullContext = item.id === 'customPrompt'
       const otherNotes: Array<{ title: string; content: string }> = []
-      const supplementaryDocs = currentProject.documents?.filter(doc => 
-        doc.type === 'document' && 
-        (doc.isNote || doc.title.toLowerCase().includes('synopsis') || doc.title.toLowerCase().includes('outline')) &&
-        !doc.isCharacterNote && 
-        !doc.isPropNote &&
-        !doc.isActBreak
-      ) || []
+      const activeDocId = useProjectStore.getState().activeDocumentId
+      const supplementaryDocs = currentProject.documents?.filter(doc => {
+        if (doc.type !== 'document') return false
+        if (doc.isCharacterNote || doc.isPropNote || doc.isActBreak) return false
+        if (needsFullContext) {
+          // For custom prompt, include all documents except the current one
+          // (the current document is already in `context` via fullDocText)
+          return doc.id !== activeDocId
+        }
+        // For other commands, only include notes/synopsis/outline
+        return doc.isNote || doc.title.toLowerCase().includes('synopsis') || doc.title.toLowerCase().includes('outline')
+      }) || []
 
       for (const doc of supplementaryDocs) {
         try {
@@ -441,7 +471,7 @@ export function SelectionSlashMenu({
             const plainText = contentToPlainText(content)
             if (plainText.trim().length > 0) {
               // Check if this looks like a synopsis based on title
-              if (doc.title.toLowerCase().includes('synopsis')) {
+              if (!needsFullContext && doc.title.toLowerCase().includes('synopsis')) {
                 supplementaryContext.synopsis = plainText
               } else {
                 otherNotes.push({ title: doc.title, content: plainText })
@@ -473,9 +503,11 @@ export function SelectionSlashMenu({
       .chain()
       .focus()
       .setTextSelection(insertPos)
-      .setColor('#fbbf24') // Gold color
-      .insertContent(loadingText)
-      .unsetColor()
+      .insertContent({
+        type: 'text',
+        text: loadingText,
+        marks: [{ type: 'textStyle', attrs: { color: '#fbbf24' } }]
+      })
       .run()
 
     // Helper: find the loading placeholder in the document
@@ -505,9 +537,11 @@ export function SelectionSlashMenu({
           .focus()
           .setTextSelection({ from: start, to: end })
           .deleteSelection()
-          .setColor('#ef4444')
-          .insertContent(message)
-          .unsetColor()
+          .insertContent({
+            type: 'text',
+            text: message,
+            marks: [{ type: 'textStyle', attrs: { color: '#ef4444' } }]
+          })
           .run()
       }
       requestAnimationFrame(() => {
@@ -565,10 +599,12 @@ export function SelectionSlashMenu({
         selection: selectedText,
         documentTitle,
         toneOption,
+        customPromptText,
         characters: isScreenplay && characters.length > 0 ? characters : undefined,
         props: isScreenplay && props.length > 0 ? props : undefined,
         templateType: isScreenplay ? 'screenplay' : undefined,
         supplementaryContext: Object.keys(supplementaryContext).length > 0 ? supplementaryContext : undefined,
+        targetRuntimeMinutes: isScreenplay ? currentProject.settings?.targetRuntimeMinutes : undefined,
       }
 
       if (item.gated) {
@@ -592,9 +628,11 @@ export function SelectionSlashMenu({
               .focus()
               .setTextSelection({ from: start, to: end })
               .deleteSelection()
-              .setColor('#f59e0b') // Amber color for decline (not error)
-              .insertContent(`[Writing Partner: ${declineMsg}.${suggestion}]`)
-              .unsetColor()
+              .insertContent({
+                type: 'text',
+                text: `[Writing Partner: ${declineMsg}.${suggestion}]`,
+                marks: [{ type: 'textStyle', attrs: { color: '#f59e0b' } }]
+              })
               .run()
           }
           requestAnimationFrame(() => {
@@ -633,6 +671,11 @@ export function SelectionSlashMenu({
         // Open submenu
         setActiveSubmenu(item.id)
         setSubmenuIndex(0)
+      } else if (item.requiresInput) {
+        // Switch to custom input mode
+        setCustomInputMode(true)
+        setCustomInputText('')
+        setTimeout(() => customInputRef.current?.focus(), 0)
       } else {
         executeCommand(item)
       }
@@ -777,9 +820,41 @@ export function SelectionSlashMenu({
           )
         })}
 
-        <div className="px-3 py-1.5 mt-1 border-t border-ink-700 text-[10px] text-ink-500 font-ui">
-          <span className="text-ink-400">↑↓</span> Navigate • <span className="text-ink-400">Enter</span> Select • <span className="text-ink-400">Esc</span> Close
-        </div>
+        {customInputMode ? (
+          <div className="px-3 py-2 border-t border-ink-700 mt-1">
+            <div className="text-[10px] font-ui font-semibold text-gold-400 uppercase tracking-wider mb-2">
+              Custom Prompt
+            </div>
+            <input
+              ref={customInputRef}
+              type="text"
+              value={customInputText}
+              onChange={(e) => setCustomInputText(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Enter' && customInputText.trim()) {
+                  const item = items.find(i => i.requiresInput)
+                  if (item) {
+                    executeCommandWithTone(item, undefined, customInputText.trim())
+                  }
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  setCustomInputMode(false)
+                }
+              }}
+              placeholder="Describe what to do with the selected text..."
+              className="w-full bg-ink-800 border border-ink-600 rounded-md px-3 py-2 text-sm font-ui text-white placeholder-ink-500 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
+              autoFocus
+            />
+            <div className="mt-2 text-[10px] text-ink-500 font-ui">
+              <span className="text-ink-400">Enter</span> Submit • <span className="text-ink-400">Esc</span> Back
+            </div>
+          </div>
+        ) : (
+          <div className="px-3 py-1.5 mt-1 border-t border-ink-700 text-[10px] text-ink-500 font-ui">
+            <span className="text-ink-400">↑↓</span> Navigate • <span className="text-ink-400">Enter</span> Select • <span className="text-ink-400">Esc</span> Close
+          </div>
+        )}
       </div>
 
       {/* Submenu for Adjust Tone */}

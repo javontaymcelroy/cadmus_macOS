@@ -11,13 +11,16 @@ import {
   TextAlignRightRegular,
   ArrowUndoRegular,
   ArrowRedoRegular,
-  ImageSparkleRegular,
-  PenSparkleRegular,
-  VideoClipRegular,
+  ImageSparkleFilled,
+  PenSparkleFilled,
+  VideoClipFilled,
+  TaskListLtrRegular,
+  BookOpenFilled,
+  WhiteboardFilled,
 } from '@fluentui/react-icons'
 import { useProjectStore } from '../../../stores/projectStore'
-import { ToolbarButton, ToolbarDivider, TextColorDropdown, RunBuildButton, ReaderModeButton, OverflowToolbar } from '../../shared/components'
-import { BookOpenRegular, DismissRegular } from '@fluentui/react-icons'
+import { ToolbarButton, ToolbarDivider, TextColorDropdown, RunBuildButton, OverflowToolbar } from '../../shared/components'
+import { DismissRegular } from '@fluentui/react-icons'
 import { SCREENPLAY_ELEMENTS, type ScreenplayElementType } from '../extensions/ScreenplayElement'
 import { hasSelection, getSelectionInfo, extractSurroundingContextWithPronouns } from '../../../utils/selectionUtils'
 
@@ -26,13 +29,6 @@ interface ScreenplayToolbarProps {
   isNote?: boolean
 }
 
-// Task list icon for notes
-const TaskListIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-    <path d="M5.85 3.35a.5.5 0 1 0-.7-.7L3.5 4.29l-.65-.64a.5.5 0 1 0-.7.7l1 1c.2.2.5.2.7 0l2-2ZM8.5 4a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9Zm0 5a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9Zm0 5a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9ZM5.85 8.85a.5.5 0 1 0-.7-.7L3.5 9.79l-.65-.64a.5.5 0 1 0-.7.7l1 1c.2.2.5.2.7 0l2-2Zm0 4.3c.2.2.2.5 0 .7l-2 2a.5.5 0 0 1-.7 0l-1-1a.5.5 0 0 1 .7-.7l.65.64 1.65-1.64c.2-.2.5-.2.7 0Z"/>
-  </svg>
-)
-
 function StoryboardToggleButton() {
   const { storyboardUI, setStoryboardMode } = useProjectStore()
 
@@ -40,14 +36,14 @@ function StoryboardToggleButton() {
     <button
       onClick={() => setStoryboardMode(storyboardUI.mode === 'side' ? null : 'side')}
       className={clsx(
-        'flex items-center justify-center w-8 h-8 shrink-0 self-center rounded-md transition-colors border',
+        'flex items-center justify-center w-8 h-8 shrink-0 self-center transition-colors',
         storyboardUI.mode
-          ? 'bg-amber-400/15 text-amber-400 border-amber-400/50'
-          : 'bg-theme-tertiary text-theme-primary hover:bg-theme-active border-theme-default'
+          ? 'bg-amber-400/15 text-amber-400'
+          : 'text-theme-primary hover:bg-theme-active'
       )}
       title={storyboardUI.mode ? "Close Storyboard" : "Open Storyboard"}
     >
-      <VideoClipRegular className="w-4 h-4" />
+      <VideoClipFilled className="w-4 h-4" />
     </button>
   )
 }
@@ -59,14 +55,54 @@ function WritingPartnerToggleButton() {
     <button
       onClick={toggleWritingPartnerPanel}
       className={clsx(
-        'flex items-center justify-center w-8 h-8 shrink-0 self-center rounded-md transition-colors border',
+        'flex items-center justify-center w-8 h-8 shrink-0 self-center transition-colors',
         ui.writingPartnerPanelOpen
-          ? 'bg-gold-400/15 text-gold-400 border-gold-400/50'
-          : 'bg-theme-tertiary text-theme-primary hover:bg-theme-active border-theme-default'
+          ? 'bg-gold-400/15 text-gold-400'
+          : 'text-theme-primary hover:bg-theme-active'
       )}
       title={ui.writingPartnerPanelOpen ? "Close Writing Partner (⌘⇧P)" : "Open Writing Partner (⌘⇧P)"}
     >
-      <PenSparkleRegular className="w-4 h-4" />
+      <PenSparkleFilled className="w-4 h-4" />
+    </button>
+  )
+}
+
+function InfiniteCanvasGroupedButton() {
+  const infiniteCanvas = useProjectStore(state => state.ui.infiniteCanvas)
+  const toggleInfiniteCanvas = useProjectStore(state => state.toggleInfiniteCanvas)
+
+  return (
+    <button
+      onClick={toggleInfiniteCanvas}
+      className={clsx(
+        'flex items-center justify-center w-8 h-8 shrink-0 self-center transition-colors',
+        infiniteCanvas
+          ? 'bg-theme-active text-theme-accent'
+          : 'text-theme-primary hover:bg-theme-active'
+      )}
+      title={infiniteCanvas ? "Exit Infinite Canvas" : "Infinite Canvas Mode"}
+    >
+      <WhiteboardFilled className="w-4 h-4" />
+    </button>
+  )
+}
+
+function ReaderModeGroupedButton() {
+  const readerMode = useProjectStore(state => state.ui.readerMode)
+  const toggleReaderMode = useProjectStore(state => state.toggleReaderMode)
+
+  return (
+    <button
+      onClick={toggleReaderMode}
+      className={clsx(
+        'flex items-center justify-center w-8 h-8 shrink-0 self-center transition-colors',
+        readerMode
+          ? 'bg-white/90 text-black'
+          : 'text-theme-primary hover:bg-theme-active'
+      )}
+      title={readerMode ? "Exit Reader Mode" : "Preview in Reader Mode"}
+    >
+      <BookOpenFilled className="w-4 h-4" />
     </button>
   )
 }
@@ -130,7 +166,7 @@ export function ScreenplayToolbar({ editor, isNote = false }: ScreenplayToolbarP
     return (
       <div className="flex items-center justify-between px-4 py-2 bg-theme-header border-b border-theme-subtle">
         <div className="flex items-center gap-2 text-theme-secondary">
-          <BookOpenRegular className="w-4 h-4" />
+          <BookOpenFilled className="w-4 h-4" />
           <span className="text-sm font-medium">Reader Mode</span>
         </div>
         <button
@@ -149,22 +185,25 @@ export function ScreenplayToolbar({ editor, isNote = false }: ScreenplayToolbarP
     <OverflowToolbar
       rightContent={
         <>
-          <button
-            onClick={handleGenerateStoryboard}
-            disabled={!hasTextSelection}
-            className={clsx(
-              'flex items-center justify-center w-8 h-8 shrink-0 self-center rounded-md transition-colors border',
-              hasTextSelection
-                ? 'bg-theme-tertiary text-theme-primary hover:bg-theme-active border-theme-default'
-                : 'bg-theme-tertiary/50 text-theme-muted border-theme-subtle cursor-not-allowed'
-            )}
-            title={hasTextSelection ? "Generate Storyboard Image from Selection" : "Select text to generate storyboard image"}
-          >
-            <ImageSparkleRegular className="w-4 h-4" />
-          </button>
-          <StoryboardToggleButton />
-          <WritingPartnerToggleButton />
-          <ReaderModeButton />
+          <div className="flex items-center self-center rounded-lg border border-theme-default bg-theme-tertiary overflow-hidden">
+            <InfiniteCanvasGroupedButton />
+            <button
+              onClick={handleGenerateStoryboard}
+              disabled={!hasTextSelection}
+              className={clsx(
+                'flex items-center justify-center w-8 h-8 shrink-0 transition-colors',
+                hasTextSelection
+                  ? 'text-theme-primary hover:bg-theme-active'
+                  : 'text-theme-muted cursor-not-allowed'
+              )}
+              title={hasTextSelection ? "Generate Storyboard Image from Selection" : "Select text to generate storyboard image"}
+            >
+              <ImageSparkleFilled className="w-4 h-4" />
+            </button>
+            <StoryboardToggleButton />
+            <WritingPartnerToggleButton />
+            <ReaderModeGroupedButton />
+          </div>
           <ToolbarDivider />
           <RunBuildButton />
         </>
@@ -297,11 +336,12 @@ export function ScreenplayToolbar({ editor, isNote = false }: ScreenplayToolbarP
             isActive={editor.isActive('taskList')}
             title="Task List (Todo)"
           >
-            <TaskListIcon />
+            <TaskListLtrRegular className="w-4 h-4" />
           </ToolbarButton>
           <ToolbarDivider />
         </>
       )}
+
     </OverflowToolbar>
   )
 }

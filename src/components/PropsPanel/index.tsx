@@ -9,115 +9,115 @@ import {
   NoteRegular,
   EditRegular,
   ArrowSyncRegular,
-  // Prop icons - Story Elements
+  // Prop icons - Story Elements (Filled variants)
   // Location/Setting
-  HomeRegular,
-  BuildingRegular,
-  GlobeRegular,
-  LocationRegular,
+  HomeFilled,
+  BuildingFilled,
+  GlobeFilled,
+  LocationFilled,
   // Objects/Physical Props
-  DiamondRegular,
-  KeyRegular,
-  BoxRegular,
-  DocumentRegular,
+  DiamondFilled,
+  KeyFilled,
+  BoxFilled,
+  DocumentFilled,
   // Time
-  HourglassRegular,
-  TimerRegular,
-  CalendarClockRegular,
+  HourglassFilled,
+  TimerFilled,
+  CalendarClockFilled,
   // Rules/Systems
-  GavelRegular,
-  ScalesRegular,
-  ShieldRegular,
-  LockClosedRegular,
+  GavelFilled,
+  ScalesFilled,
+  ShieldFilled,
+  LockClosedFilled,
   // Information
-  InfoRegular,
-  EyeRegular,
-  SearchRegular,
-  BookInformationRegular,
+  InfoFilled,
+  EyeFilled,
+  SearchFilled,
+  BookInformationFilled,
   // Status/Identity
-  CrownRegular,
-  BadgeRegular,
-  PersonRegular,
-  TargetRegular,
+  CrownFilled,
+  BadgeFilled,
+  PersonFilled,
+  TargetFilled,
   // Relationships
-  PeopleRegular,
-  LinkRegular,
-  HeartRegular,
-  HandshakeRegular,
+  PeopleFilled,
+  LinkFilled,
+  HeartFilled,
+  HandshakeFilled,
   // Emotional States
-  BrainRegular,
-  HeartBrokenRegular,
-  WarningRegular,
-  FireRegular,
+  BrainFilled,
+  HeartBrokenFilled,
+  WarningFilled,
+  FireFilled,
   // Environment
-  WeatherRainRegular,
-  WeatherSunnyRegular,
-  WeatherThunderstormRegular,
-  WeatherFogRegular,
+  WeatherRainFilled,
+  WeatherSunnyFilled,
+  WeatherThunderstormFilled,
+  WeatherFogFilled,
   // Absence/Mystery
-  QuestionCircleRegular,
-  EyeOffRegular,
-  ProhibitedRegular,
-  CircleRegular
+  QuestionCircleFilled,
+  EyeOffFilled,
+  ProhibitedFilled,
+  CircleFilled
 } from '@fluentui/react-icons'
 import type { FluentIcon } from '@fluentui/react-icons'
 
 // Icon name to component mapping for props - organized by story element category
 export const PROP_ICON_MAP: Record<string, FluentIcon> = {
   // Location/Setting - where the story happens
-  'Home': HomeRegular,
-  'Building': BuildingRegular,
-  'Globe': GlobeRegular,
-  'Location': LocationRegular,
+  'Home': HomeFilled,
+  'Building': BuildingFilled,
+  'Globe': GlobeFilled,
+  'Location': LocationFilled,
   // Objects/Physical Props - tangible items
-  'Diamond': DiamondRegular,
-  'Key': KeyRegular,
-  'Box': BoxRegular,
-  'Document': DocumentRegular,
+  'Diamond': DiamondFilled,
+  'Key': KeyFilled,
+  'Box': BoxFilled,
+  'Document': DocumentFilled,
   // Time - deadlines, countdowns, temporal pressure
-  'Hourglass': HourglassRegular,
-  'Timer': TimerRegular,
-  'Deadline': CalendarClockRegular,
+  'Hourglass': HourglassFilled,
+  'Timer': TimerFilled,
+  'Deadline': CalendarClockFilled,
   // Rules/Systems - laws, codes, constraints
-  'Gavel': GavelRegular,
-  'Scales': ScalesRegular,
-  'Shield': ShieldRegular,
-  'Lock': LockClosedRegular,
+  'Gavel': GavelFilled,
+  'Scales': ScalesFilled,
+  'Shield': ShieldFilled,
+  'Lock': LockClosedFilled,
   // Information - secrets, knowledge, leverage
-  'Info': InfoRegular,
-  'Eye': EyeRegular,
-  'Search': SearchRegular,
-  'Knowledge': BookInformationRegular,
+  'Info': InfoFilled,
+  'Eye': EyeFilled,
+  'Search': SearchFilled,
+  'Knowledge': BookInformationFilled,
   // Status/Identity - titles, reputation, roles
-  'Crown': CrownRegular,
-  'Badge': BadgeRegular,
-  'Identity': PersonRegular,
-  'Target': TargetRegular,
+  'Crown': CrownFilled,
+  'Badge': BadgeFilled,
+  'Identity': PersonFilled,
+  'Target': TargetFilled,
   // Relationships - bonds that strain or snap
-  'People': PeopleRegular,
-  'Link': LinkRegular,
-  'Heart': HeartRegular,
-  'Bond': HandshakeRegular,
+  'People': PeopleFilled,
+  'Link': LinkFilled,
+  'Heart': HeartFilled,
+  'Bond': HandshakeFilled,
   // Emotional States - conditions characters operate under
-  'Mind': BrainRegular,
-  'Heartbreak': HeartBrokenRegular,
-  'Tension': WarningRegular,
-  'Passion': FireRegular,
+  'Mind': BrainFilled,
+  'Heartbreak': HeartBrokenFilled,
+  'Tension': WarningFilled,
+  'Passion': FireFilled,
   // Environment - conditions applied to scenes
-  'Rain': WeatherRainRegular,
-  'Sun': WeatherSunnyRegular,
-  'Storm': WeatherThunderstormRegular,
-  'Fog': WeatherFogRegular,
+  'Rain': WeatherRainFilled,
+  'Sun': WeatherSunnyFilled,
+  'Storm': WeatherThunderstormFilled,
+  'Fog': WeatherFogFilled,
   // Absence/Mystery - voids doing narrative work
-  'Unknown': QuestionCircleRegular,
-  'Hidden': EyeOffRegular,
-  'Forbidden': ProhibitedRegular,
-  'Void': CircleRegular
+  'Unknown': QuestionCircleFilled,
+  'Hidden': EyeOffFilled,
+  'Forbidden': ProhibitedFilled,
+  'Void': CircleFilled
 }
 
 // Helper to get icon component by name
 export function getPropIconComponent(iconName: string): FluentIcon {
-  return PROP_ICON_MAP[iconName] || DiamondRegular
+  return PROP_ICON_MAP[iconName] || DiamondFilled
 }
 
 // Icon names for the picker

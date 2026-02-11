@@ -4,39 +4,21 @@ import {
   TextItalicRegular,
   TextUnderlineRegular,
   TextStrikethroughRegular,
+  HighlightRegular,
+  CodeRegular,
   ArrowUndoRegular,
   ArrowRedoRegular,
   ClockRegular,
   BookOpenRegular,
   DismissRegular,
+  TextBulletListLtrRegular,
+  TextNumberListLtrRegular,
+  TaskListLtrRegular,
+  DrawTextRegular,
+  TextQuoteRegular,
 } from '@fluentui/react-icons'
-import { ToolbarButton, ToolbarDivider, TextColorDropdown, FontFamilyDropdown, RunBuildButton, ReaderModeButton, OverflowToolbar } from '../../shared/components'
+import { ToolbarButton, ToolbarDivider, TextColorDropdown, FontFamilyDropdown, RunBuildButton, ReaderModeButton, InfiniteCanvasButton, OverflowToolbar } from '../../shared/components'
 import { useProjectStore } from '../../../stores/projectStore'
-
-// Inline SVG icons for lists (not available in Fluent UI)
-const BulletListIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16M2 6h.01M2 12h.01M2 18h.01" />
-  </svg>
-)
-
-const NumberedListIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7 6h13M7 12h13m-13 6h13M3 6h.01M3 12h.01M3 18h.01" />
-  </svg>
-)
-
-const TaskListIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-    <path d="M5.85 3.35a.5.5 0 1 0-.7-.7L3.5 4.29l-.65-.64a.5.5 0 1 0-.7.7l1 1c.2.2.5.2.7 0l2-2ZM8.5 4a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9Zm0 5a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9Zm0 5a.5.5 0 0 0 0 1h9a.5.5 0 0 0 0-1h-9ZM5.85 8.85a.5.5 0 1 0-.7-.7L3.5 9.79l-.65-.64a.5.5 0 1 0-.7.7l1 1c.2.2.5.2.7 0l2-2Zm0 4.3c.2.2.2.5 0 .7l-2 2a.5.5 0 0 1-.7 0l-1-1a.5.5 0 0 1 .7-.7l.65.64 1.65-1.64c.2-.2.5-.2.7 0Z"/>
-  </svg>
-)
-
-const DrawIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-  </svg>
-)
 
 // Format timestamp in a human-friendly way
 function formatTimestamp(date: Date): string {
@@ -214,6 +196,27 @@ export function JournalToolbar({ editor }: JournalToolbarProps) {
       >
         <TextStrikethroughRegular className="w-4 h-4" />
       </ToolbarButton>
+      <ToolbarButton
+        onClick={() => editor.chain().focus().toggleHighlight().run()}
+        isActive={editor.isActive('highlight')}
+        title="Highlight"
+      >
+        <HighlightRegular className="w-4 h-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => editor.chain().focus().toggleCode().run()}
+        isActive={editor.isActive('code')}
+        title="Inline Code"
+      >
+        <CodeRegular className="w-4 h-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        isActive={editor.isActive('blockquote')}
+        title="Callout"
+      >
+        <TextQuoteRegular className="w-4 h-4" />
+      </ToolbarButton>
 
       <TextColorDropdown editor={editor} />
 
@@ -225,21 +228,21 @@ export function JournalToolbar({ editor }: JournalToolbarProps) {
         isActive={editor.isActive('bulletList')}
         title="Bullet List"
       >
-        <BulletListIcon />
+        <TextBulletListLtrRegular className="w-4 h-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         isActive={editor.isActive('orderedList')}
         title="Numbered List"
       >
-        <NumberedListIcon />
+        <TextNumberListLtrRegular className="w-4 h-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleTaskList().run()}
         isActive={editor.isActive('taskList')}
         title="Task List (Todo)"
       >
-        <TaskListIcon />
+        <TaskListLtrRegular className="w-4 h-4" />
       </ToolbarButton>
 
       <ToolbarDivider />
@@ -260,8 +263,11 @@ export function JournalToolbar({ editor }: JournalToolbarProps) {
         isActive={ui.drawingMode}
         title={ui.drawingMode ? 'Exit Drawing Mode' : 'Drawing Mode'}
       >
-        <DrawIcon />
+        <DrawTextRegular className="w-4 h-4" />
       </ToolbarButton>
+
+      {/* Infinite canvas toggle */}
+      <InfiniteCanvasButton />
     </OverflowToolbar>
   )
 }

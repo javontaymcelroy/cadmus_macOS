@@ -9,19 +9,23 @@ export function useProjectEditorStyles() {
   const formattingRules = useProjectStore(
     state => state.currentProject?.settings?.formattingRules
   )
+  const templateId = useProjectStore(
+    state => state.currentProject?.templateId
+  )
 
   return useMemo(() => {
     if (!formattingRules) return { hasOverrides: false, style: {} as Record<string, string>, maxWidth: undefined as string | undefined }
 
     const style: Record<string, string> = {}
     let hasOverrides = false
+    const fontSizeUnit = templateId === 'screenplay' ? 'pt' : 'px'
 
     if (formattingRules.defaultFontFamily) {
       style['--project-font-family'] = formattingRules.defaultFontFamily
       hasOverrides = true
     }
     if (formattingRules.defaultFontSize != null) {
-      style['--project-font-size'] = `${formattingRules.defaultFontSize}px`
+      style['--project-font-size'] = `${formattingRules.defaultFontSize}${fontSizeUnit}`
       hasOverrides = true
     }
     if (formattingRules.defaultLineHeight != null) {
@@ -73,5 +77,5 @@ export function useProjectEditorStyles() {
     if (maxWidth) hasOverrides = true
 
     return { hasOverrides, style, maxWidth }
-  }, [formattingRules])
+  }, [formattingRules, templateId])
 }

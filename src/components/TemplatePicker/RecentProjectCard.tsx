@@ -234,10 +234,8 @@ export function RecentProjectCard({
             }}
             className={`text-left group animate-slide-up focus:outline-none border transition-all duration-200 rounded-2xl ${
               isPaused 
-                ? 'border-theme-subtle bg-theme-tertiary opacity-70 grayscale-[30%] hover:opacity-90 hover:grayscale-0' 
-                : hasAgendaStack 
-                  ? 'border-theme-accent/20 bg-theme-tertiary'
-                  : 'border-theme-subtle bg-theme-tertiary'
+                ? 'border-theme-subtle bg-theme-tertiary opacity-70 grayscale-[30%] hover:opacity-90 hover:grayscale-0'
+                : 'border-theme-subtle bg-theme-tertiary'
             }`}
             style={{ animationDelay: `${delay}s` }}
           >

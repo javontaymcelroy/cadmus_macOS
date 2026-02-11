@@ -9,8 +9,6 @@ export function useKeyboardShortcuts() {
     activeDocumentId,
     saveDocument,
     createDocument,
-    toggleLeftSidebar,
-    toggleRightSidebar,
     runBuild,
     zoomIn,
     zoomOut,
@@ -83,22 +81,10 @@ export function useKeyboardShortcuts() {
         createDocument(defaultTitle)
       }
 
-      // Cmd/Ctrl + B - Toggle Left Sidebar
-      if (isMod && e.key === 'b') {
-        e.preventDefault()
-        toggleLeftSidebar()
-      }
-
       // Cmd/Ctrl + Shift + B - Run Build
       if (isMod && e.shiftKey && e.key === 'B') {
         e.preventDefault()
         runBuild()
-      }
-
-      // Cmd/Ctrl + \ - Toggle Right Sidebar
-      if (isMod && e.key === '\\') {
-        e.preventDefault()
-        toggleRightSidebar()
       }
 
       // Cmd/Ctrl + Plus/= - Zoom In
@@ -134,8 +120,6 @@ export function useKeyboardShortcuts() {
     activeDocumentId,
     saveDocument,
     createDocument,
-    toggleLeftSidebar,
-    toggleRightSidebar,
     runBuild,
     zoomIn,
     zoomOut,

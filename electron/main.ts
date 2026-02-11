@@ -60,14 +60,26 @@ function createWindow(): void {
     })
   })
 
-  mainWindow = new BrowserWindow({
-    width: 2024,
-    height: 1169,
+  // Restore saved window bounds or use defaults
+  const savedBounds = projectStore.getWindowBounds()
+  const windowOptions: Electron.BrowserWindowConstructorOptions = {
+    width: savedBounds?.width || 2100,
+    height: savedBounds?.height || 1480,
     minWidth: 1000,
     minHeight: 700,
     show: true, // Show immediately to avoid blank window issues
+  }
+  if (savedBounds?.x != null && savedBounds?.y != null) {
+    windowOptions.x = savedBounds.x
+    windowOptions.y = savedBounds.y
+  } else {
+    windowOptions.center = true
+  }
+
+  mainWindow = new BrowserWindow({
+    ...windowOptions,
     titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 16 },
+    trafficLightPosition: { x: 16, y: 18 },
     backgroundColor: '#18181b',
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
@@ -91,6 +103,36 @@ function createWindow(): void {
     }
   })
 
+  // Forward fullscreen state changes to the renderer
+  mainWindow.on('enter-full-screen', () => {
+    mainWindow?.webContents.send('fullscreen-changed', true)
+  })
+  mainWindow.on('leave-full-screen', () => {
+    mainWindow?.webContents.send('fullscreen-changed', false)
+  })
+
+  // Apply saved interface scale on window ready
+  mainWindow.webContents.on('did-finish-load', () => {
+    const savedScale = projectStore.getInterfaceScale()
+    if (savedScale && savedScale !== 100 && mainWindow) {
+      mainWindow.webContents.setZoomFactor(savedScale / 100)
+    }
+  })
+
+  // Save window bounds on resize and move (debounced)
+  let boundsTimer: ReturnType<typeof setTimeout> | null = null
+  const saveBounds = () => {
+    if (boundsTimer) clearTimeout(boundsTimer)
+    boundsTimer = setTimeout(() => {
+      if (mainWindow && !mainWindow.isMaximized() && !mainWindow.isFullScreen()) {
+        const bounds = mainWindow.getBounds()
+        projectStore.setWindowBounds(bounds)
+      }
+    }, 500)
+  }
+  mainWindow.on('resize', saveBounds)
+  mainWindow.on('move', saveBounds)
+
   // HMR for renderer based on electron-vite cli
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -108,6 +150,14 @@ function setupIpcHandlers(): void {
 
   ipcMain.handle('project:open', async (_, projectPath) => {
     return projectStore.openProject(projectPath)
+  })
+
+  ipcMain.handle('project:import', async (_, sourcePath, destinationBasePath) => {
+    return projectStore.importProject(sourcePath, destinationBasePath)
+  })
+
+  ipcMain.handle('project:export', async (_, projectPath, destinationBasePath) => {
+    return projectStore.exportProject(projectPath, destinationBasePath)
   })
 
   ipcMain.handle('project:save', async (_, project) => {
@@ -267,6 +317,32 @@ function setupIpcHandlers(): void {
 
   ipcMain.handle('zoom:set', async (_, zoom: number) => {
     return projectStore.setZoom(zoom)
+  })
+
+  // Interface Scale operations (whole-app zoom via webContents)
+  ipcMain.handle('interfaceScale:get', async () => {
+    return projectStore.getInterfaceScale()
+  })
+
+  ipcMain.handle('interfaceScale:set', async (_, scale: number) => {
+    projectStore.setInterfaceScale(scale)
+    if (mainWindow) {
+      mainWindow.webContents.setZoomFactor(scale / 100)
+    }
+  })
+
+  // Panel width operations
+  ipcMain.handle('panelWidths:get', async () => {
+    return projectStore.getPanelWidths()
+  })
+
+  ipcMain.handle('panelWidths:set', async (_, widths: Record<string, number>) => {
+    projectStore.setPanelWidths(widths)
+  })
+
+  // Window bounds operations
+  ipcMain.handle('windowBounds:get', async () => {
+    return projectStore.getWindowBounds()
   })
 
   // Image Generation operations

@@ -152,19 +152,27 @@ export function AssetsPanel() {
     setDropTargetSection(null)
   }, [])
 
+  // Allowed file extensions for assets
+  const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.pdf']
+
   // Create onDrop handler for a specific category
   const createOnDrop = useCallback((category: AssetCategory) => {
     return async (acceptedFiles: File[]) => {
-      console.log('[RENDERER] onDrop called for', category, ', files:', acceptedFiles.length)
-      
-      for (const file of acceptedFiles) {
+      // Filter by extension manually (Electron can report wrong MIME types on drag)
+      const validFiles = acceptedFiles.filter(file => {
+        const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+        return allowedExtensions.includes(ext)
+      })
+
+      for (const file of validFiles) {
         try {
-          const fileWithPath = file as File & { path?: string }
-          const filePath = fileWithPath.path
-          
+          // Use Electron's webUtils.getPathForFile via preload (works with contextIsolation)
+          const filePath = window.api.utils.getPathForFile(file)
+
           if (filePath) {
             await addAsset(filePath, file.name, category)
           } else {
+            // Fallback: read file as buffer for environments where path isn't available
             const buffer = await file.arrayBuffer()
             await addAssetFromBuffer(buffer, file.name, file.type, category)
           }
@@ -175,31 +183,23 @@ export function AssetsPanel() {
     }
   }, [addAsset, addAssetFromBuffer])
 
-  // Dropzone for general assets
-  const { 
-    getRootProps: getGeneralRootProps, 
-    getInputProps: getGeneralInputProps, 
-    isDragActive: isGeneralDragActive 
+  // Dropzone for general assets - no accept filter (Electron MIME types unreliable on drag)
+  const {
+    getRootProps: getGeneralRootProps,
+    getInputProps: getGeneralInputProps,
+    isDragActive: isGeneralDragActive
   } = useDropzone({
     onDrop: createOnDrop('general'),
-    accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'],
-      'application/pdf': ['.pdf']
-    },
     noClick: generalAssets.length > 0
   })
 
   // Dropzone for storyboard assets
-  const { 
-    getRootProps: getStoryboardRootProps, 
-    getInputProps: getStoryboardInputProps, 
-    isDragActive: isStoryboardDragActive 
+  const {
+    getRootProps: getStoryboardRootProps,
+    getInputProps: getStoryboardInputProps,
+    isDragActive: isStoryboardDragActive
   } = useDropzone({
     onDrop: createOnDrop('storyboard'),
-    accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'],
-      'application/pdf': ['.pdf']
-    },
     noClick: storyboardAssets.length > 0
   })
 

@@ -38,8 +38,7 @@ export function SaveVersionButton() {
       onClick={handleSaveVersion}
       disabled={isDisabled}
       className={clsx(
-        "relative flex items-center justify-center w-8 h-8 shrink-0 self-center rounded-md transition-colors border",
-        "bg-theme-tertiary text-theme-primary hover:bg-theme-active border-theme-default",
+        "relative btn-icon-modern w-7 h-7 flex items-center justify-center",
         isDisabled && "opacity-50 cursor-not-allowed"
       )}
       title={isSaving ? "Saving..." : `Save Version${versionCount > 0 ? ` (${versionCount} saved)` : ''}`}

@@ -1,5 +1,6 @@
 import { useProjectStore, getDocumentHierarchyType } from '../../stores/projectStore'
 import { useWorkspace } from '../../workspaces'
+import { MoviesAndTvRegular } from '@fluentui/react-icons'
 
 export function StatusBar() {
   const { 
@@ -37,47 +38,95 @@ export function StatusBar() {
     return text.split(/\s+/).filter(word => word.length > 0).length
   }
 
-  // Check if document content starts with a scene-heading element
-  const isScenePage = (content: any): boolean => {
-    if (!content?.content) return false
-    
-    // Find the first meaningful content node
-    for (const node of content.content) {
-      // Skip empty paragraphs
-      if (node.type === 'paragraph' && (!node.content || node.content.length === 0)) {
-        continue
-      }
-      // Check if it's a screenplay element with scene-heading type
-      if (node.type === 'screenplayElement' && node.attrs?.elementType === 'scene-heading') {
-        return true
-      }
-      // If first non-empty node is not a scene-heading, it's not a scene page
-      return false
+  // Extract plain text from a TipTap JSON node
+  const extractNodeText = (node: any): string => {
+    if (node.text) return node.text
+    if (node.content) {
+      return node.content.map(extractNodeText).join('')
     }
-    return false
+    return ''
+  }
+
+  // Calculate equivalent screenplay lines from a document's content.
+  // Uses structure-weighted line counts: dialogue is narrower (~35 chars/line)
+  // than action (~61 chars/line), matching standard Courier 12 screenplay margins.
+  // Spacing is modeled at element boundaries, not baked into each element,
+  // to avoid double-counting when the renderer already handles gaps.
+  const getContentEquivalentLines = (content: any): number => {
+    if (!content?.content) return 0
+
+    let lines = 0
+    let prevType: string | null = null
+
+    for (const node of content.content) {
+      const textLength = extractNodeText(node).length
+
+      if (node.type === 'screenplayElement') {
+        const elType = node.attrs?.elementType || 'action'
+
+        // Add inter-element spacing based on type transitions.
+        // No blank line within dialogue blocks (character→dialogue/parenthetical,
+        // parenthetical→dialogue, dialogue→parenthetical).
+        if (prevType !== null) {
+          const inDialogueBlock =
+            (prevType === 'character' && (elType === 'dialogue' || elType === 'parenthetical')) ||
+            (prevType === 'parenthetical' && elType === 'dialogue') ||
+            (prevType === 'dialogue' && elType === 'parenthetical')
+
+          if (!inDialogueBlock) {
+            lines += 1
+          }
+        }
+
+        // Raw content lines only — no spacing baked in
+        switch (elType) {
+          case 'scene-heading':
+          case 'character':
+          case 'parenthetical':
+          case 'transition':
+          case 'shot':
+            lines += 1
+            break
+          case 'action':
+            lines += Math.max(1, Math.ceil(textLength / 61))
+            break
+          case 'dialogue':
+            lines += Math.max(1, Math.ceil(textLength / 35))
+            break
+          default:
+            lines += Math.max(1, Math.ceil(textLength / 61))
+        }
+
+        prevType = elType
+      } else if (node.type === 'paragraph') {
+        if (prevType !== null) lines += 1
+        lines += textLength > 0 ? Math.max(1, Math.ceil(textLength / 61)) : 1
+        prevType = 'paragraph'
+      }
+    }
+
+    return lines
   }
 
   // Calculate screenplay runtime estimate (only when enabled in workspace config)
-  // Rule: 1 page = ~1 minute of screen time
-  // Only count scene pages (pages with scene-heading), not breaks, title pages, or notes
+  // Uses structure-weighted line model: ~55 lines per page, 1 page ≈ 1 minute.
+  // ceil so the estimate doesn't drop a minute when deleting a word mid-threshold.
   const getScreenplayRuntime = (): number => {
     if (!showStatusBarRuntime) return 0
-    
-    let scenePageCount = 0
-    
+
+    let totalLines = 0
+
     for (const doc of currentProject.documents) {
-      // Check if this is a "page" in the hierarchy (child of top-level document)
       const hierarchyType = getDocumentHierarchyType(doc, currentProject.documents)
       if (hierarchyType !== 'page') continue
-      
-      // Check if this document's content starts with a scene-heading
+
       const docContent = documents[doc.id]?.content
-      if (docContent && isScenePage(docContent)) {
-        scenePageCount++
+      if (docContent) {
+        totalLines += getContentEquivalentLines(docContent)
       }
     }
-    
-    return scenePageCount
+
+    return Math.ceil(totalLines / 55)
   }
 
   // Format runtime for display
@@ -92,6 +141,8 @@ export function StatusBar() {
 
   const wordCount = getWordCount()
   const screenplayRuntime = showStatusBarRuntime ? getScreenplayRuntime() : 0
+  const targetRuntime = currentProject.settings?.targetRuntimeMinutes
+  const isOverTarget = targetRuntime != null && screenplayRuntime > targetRuntime
 
   return (
     <div className="h-7 flex items-center justify-between px-4 mb-3 statusbar-floating text-xs font-ui">
@@ -112,8 +163,11 @@ export function StatusBar() {
         )}
         {/* Screenplay runtime estimate - only shown when enabled */}
         {showStatusBarRuntime && (
-          <span className="text-theme-primary">
-            Estimated film runtime: {formatRuntime(screenplayRuntime)}
+          <span className="text-theme-primary flex items-center gap-1.5">
+            <MoviesAndTvRegular className="w-3.5 h-3.5" />
+            <span>
+              Estimated film runtime: <span className={isOverTarget ? 'text-red-500' : undefined}>{formatRuntime(screenplayRuntime)}</span>{targetRuntime != null && <span className="text-theme-muted"> of {formatRuntime(targetRuntime)}</span>}
+            </span>
           </span>
         )}
       </div>

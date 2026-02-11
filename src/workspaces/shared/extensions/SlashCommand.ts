@@ -26,6 +26,9 @@ export type AIWritingCommand =
   | 'scriptDoctor'
   // General document commands
   | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
+  | 'customPrompt'
+  | 'ask'
+  | 'makeConsistent'
 
 // Tone options for the "Adjust Tone" submenu
 export interface ToneOption {
@@ -56,6 +59,7 @@ export interface SlashCommandItem {
   submenu?: ToneOption[]       // For commands with submenus (e.g., Adjust Tone)
   separator?: boolean          // If true, show a separator before this item
   gated?: boolean              // If true, route through the gated writing pipeline
+  requiresInput?: boolean      // If true, show a text input before executing
 }
 
 // Commands for generating NEW content (no selection)
@@ -87,6 +91,14 @@ export const SLASH_COMMANDS_GENERATE: SlashCommandItem[] = [
     description: 'Produce text in a specific character voice',
     shortcut: 'P',
     icon: 'person'
+  },
+  {
+    id: 'ask',
+    name: 'Ask',
+    description: 'Ask a question and get formatted content',
+    shortcut: 'A',
+    icon: 'chat-question',
+    requiresInput: true
   }
 ]
 
@@ -108,6 +120,15 @@ export const SLASH_COMMANDS_SELECTION: SlashCommandItem[] = [
     description: 'General revision, polish and refine',
     shortcut: 'R',
     icon: 'edit',
+    requiresSelection: true
+  },
+  // Style consistency
+  {
+    id: 'makeConsistent',
+    name: 'Make Consistent',
+    description: 'Match selected text to the document\'s dominant style',
+    shortcut: 'K',
+    icon: 'textAlign',
     requiresSelection: true
   },
   // Tone adjustment with submenu
@@ -263,7 +284,7 @@ export const SLASH_COMMANDS_SELECTION_GENERAL: SlashCommandItem[] = [
   {
     id: 'fixGrammar',
     name: 'Fix Grammar & Spelling',
-    description: 'Correct grammar, spelling, and punctuation',
+    description: 'Correct grammar, spelling, punctuation, and capitalization',
     shortcut: 'G',
     icon: 'checkmark',
     requiresSelection: true
@@ -275,6 +296,15 @@ export const SLASH_COMMANDS_SELECTION_GENERAL: SlashCommandItem[] = [
     description: 'General revision, polish and refine',
     shortcut: 'R',
     icon: 'edit',
+    requiresSelection: true
+  },
+  // Style consistency
+  {
+    id: 'makeConsistent',
+    name: 'Make Consistent',
+    description: 'Match selected text to the document\'s dominant style',
+    shortcut: 'K',
+    icon: 'textAlign',
     requiresSelection: true
   },
   // Tone adjustment with submenu
@@ -356,6 +386,17 @@ export const SLASH_COMMANDS_SELECTION_GENERAL: SlashCommandItem[] = [
     shortcut: 'V',
     icon: 'textAlign',
     requiresSelection: true
+  },
+  // Custom prompt
+  {
+    id: 'customPrompt',
+    name: 'Custom Prompt',
+    description: 'Write your own instruction for the AI',
+    shortcut: '/',
+    icon: 'chat',
+    requiresSelection: true,
+    requiresInput: true,
+    separator: true
   },
 ]
 

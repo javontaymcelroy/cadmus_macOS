@@ -147,10 +147,10 @@ export function StateDropdown({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          flex items-center gap-1.5 px-2 py-1 rounded-md border transition-all
+          flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all
           ${config.bgColor} ${config.borderColor}
           hover:brightness-110 hover:scale-[1.02] active:scale-[0.98]
-          ${compact ? 'text-xs' : 'text-xs'}
+          text-xs
         `}
       >
         <Icon className={`w-3.5 h-3.5 ${config.color}`} />

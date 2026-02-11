@@ -1,5 +1,5 @@
 import { promises as fs } from 'fs'
-import { join, extname } from 'path'
+import { join, extname, basename } from 'path'
 import { v4 as uuidv4 } from 'uuid'
 import Store from 'electron-store'
 import type { 
@@ -231,12 +231,28 @@ function createScreenplayTitlePageContent(fontFamily: string, projectName: strin
   }
 }
 
+interface PanelWidths {
+  leftSidebarWidth?: number
+  rightSidebarWidth?: number
+  bottomPanelHeight?: number
+  storyboardPanelWidth?: number
+}
+
+interface WindowBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 interface AppPreferences {
   lastOpenedProjectPath?: string
   recentProjects: RecentProject[]
   livingDocuments: LivingDocument[]
   agendaItems: AgendaItem[]
   theme: 'dark' | 'light'
+  panelWidths?: PanelWidths
+  windowBounds?: WindowBounds
 }
 
 export class ProjectStore {
@@ -428,6 +444,79 @@ export class ProjectStore {
     this.addToRecentProjects(projectPath, project.name, project.templateId)
     
     return project
+  }
+
+  async importProject(sourcePath: string, destinationBasePath: string): Promise<Project> {
+    // Validate source has a project.json
+    const sourceManifestPath = join(sourcePath, 'project.json')
+    let sourceContent: string
+    try {
+      sourceContent = await fs.readFile(sourceManifestPath, 'utf-8')
+    } catch {
+      throw new Error('Invalid Cadmus project: no project.json found in the selected folder')
+    }
+
+    const sourceProject: Project = JSON.parse(sourceContent)
+
+    // Determine target folder name, handle conflicts
+    let targetName = sourceProject.name || basename(sourcePath)
+    let targetPath = join(destinationBasePath, targetName)
+    let suffix = 1
+    while (true) {
+      try {
+        await fs.access(targetPath)
+        // Path exists, try with suffix
+        suffix++
+        targetPath = join(destinationBasePath, `${targetName} (${suffix})`)
+      } catch {
+        // Path doesn't exist, we can use it
+        break
+      }
+    }
+
+    // Deep copy the entire project directory
+    await fs.cp(sourcePath, targetPath, { recursive: true })
+
+    // Update the project.json with the new path
+    const project: Project = { ...sourceProject, path: targetPath }
+    const newManifestPath = join(targetPath, 'project.json')
+    await fs.writeFile(newManifestPath, JSON.stringify(project, null, 2))
+
+    // Ensure backwards compatibility
+    if (!project.characters) {
+      project.characters = []
+    }
+
+    // Register in recent projects and living documents
+    this.addToRecentProjects(targetPath, project.name, project.templateId)
+
+    return project
+  }
+
+  async exportProject(projectPath: string, destinationBasePath: string): Promise<string> {
+    // Read the source project
+    const sourceManifestPath = join(projectPath, 'project.json')
+    const sourceContent = await fs.readFile(sourceManifestPath, 'utf-8')
+    const sourceProject: Project = JSON.parse(sourceContent)
+
+    // Determine target folder name, handle conflicts
+    let targetName = sourceProject.name || basename(projectPath)
+    let targetPath = join(destinationBasePath, targetName)
+    let suffix = 1
+    while (true) {
+      try {
+        await fs.access(targetPath)
+        suffix++
+        targetPath = join(destinationBasePath, `${targetName} (${suffix})`)
+      } catch {
+        break
+      }
+    }
+
+    // Deep copy the entire project directory
+    await fs.cp(projectPath, targetPath, { recursive: true })
+
+    return targetPath
   }
 
   async saveProject(project: Project): Promise<void> {
@@ -1259,6 +1348,34 @@ export class ProjectStore {
 
   setZoom(zoom: number): void {
     this.store.set('viewZoom', zoom)
+  }
+
+  // Interface scale methods (whole-app zoom via webContents)
+  getInterfaceScale(): number {
+    return this.store.get('interfaceScale') || 100
+  }
+
+  setInterfaceScale(scale: number): void {
+    this.store.set('interfaceScale', scale)
+  }
+
+  // Panel width methods
+  getPanelWidths(): PanelWidths {
+    return this.store.get('panelWidths') || {}
+  }
+
+  setPanelWidths(widths: PanelWidths): void {
+    const current = this.store.get('panelWidths') || {}
+    this.store.set('panelWidths', { ...current, ...widths })
+  }
+
+  // Window bounds methods
+  getWindowBounds(): WindowBounds | undefined {
+    return this.store.get('windowBounds')
+  }
+
+  setWindowBounds(bounds: WindowBounds): void {
+    this.store.set('windowBounds', bounds)
   }
 
   private getAssetType(ext: string): AssetType {

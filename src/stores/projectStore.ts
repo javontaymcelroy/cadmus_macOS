@@ -1574,6 +1574,7 @@ interface UIState {
   isRunningCritique: boolean // Running dramatic critique analysis
   settingsPanelOpen: boolean // Project settings panel
   drawingMode: boolean // Freehand drawing overlay active
+  infiniteCanvas: boolean // Infinite canvas mode - free scroll in all directions
 }
 
 // Citation navigation state
@@ -1731,6 +1732,7 @@ interface ProjectState {
   initialize: () => Promise<void>
   createProject: (template: Template, name: string, basePath: string) => Promise<void>
   openProject: (projectPath: string) => Promise<void>
+  importProject: (sourcePath: string, destinationBasePath: string) => Promise<void>
   closeProject: () => void
   
   // Document actions
@@ -1792,10 +1794,15 @@ interface ProjectState {
   zoomOut: () => void
   resetZoom: () => void
   initializeZoom: () => Promise<void>
+  initializePanelWidths: () => Promise<void>
 
   // Reader mode actions
   toggleReaderMode: () => void
   setReaderMode: (mode: boolean) => void
+
+  // Infinite canvas actions
+  toggleInfiniteCanvas: () => void
+  setInfiniteCanvas: (mode: boolean) => void
 
   // Settings panel actions
   toggleSettingsPanel: () => void
@@ -1945,7 +1952,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     rightSidebarOpen: true,
     bottomPanelOpen: false,
     bottomPanelHeight: 320,
-    leftSidebarWidth: 280,
+    leftSidebarWidth: 345,
     rightSidebarWidth: 320,
     storyboardPanelWidth: 320,
     activeModal: null,
@@ -1956,7 +1963,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     writingPartnerPanelOpen: false,
     isRunningCritique: false,
     settingsPanelOpen: false,
-    drawingMode: false
+    drawingMode: false,
+    infiniteCanvas: false
   },
   isLoading: true,
   error: null,
@@ -2050,8 +2058,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
               }))
             }
             
-            // Load first document if available
-            if (project.documents.length > 0) {
+            // Restore last active document, or fall back to first document
+            const savedDocId = sessionStorage.getItem(`cadmus_active_document:${project.path}`)
+            const savedDocExists = savedDocId && project.documents.some(d => d.id === savedDocId)
+
+            if (savedDocExists) {
+              await get().setActiveDocument(savedDocId)
+            } else if (project.documents.length > 0) {
               const firstDoc = project.documents.find(d => d.type === 'document')
               if (firstDoc) {
                 await get().setActiveDocument(firstDoc.id)
@@ -2153,7 +2166,65 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           }
         }))
       }
-      
+
+      // Restore last active document for this project, or fall back to first
+      const savedDocId = sessionStorage.getItem(`cadmus_active_document:${project.path}`)
+      const savedDocExists = savedDocId && project.documents.some(d => d.id === savedDocId)
+
+      if (savedDocExists) {
+        get().setActiveDocument(savedDocId)
+      } else if (project.documents.length > 0) {
+        const firstDoc = project.documents.find(d => d.type === 'document')
+        if (firstDoc) {
+          get().setActiveDocument(firstDoc.id)
+        }
+      }
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to open project',
+        isLoading: false 
+      })
+    }
+  },
+
+  // Import project from another location (copies to destination)
+  importProject: async (sourcePath, destinationBasePath) => {
+    try {
+      set({ isLoading: true, error: null })
+
+      const project = await window.api.project.import(sourcePath, destinationBasePath)
+
+      set({
+        currentProject: project,
+        assets: project.assets,
+        documents: {},
+        activeDocumentId: null,
+        isLoading: false
+      })
+
+      // For workspaces with derived titles, preload content for all child pages
+      const workspaceConfig = getWorkspaceConfig(project.templateId)
+      if (workspaceConfig.features.deriveTitlesFromContent) {
+        const childPages = project.documents.filter(d => d.type === 'document' && d.parentId)
+        await Promise.all(childPages.map(async (doc) => {
+          try {
+            const content = await window.api.document.load(project.path, doc.id)
+            set(state => ({
+              documents: {
+                ...state.documents,
+                [doc.id]: {
+                  content,
+                  isDirty: false,
+                  lastSaved: new Date().toISOString()
+                }
+              }
+            }))
+          } catch (err) {
+            console.error(`Failed to preload document ${doc.id}:`, err)
+          }
+        }))
+      }
+
       // Load first document
       if (project.documents.length > 0) {
         const firstDoc = project.documents.find(d => d.type === 'document')
@@ -2162,9 +2233,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }
       }
     } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to open project',
-        isLoading: false 
+      set({
+        error: error instanceof Error ? error.message : 'Failed to import project',
+        isLoading: false
       })
     }
   },
@@ -2184,7 +2255,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   // Set active document
   setActiveDocument: async (docId) => {
     set({ activeDocumentId: docId })
-    
+
+    // Persist to sessionStorage so we can restore on refresh/project switch
+    const projectPath = get().currentProject?.path
+    if (docId && projectPath) {
+      sessionStorage.setItem(`cadmus_active_document:${projectPath}`, docId)
+    }
+
     if (docId && !get().documents[docId]?.content) {
       await get().loadDocumentContent(docId)
     }
@@ -2985,6 +3062,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, bottomPanelHeight: height }
     }))
+    window.api.panelWidths?.set({ bottomPanelHeight: height })
   },
 
   // Set left sidebar width
@@ -2992,6 +3070,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, leftSidebarWidth: width }
     }))
+    window.api.panelWidths?.set({ leftSidebarWidth: width })
   },
 
   // Set right sidebar width
@@ -2999,6 +3078,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, rightSidebarWidth: width }
     }))
+    window.api.panelWidths?.set({ rightSidebarWidth: width })
   },
 
   // Set storyboard panel width
@@ -3006,6 +3086,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, storyboardPanelWidth: width }
     }))
+    window.api.panelWidths?.set({ storyboardPanelWidth: width })
   },
 
   // Set active modal
@@ -3069,6 +3150,25 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
+  initializePanelWidths: async () => {
+    try {
+      const saved = await window.api.panelWidths?.get()
+      if (saved) {
+        set(state => ({
+          ui: {
+            ...state.ui,
+            ...(saved.leftSidebarWidth && { leftSidebarWidth: saved.leftSidebarWidth }),
+            ...(saved.rightSidebarWidth && { rightSidebarWidth: saved.rightSidebarWidth }),
+            ...(saved.bottomPanelHeight && { bottomPanelHeight: saved.bottomPanelHeight }),
+            ...(saved.storyboardPanelWidth && { storyboardPanelWidth: saved.storyboardPanelWidth }),
+          }
+        }))
+      }
+    } catch (error) {
+      console.error('[ProjectStore] Failed to initialize panel widths:', error)
+    }
+  },
+
   // Reader mode actions
   toggleReaderMode: () => {
     set(state => ({
@@ -3079,6 +3179,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setReaderMode: (mode) => {
     set(state => ({
       ui: { ...state.ui, readerMode: mode }
+    }))
+  },
+
+  // Infinite canvas actions
+  toggleInfiniteCanvas: () => {
+    set(state => ({
+      ui: { ...state.ui, infiniteCanvas: !state.ui.infiniteCanvas }
+    }))
+  },
+
+  setInfiniteCanvas: (mode) => {
+    set(state => ({
+      ui: { ...state.ui, infiniteCanvas: mode }
     }))
   },
 

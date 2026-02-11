@@ -4,24 +4,13 @@ import { clsx } from 'clsx'
 import type { Character } from '../../types/project'
 import {
   DeleteRegular,
-  PersonRegular,
+  PersonFilled,
   CheckmarkRegular,
   DismissRegular,
   NoteRegular,
   EditRegular,
   ArrowSyncRegular
 } from '@fluentui/react-icons'
-
-// Helper to determine if a color is light (needs dark icon) or dark (needs light icon)
-function isLightColor(hexColor: string): boolean {
-  const hex = hexColor.replace('#', '')
-  const r = parseInt(hex.substr(0, 2), 16)
-  const g = parseInt(hex.substr(2, 2), 16)
-  const b = parseInt(hex.substr(4, 2), 16)
-  // Using relative luminance formula
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.5
-}
 
 // Expanded color palette for characters - organized by tone/use
 const COLOR_PALETTE = [
@@ -170,8 +159,7 @@ function CharacterItem({ character, onUpdate, onDelete, onNavigateToNote }: Char
   // Check if character has a linked note document
   const hasNote = !!character.noteDocumentId
 
-  // Determine icon color based on background brightness
-  const iconColorClass = isLightColor(character.color) ? 'text-gray-800' : 'text-white'
+  const iconColorClass = 'text-slate-900'
 
   return (
     <div className="list-item-modern flex items-center gap-3 p-2.5 group relative">
@@ -183,7 +171,7 @@ function CharacterItem({ character, onUpdate, onDelete, onNavigateToNote }: Char
           style={{ backgroundColor: character.color }}
           title="Change color"
         >
-          <PersonRegular className={clsx('w-4 h-4', iconColorClass)} />
+          <PersonFilled className={clsx('w-4 h-4', iconColorClass)} />
         </button>
         {showColorPicker && (
           <ColorPicker
@@ -364,7 +352,7 @@ export function CharactersPanel() {
         {characters.length === 0 && !isAdding ? (
           <div className="text-center p-8">
             <div className="w-14 h-14 rounded-full bg-theme-hover flex items-center justify-center mx-auto mb-4">
-              <PersonRegular className="w-7 h-7 text-theme-muted" />
+              <PersonFilled className="w-7 h-7 text-theme-muted" />
             </div>
             <p className="text-sm text-theme-secondary font-ui font-medium mb-2">
               No characters yet
@@ -398,7 +386,7 @@ export function CharactersPanel() {
                   className="w-8 h-8 rounded-lg border-2 border-theme-default flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: '#fbbf24' }}
                 >
-                  <PersonRegular className="w-4 h-4 text-gray-800" />
+                  <PersonFilled className="w-4 h-4 text-slate-900" />
                 </div>
                 <div className="flex-1 relative">
                   <input

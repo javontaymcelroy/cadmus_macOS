@@ -15,7 +15,7 @@ export function ToolbarButton({ onClick, isActive, disabled, title, children }: 
       disabled={disabled}
       title={title}
       className={clsx(
-        'p-2 rounded-md transition-colors',
+        'flex items-center justify-center w-8 h-8 rounded-md transition-colors',
         isActive 
           ? 'bg-theme-active text-theme-accent' 
           : 'text-theme-secondary hover:text-theme-accent hover:bg-theme-hover',

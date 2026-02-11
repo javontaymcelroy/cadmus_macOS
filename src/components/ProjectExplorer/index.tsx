@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useProjectStore, getDocumentHierarchyType, getPageNumber, canCreateSubDocument } from '../../stores/projectStore'
 import { clsx } from 'clsx'
 import type { ProjectDocument } from '../../types/project'
@@ -14,10 +15,11 @@ import {
   CheckmarkRegular,
   DismissRegular,
   DividerTallRegular,
-  PersonRegular,
+  PersonFilled,
   BoxRegular,
   SettingsRegular,
-  ArrowLeftRegular
+  ArrowLeftRegular,
+  SaveArrowRightFilled
 } from '@fluentui/react-icons'
 import { getPropIconComponent } from '../PropsPanel'
 import { SaveVersionButton } from '../../workspaces/shared/components'
@@ -125,14 +127,41 @@ export function ProjectExplorer() {
     toggleSettingsPanel
   } = useProjectStore()
   
+  const [isExporting, setIsExporting] = useState(false)
+
+  const handleExportProject = async () => {
+    if (!currentProject || isExporting) return
+    const destinationPath = await window.api.dialog.selectFolder()
+    if (!destinationPath) return
+    setIsExporting(true)
+    try {
+      await window.api.project.export(currentProject.path, destinationPath)
+    } catch (err) {
+      console.error('Failed to export project:', err)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [editingProjectName, setEditingProjectName] = useState(false)
   const [projectNameInput, setProjectNameInput] = useState('')
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
+    // Start with all parent documents expanded by default
+    if (!currentProject) return new Set<string>()
+    const parentIds = new Set<string>()
+    for (const doc of currentProject.documents) {
+      if (doc.parentId) parentIds.add(doc.parentId)
+    }
+    return parentIds
+  })
   const [showAddMenu, setShowAddMenu] = useState(false)
   const addMenuRef = useRef<HTMLDivElement>(null)
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  const addDropdownRef = useRef<HTMLDivElement>(null)
+  const [addMenuPos, setAddMenuPos] = useState({ top: 0, right: 0 })
   const projectNameInputRef = useRef<HTMLInputElement>(null)
   const [dragState, setDragState] = useState<DragState>({
     draggedId: null,
@@ -195,19 +224,34 @@ export function ProjectExplorer() {
   // Scroll to a scene heading and center it in the viewport
   const scrollToScene = (blockId: string) => {
     const targetElement = document.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement | null
-    
+
     if (targetElement) {
       // Use scrollIntoView with center alignment - browser handles finding the scrollable container
       targetElement.scrollIntoView({
         behavior: 'smooth',
         block: 'center'
       })
-      
-      // Add highlight effect
-      targetElement.classList.add('citation-target-highlight')
+
+      // Highlight using inline styles (avoids CSS specificity issues)
+      targetElement.style.backgroundColor = 'rgba(251, 191, 36, 0.35)'
+      targetElement.style.boxShadow = '0 0 0 6px rgba(251, 191, 36, 0.2)'
+      targetElement.style.borderRadius = '4px'
+
+      // After hold period, fade out by adding transition then clearing values
       setTimeout(() => {
-        targetElement.classList.remove('citation-target-highlight')
-      }, 2000)
+        targetElement.style.transition = 'background-color 1s ease-out, box-shadow 1s ease-out'
+        // Use requestAnimationFrame to ensure the transition property is applied before changing values
+        requestAnimationFrame(() => {
+          targetElement.style.backgroundColor = ''
+          targetElement.style.boxShadow = ''
+        })
+      }, 1200)
+
+      // Clean up all inline styles after fade completes
+      setTimeout(() => {
+        targetElement.style.transition = ''
+        targetElement.style.borderRadius = ''
+      }, 2500)
     }
   }
 
@@ -221,7 +265,11 @@ export function ProjectExplorer() {
   // Close add menu on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      if (
+        addButtonRef.current && !addButtonRef.current.contains(target) &&
+        addDropdownRef.current && !addDropdownRef.current.contains(target)
+      ) {
         setShowAddMenu(false)
       }
     }
@@ -544,7 +592,7 @@ export function ProjectExplorer() {
   const isScreenplayProject = currentProject.templateId === 'screenplay'
 
   // Indent configuration
-  const INDENT_SIZE = 10 // pixels per depth level
+  const INDENT_SIZE = 14 // pixels per depth level
 
   const renderDocument = (doc: ProjectDocument, depth = 0) => {
     const isFolder = doc.type === 'folder'
@@ -574,17 +622,19 @@ export function ProjectExplorer() {
     const isDropInside = isDropTarget && dragState.dropPosition === 'inside'
     const isDropBeforeOrAfter = isDropTarget && (dragState.dropPosition === 'before' || dragState.dropPosition === 'after')
 
+    const hasChildren = children.length > 0
+
     return (
       <div key={doc.id} className="relative">
-        
+
         {/* Drop indicator - before */}
         {isDropTarget && dragState.dropPosition === 'before' && (
-          <div 
+          <div
             className="absolute left-2 right-2 h-0.5 bg-gold-400 rounded-full z-10"
             style={{ top: 0, marginLeft: `${depth * INDENT_SIZE}px` }}
           />
         )}
-        
+
         <div
           data-doc-item
           draggable={!isEditing}
@@ -610,12 +660,20 @@ export function ProjectExplorer() {
           }}
           onContextMenu={(e) => handleContextMenu(e, doc.id)}
         >
-          {/* Icon - only show for folders */}
-          {isFolder && (
-            <ChevronRightRegular 
-              className={clsx('w-4 h-4 text-theme-muted transition-transform duration-200 mr-1', isExpanded && 'rotate-90')} 
+          {/* Expand/collapse chevron for folders or documents with children */}
+          {(isFolder || hasChildren) ? (
+            <ChevronRightRegular
+              className={clsx('w-3.5 h-3.5 text-theme-muted transition-transform duration-200 mr-1 shrink-0', isExpanded && 'rotate-90')}
+              onClick={(e) => {
+                if (!isFolder) {
+                  e.stopPropagation()
+                  toggleFolder(doc.id)
+                }
+              }}
             />
-          )}
+          ) : depth > 0 ? (
+            <span className="w-3.5 mr-1 shrink-0" />
+          ) : null}
           
           {/* Title */}
           {isEditing ? (
@@ -645,13 +703,6 @@ export function ProjectExplorer() {
             </span>
           )}
 
-          {/* Date created indicator - controlled by workspace config */}
-          {workspaceConfig.features.showTimestamps && doc.createdAt && (
-            <span className="text-theme-muted text-[10px] font-ui shrink-0">
-              {formatRelativeTime(doc.createdAt)}
-            </span>
-          )}
-
           {/* Character/Prop indicators for child documents - tiny colored squares */}
           {hierarchyType === 'page' && doc.parentId && (
             <div className="flex items-center gap-0.5 shrink-0 ml-2">
@@ -672,9 +723,6 @@ export function ProjectExplorer() {
                 />
               ))}
             </div>
-          )}
-          {hierarchyType === 'note' && (
-            <span className="text-theme-muted text-xs font-ui shrink-0 ml-2">{workspaceConfig.hierarchy.noteLabel}</span>
           )}
 
           {/* Actions */}
@@ -697,8 +745,8 @@ export function ProjectExplorer() {
           />
         )}
 
-        {/* Children - render for both folders (when expanded) and documents (always) */}
-        {children.length > 0 && (isFolder ? isExpanded : true) && (
+        {/* Children - collapsible for both folders and documents with children */}
+        {hasChildren && isExpanded && (
           <div>
             {children.map((child) => renderDocument(child, depth + 1))}
           </div>
@@ -715,6 +763,20 @@ export function ProjectExplorer() {
           {ui.settingsPanelOpen ? 'Settings' : 'Project'}
         </h2>
         <div className="flex items-center gap-1">
+          {!ui.settingsPanelOpen && (
+            <button
+              onClick={handleExportProject}
+              disabled={isExporting}
+              className={clsx(
+                'btn-icon-modern w-7 h-7 flex items-center justify-center text-theme-accent',
+                isExporting && 'opacity-50 cursor-not-allowed'
+              )}
+              title={isExporting ? 'Exporting...' : 'Export Project'}
+            >
+              <SaveArrowRightFilled className="w-4 h-4" />
+            </button>
+          )}
+          {!ui.settingsPanelOpen && <SaveVersionButton />}
           <button
             onClick={toggleSettingsPanel}
             className={clsx(
@@ -727,11 +789,20 @@ export function ProjectExplorer() {
               ? <ArrowLeftRegular className="w-4 h-4" />
               : <SettingsRegular className="w-4 h-4" />}
           </button>
-          {!ui.settingsPanelOpen && <SaveVersionButton />}
           {!ui.settingsPanelOpen && (
             <div className="relative" ref={addMenuRef}>
               <button
-                onClick={() => setShowAddMenu(!showAddMenu)}
+                ref={addButtonRef}
+                onClick={() => {
+                  if (!showAddMenu && addButtonRef.current) {
+                    const rect = addButtonRef.current.getBoundingClientRect()
+                    setAddMenuPos({
+                      top: rect.bottom + 4,
+                      right: window.innerWidth - rect.right
+                    })
+                  }
+                  setShowAddMenu(!showAddMenu)
+                }}
                 className={clsx(
                   'btn-icon-modern p-1.5',
                   showAddMenu && 'bg-theme-active text-theme-accent'
@@ -742,8 +813,8 @@ export function ProjectExplorer() {
               </button>
 
               {/* Add menu dropdown */}
-              {showAddMenu && (
-                <div className="menu-modern absolute right-0 top-full mt-1 py-1.5 z-50 min-w-[200px]">
+              {showAddMenu && createPortal(
+                <div ref={addDropdownRef} className="menu-modern fixed py-1.5 z-[9999] min-w-[200px]" style={{ top: addMenuPos.top, right: addMenuPos.right }}>
                   {isScreenplayProject ? (
                     <>
                       <button
@@ -838,7 +909,8 @@ export function ProjectExplorer() {
                       {workspaceConfig.hierarchy.defaultDocumentTitle}
                     </button>
                   )}
-                </div>
+                </div>,
+                document.body
               )}
             </div>
           )}
@@ -918,8 +990,8 @@ export function ProjectExplorer() {
       </div>
 
       {/* Document tree */}
-      <div 
-        className="flex-1 overflow-auto p-2"
+      <div
+        className="shrink overflow-auto p-2"
         onContextMenu={(e) => handleContextMenu(e, null)}
       >
         {topLevelDocs.map((doc, index) => (
@@ -956,18 +1028,18 @@ export function ProjectExplorer() {
 
       {/* Scenes Section - only for screenplay projects */}
       {currentProject.templateId === 'screenplay' && activeDocumentId && (sceneHeadings[activeDocumentId]?.length || 0) > 0 && (
-        <div className="border-t border-theme-subtle">
+        <div className="border-t border-theme-subtle flex flex-col flex-1 min-h-0">
           {/* Scenes Header */}
           <button
             onClick={() => setScenesExpanded(!scenesExpanded)}
-            className="flex items-center justify-between w-full px-4 py-3 border-b border-theme-subtle bg-theme-header hover:bg-theme-hover transition-colors"
+            className="flex items-center justify-between w-full px-4 py-3 border-b border-theme-subtle bg-theme-header hover:bg-theme-hover transition-colors shrink-0"
           >
             <div className="flex items-center gap-2">
-              <ChevronRightRegular 
+              <ChevronRightRegular
                 className={clsx(
                   'w-3 h-3 text-theme-muted transition-transform',
                   scenesExpanded && 'rotate-90'
-                )} 
+                )}
               />
               <h2 className="text-xs font-ui font-medium uppercase tracking-wider text-theme-muted">
                 Scenes
@@ -977,10 +1049,10 @@ export function ProjectExplorer() {
               {sceneHeadings[activeDocumentId]?.length || 0}
             </span>
           </button>
-          
+
           {/* Scenes List */}
           {scenesExpanded && (
-            <div className="overflow-auto p-2 max-h-64">
+            <div className="overflow-auto p-2 flex-1 min-h-0">
               {sceneHeadings[activeDocumentId]?.map((scene) => (
                 <button
                   key={scene.blockId}
@@ -1041,7 +1113,7 @@ export function ProjectExplorer() {
                     className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                     style={{ backgroundColor: character?.color || '#fbbf24' }}
                   >
-                    <PersonRegular className="w-3 h-3 text-white" />
+                    <PersonFilled className="w-3 h-3 text-slate-900" />
                   </div>
                   
                   {/* Character name */}
@@ -1127,33 +1199,33 @@ export function ProjectExplorer() {
       {/* Context menu */}
       {contextMenu && (() => {
         // Get hierarchy info for context menu document
-        const contextDoc = contextMenu.docId 
+        const contextDoc = contextMenu.docId
           ? currentProject.documents.find(d => d.id === contextMenu.docId)
           : null
-        const contextHierarchyType = contextDoc 
+        const contextHierarchyType = contextDoc
           ? getDocumentHierarchyType(contextDoc, currentProject.documents)
           : null
-        
+
         // Get workspace config for menu labels
         const workspaceConfig = getWorkspaceConfig(currentProject.templateId)
-        
+
         // Character notes and prop notes cannot have children
         const isCharacterNote = contextDoc?.isCharacterNote === true
         const isPropNote = contextDoc?.isPropNote === true
         // Check if pages can have children in this workspace
         const isPageWithoutChildren = contextHierarchyType === 'page' && !workspaceConfig.hierarchy.pagesCanHaveChildren
-        const canCreateChild = contextDoc 
+        const canCreateChild = contextDoc
           ? canCreateSubDocument(contextDoc, currentProject.documents) && !isCharacterNote && !isPropNote && !isPageWithoutChildren
           : true
-        
+
         // Determine the label for creating child documents based on hierarchy level
-        const newChildLabel = contextHierarchyType === 'document' 
+        const newChildLabel = contextHierarchyType === 'document'
           ? workspaceConfig.hierarchy.documentChildLabel  // "New Page" for screenplay, "New Note" for notes-journal
           : contextHierarchyType === 'page'
             ? workspaceConfig.hierarchy.pageChildLabel    // "New Note" for screenplay
             : workspaceConfig.hierarchy.documentChildLabel
-        
-        return (
+
+        return createPortal(
           <div
             className="menu-modern fixed py-1.5 z-50 min-w-[180px]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
@@ -1227,7 +1299,8 @@ export function ProjectExplorer() {
                 </button>
               </>
             )}
-          </div>
+          </div>,
+          document.body
         )
       })()}
     </div>

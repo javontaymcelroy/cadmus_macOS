@@ -346,30 +346,35 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
       handlePaste: (view, event, _slice) => {
         const citationDataStr = event.clipboardData?.getData(CITATION_MIME_TYPE)
         if (!citationDataStr) return false
-        
+
         try {
           const citationData: CitationClipboardData = JSON.parse(citationDataStr)
-          
+
           if (citationData.sourceDocumentId === activeDocumentId) {
             return false
           }
-          
+
+          const { schema } = view.state
           const { tr } = view.state
-          const citationMark = view.state.schema.marks.citation?.create({
+          const citationMark = schema.marks.citation?.create({
             sourceDocumentId: citationData.sourceDocumentId,
             sourceBlockId: citationData.sourceBlockId,
             sourceDocumentTitle: citationData.sourceDocumentTitle,
           })
-          
+
           if (citationMark) {
-            const textNode = view.state.schema.text(citationData.text, [citationMark])
-            view.dispatch(tr.replaceSelectionWith(textNode, false))
+            // Insert pasted text as regular text, then append a citation chip
+            const plainText = schema.text(citationData.text)
+            const chipText = schema.text('Source', [citationMark])
+            const { from, to } = tr.selection
+            tr.replaceWith(from, to, [plainText, chipText])
+            view.dispatch(tr)
             return true
           }
         } catch (err) {
           console.error('Failed to parse citation data:', err)
         }
-        
+
         return false
       },
       handleDrop: (view, event, _slice, moved) => {
@@ -569,6 +574,13 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
 
     return () => clearTimeout(scrollTimeout)
   }, [scrollTargetRange, editor, clearScrollTargetRange])
+
+  // Reset horizontal scroll when exiting infinite canvas mode
+  useEffect(() => {
+    if (!ui.infiniteCanvas && editorContainerRef.current) {
+      editorContainerRef.current.scrollLeft = 0
+    }
+  }, [ui.infiniteCanvas])
 
   // Handle pending fix requests
   useEffect(() => {
@@ -892,51 +904,64 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
       </div>
       
       <div className={`flex-1 min-h-0 flex ${versionHistoryMode.active ? 'flex-row' : 'flex-col'} overflow-hidden`}>
-        <div className={clsx(
-          'flex-1 flex flex-col overflow-hidden min-w-0 min-h-0',
-          versionHistoryMode.active && 'w-1/2 border-r border-ink-700'
-        )}>
+        <div
+          ref={editorContainerRef}
+          className={clsx(
+            'flex-1 min-w-0 min-h-0',
+            ui.infiniteCanvas ? 'overflow-auto' : 'overflow-y-auto overflow-x-hidden',
+            versionHistoryMode.active && 'w-1/2 border-r border-ink-700'
+          )}
+        >
           {/* Document title */}
-          <div className="px-8 pt-6 pb-2 border-b border-theme-subtle bg-theme-header flex-shrink-0">
-            {isEditingTitle ? (
-              <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={editedTitle}
-                  onChange={(e) => setEditedTitle(e.target.value)}
-                  onKeyDown={handleTitleKeyDown}
-                  autoFocus
-                  className="flex-1 text-2xl font-bold text-theme-primary bg-transparent outline-none border-b-2 border-theme-accent caret-gold-400 pb-1"
+          <div className="px-8 py-4 border-b border-theme-subtle bg-theme-header sticky top-0 z-10">
+            <div className="flex items-center justify-between gap-4">
+              {isEditingTitle ? (
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <input
+                    type="text"
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    onKeyDown={handleTitleKeyDown}
+                    autoFocus
+                    className="flex-1 text-2xl font-bold text-theme-primary bg-transparent outline-none border-b-2 border-theme-accent caret-gold-400 pb-1"
+                    style={{ fontFamily: titleFontFamily }}
+                  />
+                  <button
+                    onClick={saveTitleChange}
+                    className="p-1.5 text-theme-primary hover:text-theme-accent transition-colors"
+                    title="Save (Enter)"
+                  >
+                    <CheckmarkRegular className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsEditingTitle(false)
+                      setEditedTitle('')
+                    }}
+                    className="p-1.5 text-theme-primary hover:text-theme-accent transition-colors"
+                    title="Cancel (Escape)"
+                  >
+                    <DismissRegular className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <h1
+                  className="text-2xl font-bold text-theme-primary cursor-pointer hover:text-theme-accent transition-colors truncate min-w-0 flex-1"
                   style={{ fontFamily: titleFontFamily }}
-                />
-                <button
-                  onClick={saveTitleChange}
-                  className="p-1.5 text-theme-primary hover:text-theme-accent transition-colors"
-                  title="Save (Enter)"
+                  onClick={handleTitleClick}
+                  title={documentTitle}
                 >
-                  <CheckmarkRegular className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => {
-                    setIsEditingTitle(false)
-                    setEditedTitle('')
-                  }}
-                  className="p-1.5 text-theme-primary hover:text-theme-accent transition-colors"
-                  title="Cancel (Escape)"
-                >
-                  <DismissRegular className="w-5 h-5" />
-                </button>
-              </div>
-            ) : (
-              <h1 
-                className="text-2xl font-bold text-theme-primary cursor-pointer hover:text-theme-accent transition-colors truncate max-w-full"
-                style={{ fontFamily: titleFontFamily }}
-                onClick={handleTitleClick}
-                title={documentTitle}
-              >
-                {documentTitle}
-              </h1>
-            )}
+                  {documentTitle}
+                </h1>
+              )}
+
+              <StateDropdown
+                value={projectState}
+                stateNote={projectStateNote}
+                onChange={handleProjectStateChange}
+                showNote={true}
+              />
+            </div>
             {hierarchyInfo.type === 'page' && hierarchyInfo.parentTitle && (
               <p className="text-sm text-theme-muted font-ui mt-1">
                 Page {hierarchyInfo.pageNumber} of {hierarchyInfo.parentTitle}
@@ -961,23 +986,11 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
                   Comparing with version history
                 </span>
               )}
-              
-              <div className="ml-auto">
-                <StateDropdown
-                  value={projectState}
-                  stateNote={projectStateNote}
-                  onChange={handleProjectStateChange}
-                  showNote={true}
-                />
-              </div>
             </div>
           </div>
 
           {/* Editor content */}
-          <div 
-            className="flex-1 overflow-auto relative" 
-            ref={editorContainerRef}
-          >
+          <div className="relative">
             {(batchFixState?.active || activeFixPreviewCount > 0) && (
               <div className="sticky top-4 z-50 flex justify-end px-4 pointer-events-none">
                 <div className="pointer-events-auto flex items-center gap-2 bg-ink-800/95 backdrop-blur-sm border border-ink-600 rounded-lg px-3 py-2 shadow-xl">
@@ -1002,13 +1015,16 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
               </div>
             )}
             
-            <div 
-              className="mx-auto py-8 transition-transform duration-150 ease-out"
+            <div
+              className="py-8"
               style={{
                 transform: `scale(${ui.viewZoom / 100})`,
                 transformOrigin: 'top center',
                 width: `${100 / (ui.viewZoom / 100)}%`,
                 maxWidth: `${(768 * 100) / ui.viewZoom}%`,
+                marginLeft: ui.viewZoom < 100 ? `${-(100 / ui.viewZoom - 1) * 50}%` : 'auto',
+                marginRight: 'auto',
+                transition: 'transform 150ms ease-out, margin-left 150ms ease-out',
               }}
             >
               <div

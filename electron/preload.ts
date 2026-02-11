@@ -279,6 +279,9 @@ type AIWritingCommand =
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   | 'scriptDoctor'
   | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
+  | 'customPrompt'
+  | 'ask'
+  | 'makeConsistent'
 
 type ScreenplayElementType = 
   | 'scene-heading'
@@ -330,8 +333,11 @@ interface AIWritingRequest {
   documentTitle?: string
   templateType?: string
   toneOption?: string
+  customPromptText?: string
   supplementaryContext?: SupplementaryWritingContext
   sceneContext?: SceneContext
+  targetRuntimeMinutes?: number
+  userQuestion?: string
 }
 
 interface AIWritingResponse {
@@ -445,7 +451,13 @@ const api = {
     
     open: (projectPath: string): Promise<Project> =>
       ipcRenderer.invoke('project:open', projectPath),
-    
+
+    import: (sourcePath: string, destinationBasePath: string): Promise<Project> =>
+      ipcRenderer.invoke('project:import', sourcePath, destinationBasePath),
+
+    export: (projectPath: string, destinationBasePath: string): Promise<string> =>
+      ipcRenderer.invoke('project:export', projectPath, destinationBasePath),
+
     save: (project: Project): Promise<void> =>
       ipcRenderer.invoke('project:save', project),
     
@@ -624,6 +636,15 @@ const api = {
       ipcRenderer.invoke('zoom:set', zoom)
   },
 
+  // Interface Scale operations (whole-app zoom)
+  interfaceScale: {
+    get: (): Promise<number> =>
+      ipcRenderer.invoke('interfaceScale:get'),
+
+    set: (scale: number): Promise<void> =>
+      ipcRenderer.invoke('interfaceScale:set', scale)
+  },
+
   // Image Generation operations
   imageGeneration: {
     generate: (prompt: string, options: ImageGenOptions): Promise<GeneratedImageResult> =>
@@ -691,6 +712,24 @@ const api = {
   gatedWriting: {
     generate: (request: AIWritingRequest, storyFacts?: StoryFacts, forceOverride?: boolean): Promise<PipelineResult> =>
       ipcRenderer.invoke('gatedWriting:generate', request, storyFacts, forceOverride)
+  },
+
+  // Panel widths persistence
+  panelWidths: {
+    get: (): Promise<Record<string, number>> =>
+      ipcRenderer.invoke('panelWidths:get'),
+
+    set: (widths: Record<string, number>): Promise<void> =>
+      ipcRenderer.invoke('panelWidths:set', widths)
+  },
+
+  // Window state
+  window: {
+    onFullScreenChange: (callback: (isFullScreen: boolean) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, isFullScreen: boolean) => callback(isFullScreen)
+      ipcRenderer.on('fullscreen-changed', handler)
+      return () => ipcRenderer.removeListener('fullscreen-changed', handler)
+    }
   }
 }
 

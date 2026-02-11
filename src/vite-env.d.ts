@@ -17,6 +17,9 @@ type AIWritingCommand =
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   | 'scriptDoctor'
   | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
+  | 'customPrompt'
+  | 'ask'
+  | 'makeConsistent'
 
 type ScreenplayElementType = 
   | 'scene-heading'
@@ -68,8 +71,11 @@ interface AIWritingRequest {
   documentTitle?: string
   templateType?: string
   toneOption?: string
+  customPromptText?: string
   supplementaryContext?: SupplementaryWritingContext
   sceneContext?: AISceneContext
+  targetRuntimeMinutes?: number
+  userQuestion?: string
 }
 
 interface AIWritingResponse {
@@ -236,6 +242,17 @@ interface ElectronAPI {
     generateProp: (propName: string, scriptContexts: ScriptContext[], supplementaryDocs?: SupplementaryDocument[]) => Promise<PropDocOutput | null>
     generateLocation: (locationName: string, scriptContexts: ScriptContext[]) => Promise<LocationDocOutput | null>
     hasApiKey: () => Promise<boolean>
+  }
+  zoom: {
+    get: () => Promise<number>
+    set: (zoom: number) => Promise<void>
+  }
+  interfaceScale: {
+    get: () => Promise<number>
+    set: (scale: number) => Promise<void>
+  }
+  window: {
+    onFullScreenChange: (callback: (isFullScreen: boolean) => void) => () => void
   }
 }
 

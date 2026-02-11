@@ -71,17 +71,17 @@ const severityConfig: Record<IssueSeverity, {
   warning: {
     icon: <WarningRegular className="w-3.5 h-3.5" />,
     label: 'WARNING',
-    color: 'text-amber-400',
-    bgColor: 'bg-amber-400/10',
-    borderColor: 'border-amber-400/30',
+    color: 'text-theme-accent',
+    bgColor: 'bg-[var(--accent-gold-muted)]',
+    borderColor: 'border-[var(--accent-gold-border)]',
     sortOrder: 1
   },
   optional: {
     icon: <InfoRegular className="w-3.5 h-3.5" />,
     label: 'OPTIONAL',
-    color: 'text-white/40',
-    bgColor: 'bg-white/5',
-    borderColor: 'border-white/10',
+    color: 'text-theme-muted',
+    bgColor: 'bg-theme-hover',
+    borderColor: 'border-theme-default',
     sortOrder: 2
   }
 }
@@ -92,160 +92,160 @@ const operatorConfig: Record<CritiqueOperator, { icon: React.ReactNode; label: s
   unclear_motivation: {
     icon: <QuestionCircleRegular className="w-4 h-4" />,
     label: 'Unclear Motivation',
-    color: 'text-amber-400'
+    color: 'text-theme-accent'
   },
   motivation_shift: {
     icon: <ArrowShuffleRegular className="w-4 h-4" />,
     label: 'Motivation Shift',
-    color: 'text-amber-400'
+    color: 'text-theme-accent'
   },
   behavior_contradiction: {
     icon: <WarningRegular className="w-4 h-4" />,
     label: 'Behavior Contradiction',
-    color: 'text-red-400'
+    color: 'text-theme-accent'
   },
   protagonist_passivity: {
     icon: <PersonRegular className="w-4 h-4" />,
     label: 'Protagonist Passivity',
-    color: 'text-orange-400'
+    color: 'text-theme-accent'
   },
   // Convenience/Coincidence (5-6)
   coincidence_plotting: {
     icon: <ThumbDislikeRegular className="w-4 h-4" />,
     label: 'Coincidence Plotting',
-    color: 'text-rose-400'
+    color: 'text-theme-accent'
   },
   convenient_information: {
     icon: <FlashRegular className="w-4 h-4" />,
     label: 'Convenient Information',
-    color: 'text-rose-400'
+    color: 'text-theme-accent'
   },
   // Exposition/Dialogue (7-8, 21-22)
   exposition_dump: {
     icon: <MegaphoneRegular className="w-4 h-4" />,
     label: 'Exposition Dump',
-    color: 'text-yellow-400'
+    color: 'text-theme-accent'
   },
   audience_dialogue: {
     icon: <ChatRegular className="w-4 h-4" />,
     label: 'Audience Dialogue',
-    color: 'text-yellow-400'
+    color: 'text-theme-accent'
   },
   theme_stated: {
     icon: <BookRegular className="w-4 h-4" />,
     label: 'Theme Stated',
-    color: 'text-yellow-400'
+    color: 'text-theme-accent'
   },
   plot_dialogue: {
     icon: <TextBulletListSquareRegular className="w-4 h-4" />,
     label: 'Plot Dialogue',
-    color: 'text-yellow-400'
+    color: 'text-theme-accent'
   },
   // Rules/Logic (9-10, 25-26)
   late_rules: {
     icon: <SettingsRegular className="w-4 h-4" />,
     label: 'Late Rules',
-    color: 'text-purple-400'
+    color: 'text-theme-accent'
   },
   rules_broken: {
     icon: <ShieldErrorRegular className="w-4 h-4" />,
     label: 'Rules Broken',
-    color: 'text-purple-400'
+    color: 'text-theme-accent'
   },
   impossible_knowledge: {
     icon: <BrainCircuitRegular className="w-4 h-4" />,
     label: 'Impossible Knowledge',
-    color: 'text-purple-400'
+    color: 'text-theme-accent'
   },
   undefined_tech: {
     icon: <FlashRegular className="w-4 h-4" />,
     label: 'Undefined Tech',
-    color: 'text-purple-400'
+    color: 'text-theme-accent'
   },
   // Setup/Payoff (11-13)
   setup_no_payoff: {
     icon: <TargetArrowRegular className="w-4 h-4" />,
     label: 'Setup No Payoff',
-    color: 'text-blue-400'
+    color: 'text-theme-accent'
   },
   payoff_no_setup: {
     icon: <GiftRegular className="w-4 h-4" />,
     label: 'Payoff No Setup',
-    color: 'text-blue-400'
+    color: 'text-theme-accent'
   },
   forgotten_prop: {
     icon: <BoxRegular className="w-4 h-4" />,
     label: 'Forgotten Prop',
-    color: 'text-blue-400'
+    color: 'text-theme-accent'
   },
   // Continuity/Timeline (14-16)
   location_logic: {
     icon: <MapRegular className="w-4 h-4" />,
     label: 'Location Logic',
-    color: 'text-indigo-400'
+    color: 'text-theme-accent'
   },
   timeline_issue: {
     icon: <ClockRegular className="w-4 h-4" />,
     label: 'Timeline Issue',
-    color: 'text-indigo-400'
+    color: 'text-theme-accent'
   },
   spatial_error: {
     icon: <CompassNorthwestRegular className="w-4 h-4" />,
     label: 'Spatial Error',
-    color: 'text-indigo-400'
+    color: 'text-theme-accent'
   },
   // Stakes/Conflict (17-20, 23-24)
   offscreen_resolution: {
     icon: <EyeOffRegular className="w-4 h-4" />,
     label: 'Offscreen Resolution',
-    color: 'text-pink-400'
+    color: 'text-theme-accent'
   },
   stakes_asserted: {
     icon: <ScalesRegular className="w-4 h-4" />,
     label: 'Stakes Asserted',
-    color: 'text-pink-400'
+    color: 'text-theme-accent'
   },
   unearned_emotion: {
     icon: <HeartBrokenRegular className="w-4 h-4" />,
     label: 'Unearned Emotion',
-    color: 'text-pink-400'
+    color: 'text-theme-accent'
   },
   tonal_whiplash: {
     icon: <WeatherThunderstormRegular className="w-4 h-4" />,
     label: 'Tonal Whiplash',
-    color: 'text-pink-400'
+    color: 'text-theme-accent'
   },
   fake_conflict: {
     icon: <LinkRegular className="w-4 h-4" />,
     label: 'Fake Conflict',
-    color: 'text-pink-400'
+    color: 'text-theme-accent'
   },
   antagonist_fluctuation: {
     icon: <PeopleRegular className="w-4 h-4" />,
     label: 'Antagonist Fluctuation',
-    color: 'text-pink-400'
+    color: 'text-theme-accent'
   },
   // Structure/Ending (27-29)
   montage_causality: {
     icon: <VideoRegular className="w-4 h-4" />,
     label: 'Montage Causality',
-    color: 'text-teal-400'
+    color: 'text-theme-accent'
   },
   conflict_avoided: {
     icon: <ArrowTurnRightRegular className="w-4 h-4" />,
     label: 'Conflict Avoided',
-    color: 'text-teal-400'
+    color: 'text-theme-accent'
   },
   consequence_dodged: {
     icon: <ShieldErrorRegular className="w-4 h-4" />,
     label: 'Consequence Dodged',
-    color: 'text-teal-400'
+    color: 'text-theme-accent'
   },
   // Meta (30)
   repetition_sin: {
     icon: <NumberSymbolRegular className="w-4 h-4" />,
     label: 'Repetition Sin',
-    color: 'text-cyan-400'
+    color: 'text-theme-accent'
   }
 }
 
@@ -262,49 +262,49 @@ const debtCategories: Record<DebtCategory, {
     label: 'Character Debt',
     operators: ['unclear_motivation', 'motivation_shift', 'behavior_contradiction', 'protagonist_passivity'],
     icon: <PersonRegular className="w-3.5 h-3.5" />,
-    color: 'text-amber-400'
+    color: 'text-theme-accent'
   },
   convenience: {
     label: 'Convenience Sins',
     operators: ['coincidence_plotting', 'convenient_information', 'impossible_knowledge', 'undefined_tech'],
     icon: <FlashRegular className="w-3.5 h-3.5" />,
-    color: 'text-rose-400'
+    color: 'text-theme-accent'
   },
   exposition: {
     label: 'Telling Not Showing',
     operators: ['exposition_dump', 'audience_dialogue', 'theme_stated', 'plot_dialogue'],
     icon: <MegaphoneRegular className="w-3.5 h-3.5" />,
-    color: 'text-yellow-400'
+    color: 'text-theme-accent'
   },
   logic: {
     label: 'Logic/Rules Debt',
     operators: ['late_rules', 'rules_broken', 'location_logic', 'spatial_error'],
     icon: <SettingsRegular className="w-3.5 h-3.5" />,
-    color: 'text-purple-400'
+    color: 'text-theme-accent'
   },
   setup: {
     label: 'Promise Debt',
     operators: ['setup_no_payoff', 'payoff_no_setup', 'forgotten_prop'],
     icon: <TargetArrowRegular className="w-3.5 h-3.5" />,
-    color: 'text-blue-400'
+    color: 'text-theme-accent'
   },
   stakes: {
     label: 'Stakes/Conflict Debt',
     operators: ['offscreen_resolution', 'stakes_asserted', 'unearned_emotion', 'tonal_whiplash', 'fake_conflict', 'antagonist_fluctuation'],
     icon: <ScalesRegular className="w-3.5 h-3.5" />,
-    color: 'text-pink-400'
+    color: 'text-theme-accent'
   },
   structure: {
     label: 'Structure Sins',
     operators: ['timeline_issue', 'montage_causality', 'conflict_avoided', 'consequence_dodged'],
     icon: <ClockRegular className="w-3.5 h-3.5" />,
-    color: 'text-teal-400'
+    color: 'text-theme-accent'
   },
   meta: {
     label: 'Pattern Sins',
     operators: ['repetition_sin'],
     icon: <NumberSymbolRegular className="w-3.5 h-3.5" />,
-    color: 'text-cyan-400'
+    color: 'text-theme-accent'
   }
 }
 
@@ -406,14 +406,14 @@ function SinScoreboard({ issues }: SinScoreboardProps) {
   if (totalSins === 0) return null
 
   return (
-    <div className="border-b border-white/[0.06] bg-black/20">
+    <div className="border-b border-theme-subtle">
       {/* Header with total counter */}
       <div className="px-3 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-ui font-medium uppercase tracking-wider text-white/30">
+          <span className="text-[10px] font-ui font-medium uppercase tracking-wider text-theme-muted">
             Narrative Sins
           </span>
-          <span className="text-[9px] font-ui text-white/20 italic">
+          <span className="text-[9px] font-ui text-theme-muted italic">
             what the audience sees
           </span>
         </div>
@@ -426,8 +426,8 @@ function SinScoreboard({ issues }: SinScoreboardProps) {
           <div className={clsx(
             'px-2 py-0.5 rounded font-mono text-sm font-bold',
             unpaidSins > 10 ? 'bg-red-500/20 text-red-400' :
-            unpaidSins > 5 ? 'bg-amber-500/20 text-amber-400' :
-            'bg-white/10 text-white/60'
+            unpaidSins > 5 ? 'bg-[var(--accent-gold-muted)] text-theme-accent' :
+            'bg-theme-active text-theme-secondary'
           )}>
             {unpaidSins}
           </div>
@@ -439,31 +439,31 @@ function SinScoreboard({ issues }: SinScoreboardProps) {
         {(Object.entries(debtCategories) as [DebtCategory, typeof debtCategories[DebtCategory]][]).map(([key, config]) => {
           const debt = categoryDebts[key]
           if (debt.total === 0) return null
-          
+
           const barWidth = (debt.unpaid / maxCategoryDebt) * 100
-          
+
           return (
             <div key={key} className="flex items-center gap-2 text-xs">
               <div className={clsx('w-4 flex-shrink-0', config.color)}>
                 {config.icon}
               </div>
-              <span className="w-24 text-white/40 font-ui truncate text-[10px]">
+              <span className="w-24 text-theme-muted font-ui truncate text-[10px]">
                 {config.label}
               </span>
-              <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div 
+              <div className="flex-1 h-1.5 bg-theme-hover rounded-full overflow-hidden">
+                <div
                   className={clsx(
                     'h-full rounded-full transition-all duration-500',
                     debt.unpaid > 5 ? 'bg-red-400/60' :
-                    debt.unpaid > 2 ? 'bg-amber-400/60' :
-                    'bg-white/30'
+                    debt.unpaid > 2 ? 'bg-[var(--accent-gold)]/60' :
+                    'bg-[var(--accent-gold)]/30'
                   )}
                   style={{ width: `${barWidth}%` }}
                 />
               </div>
               <span className={clsx(
                 'w-6 text-right font-mono text-[10px]',
-                debt.unpaid > 0 ? config.color : 'text-white/20'
+                debt.unpaid > 0 ? config.color : 'text-theme-muted'
               )}>
                 +{debt.unpaid}
               </span>
@@ -479,16 +479,16 @@ function SinScoreboard({ issues }: SinScoreboardProps) {
 
       {/* Net debt summary */}
       {unpaidSins > 0 && (
-        <div className="px-3 py-1.5 bg-black/30 border-t border-white/[0.04]">
+        <div className="px-3 py-1.5 bg-theme-active border-t border-theme-subtle">
           <div className="flex items-center justify-between text-[10px] font-ui">
-            <span className="text-white/30 uppercase tracking-wide">
+            <span className="text-theme-muted uppercase tracking-wide">
               Unresolved narrative debt
             </span>
             <span className={clsx(
               'font-mono font-bold',
               unpaidSins > 10 ? 'text-red-400' :
-              unpaidSins > 5 ? 'text-amber-400' :
-              'text-white/50'
+              unpaidSins > 5 ? 'text-theme-accent' :
+              'text-theme-secondary'
             )}>
               {unpaidSins} sins
             </span>
@@ -519,17 +519,17 @@ function CritiqueIssueCard({ issue, onDismiss, onNavigate, onResolve }: Critique
 
   return (
     <div className={clsx(
-      'border-b border-white/[0.03] last:border-b-0',
+      'border-b border-theme-subtle last:border-b-0',
       isResolved && 'opacity-50'
     )}>
       {/* Header */}
-      <div 
-        className="px-3 py-3 hover:bg-white/[0.02] cursor-pointer transition-all duration-200 group"
+      <div
+        className="px-3 py-3 hover:bg-theme-hover cursor-pointer transition-all duration-200 group"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-start gap-3">
           {/* Expand/collapse icon */}
-          <button className="mt-0.5 text-white/30 hover:text-white/60 shrink-0">
+          <button className="mt-0.5 text-theme-muted hover:text-theme-secondary shrink-0">
             {isExpanded ? (
               <ChevronDownRegular className="w-4 h-4" />
             ) : (
@@ -554,34 +554,34 @@ function CritiqueIssueCard({ issue, onDismiss, onNavigate, onResolve }: Critique
             {/* Question - primary content */}
             <p className={clsx(
               'text-sm font-medium leading-relaxed mb-1.5',
-              isResolved ? 'text-white/50 line-through' : 'text-white/90'
+              isResolved ? 'text-theme-secondary line-through' : 'text-theme-primary'
             )}>
               {issue.question}
             </p>
-            
+
             {/* Consequence - the cost of not fixing */}
             {issue.consequence && !isResolved && (
               <p className={clsx(
                 'text-xs leading-relaxed mb-1.5 italic',
-                issue.severity === 'blocking' ? 'text-red-400/80' : 'text-amber-400/70'
+                issue.severity === 'blocking' ? 'text-red-400/80' : 'text-theme-accent opacity-70'
               )}>
                 {issue.consequence}
               </p>
             )}
-            
+
             {/* Meta row */}
             <div className="flex items-center gap-2 text-[10px] font-ui flex-wrap">
               <span className={clsx('uppercase tracking-wide', operatorCfg.color)}>
                 {operatorCfg.label}
               </span>
-              <span className="text-white/20">•</span>
-              <span className="text-white/40">
+              <span className="text-theme-muted">·</span>
+              <span className="text-theme-muted">
                 {confidencePercent}%
               </span>
               {issue.deadline && !isResolved && (
                 <>
-                  <span className="text-white/20">•</span>
-                  <span className="text-amber-400/70 flex items-center gap-1">
+                  <span className="text-theme-muted">·</span>
+                  <span className="text-theme-accent opacity-70 flex items-center gap-1">
                     <ClockRegular className="w-3 h-3" />
                     {issue.deadline}
                   </span>
@@ -589,10 +589,10 @@ function CritiqueIssueCard({ issue, onDismiss, onNavigate, onResolve }: Critique
               )}
               {isResolved && (
                 <>
-                  <span className="text-white/20">•</span>
+                  <span className="text-theme-muted">·</span>
                   <span className="text-green-400/70 flex items-center gap-1">
                     <CheckmarkCircleRegular className="w-3 h-3" />
-                    {issue.resolution === 'fixed' ? 'Resolved' : 
+                    {issue.resolution === 'fixed' ? 'Resolved' :
                      issue.resolution === 'intentional' ? 'Paid' : 'Debt Accepted'}
                   </span>
                 </>
@@ -606,7 +606,7 @@ function CritiqueIssueCard({ issue, onDismiss, onNavigate, onResolve }: Critique
               e.stopPropagation()
               onDismiss()
             }}
-            className="p-1.5 text-white/30 hover:text-white/60 hover:bg-white/[0.04] rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100 shrink-0"
+            className="p-1.5 text-theme-muted hover:text-theme-secondary hover:bg-theme-hover rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100 shrink-0"
             title="Dismiss"
           >
             <DismissRegular className="w-4 h-4" />
@@ -619,47 +619,47 @@ function CritiqueIssueCard({ issue, onDismiss, onNavigate, onResolve }: Critique
         <div className="px-3 pb-3 pl-10 space-y-3">
           {/* Context */}
           {issue.context && (
-            <div className="text-xs text-white/50 leading-relaxed">
+            <div className="text-xs text-theme-secondary leading-relaxed">
               {issue.context}
             </div>
           )}
-          
+
           {/* Resolution note if exists */}
           {issue.resolutionNote && (
             <div className="text-xs text-green-400/60 leading-relaxed bg-green-400/5 rounded px-2 py-1.5 border border-green-400/20">
               Note: {issue.resolutionNote}
             </div>
           )}
-          
+
           {/* Evidence - showing source documents and quotes */}
           {issue.evidence.length > 0 && (
             <div className="space-y-2">
-              <div className="text-[10px] font-ui uppercase tracking-wide text-white/30 mb-1">
+              <div className="text-[10px] font-ui uppercase tracking-wide text-theme-muted mb-1">
                 Evidence
               </div>
-              
+
               {/* Evidence citations */}
               <div className="space-y-2">
                 {issue.evidence.slice(0, 3).map((ev, idx) => (
-                  <div key={idx} className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-2.5">
+                  <div key={idx} className="bg-theme-hover border border-theme-subtle rounded-lg p-2.5">
                     {/* Source document and scene ref */}
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-[10px] font-ui font-medium text-gold-400/80 bg-gold-400/10 px-1.5 py-0.5 rounded">
+                      <span className="text-[10px] font-ui font-medium text-theme-accent bg-[var(--accent-gold-muted)] px-1.5 py-0.5 rounded">
                         {(ev as { sourceDocument?: string }).sourceDocument || 'Script'}
                       </span>
-                      <span className="text-[10px] font-ui text-white/40 truncate">
+                      <span className="text-[10px] font-ui text-theme-muted truncate">
                         {ev.sceneRef}
                       </span>
                     </div>
-                    
+
                     {/* Quote */}
-                    <p className="text-xs text-white/60 leading-relaxed border-l-2 border-gold-400/30 pl-2 italic">
+                    <p className="text-xs text-theme-secondary leading-relaxed border-l-2 border-[var(--accent-gold-border)] pl-2 italic">
                       "{ev.excerpt}"
                     </p>
                   </div>
                 ))}
                 {issue.evidence.length > 3 && (
-                  <p className="text-[11px] text-white/30 italic pl-1">
+                  <p className="text-[11px] text-theme-muted italic pl-1">
                     +{issue.evidence.length - 3} more citation{issue.evidence.length > 4 ? 's' : ''}
                   </p>
                 )}
@@ -674,7 +674,7 @@ function CritiqueIssueCard({ issue, onDismiss, onNavigate, onResolve }: Critique
                       e.stopPropagation()
                       onNavigate(navigableEvidence.documentId, navigableEvidence.blockId || '')
                     }}
-                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-ui font-medium text-gold-400 bg-gold-400/10 hover:bg-gold-400/20 rounded-md transition-colors w-full justify-center"
+                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-ui font-medium text-theme-accent bg-[var(--accent-gold-muted)] hover:bg-[var(--accent-gold-border)] rounded-md transition-colors w-full justify-center"
                   >
                     <LocationRegular className="w-3.5 h-3.5" />
                     View in Script
@@ -687,7 +687,7 @@ function CritiqueIssueCard({ issue, onDismiss, onNavigate, onResolve }: Critique
           {/* Resolution actions - only show if not resolved and handler provided */}
           {!isResolved && onResolve && (
             <div className="flex items-center gap-2 pt-1">
-              <span className="text-[10px] font-ui text-white/30 uppercase tracking-wide">Action:</span>
+              <span className="text-[10px] font-ui text-theme-muted uppercase tracking-wide">Action:</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -703,7 +703,7 @@ function CritiqueIssueCard({ issue, onDismiss, onNavigate, onResolve }: Critique
                   e.stopPropagation()
                   onResolve('intentional')
                 }}
-                className="px-2 py-1 text-[10px] font-ui font-medium text-blue-400 bg-blue-400/10 hover:bg-blue-400/20 rounded transition-colors"
+                className="px-2 py-1 text-[10px] font-ui font-medium text-theme-accent bg-[var(--accent-gold-muted)] hover:bg-[var(--accent-gold-border)] rounded transition-colors"
                 title="Deliberate choice - pay this sin"
               >
                 Pay Sin
@@ -713,7 +713,7 @@ function CritiqueIssueCard({ issue, onDismiss, onNavigate, onResolve }: Critique
                   e.stopPropagation()
                   onResolve('deferred')
                 }}
-                className="px-2 py-1 text-[10px] font-ui font-medium text-amber-400 bg-amber-400/10 hover:bg-amber-400/20 rounded transition-colors"
+                className="px-2 py-1 text-[10px] font-ui font-medium text-theme-muted bg-theme-hover hover:bg-theme-active rounded transition-colors"
                 title="Accept this debt for now"
               >
                 Accept Debt
@@ -731,19 +731,19 @@ function CritiqueIssueCard({ issue, onDismiss, onNavigate, onResolve }: Critique
 // =============================================================================
 
 const phaseColors: Record<string, string> = {
-  setup: 'text-blue-400',
-  escalation: 'text-amber-400',
+  setup: 'text-theme-muted',
+  escalation: 'text-theme-accent',
   climax: 'text-red-400',
-  release: 'text-green-400',
-  transition: 'text-white/40'
+  release: 'text-theme-secondary',
+  transition: 'text-theme-muted'
 }
 
 const phaseBgColors: Record<string, string> = {
-  setup: 'bg-blue-400/10 border-blue-400/20',
-  escalation: 'bg-amber-400/10 border-amber-400/20',
+  setup: 'bg-theme-hover border-theme-default',
+  escalation: 'bg-[var(--accent-gold-muted)] border-[var(--accent-gold-border)]',
   climax: 'bg-red-400/10 border-red-400/20',
-  release: 'bg-green-400/10 border-green-400/20',
-  transition: 'bg-white/5 border-white/10'
+  release: 'bg-theme-hover border-theme-default',
+  transition: 'bg-theme-hover border-theme-default'
 }
 
 const focusLabels: Record<string, string> = {
@@ -756,8 +756,8 @@ const focusLabels: Record<string, string> = {
 
 const eligibilityConfig: Record<string, { label: string; color: string; bgColor: string }> = {
   eligible: { label: 'Eligible', color: 'text-green-400', bgColor: 'bg-green-400/10' },
-  'present-passive': { label: 'Passive', color: 'text-amber-400', bgColor: 'bg-amber-400/10' },
-  'available-delayed': { label: 'Delayed', color: 'text-blue-400', bgColor: 'bg-blue-400/10' },
+  'present-passive': { label: 'Passive', color: 'text-theme-accent', bgColor: 'bg-[var(--accent-gold-muted)]' },
+  'available-delayed': { label: 'Delayed', color: 'text-theme-secondary', bgColor: 'bg-theme-hover' },
   excluded: { label: 'Excluded', color: 'text-red-400', bgColor: 'bg-red-400/10' }
 }
 
@@ -769,32 +769,32 @@ function SceneStateDisplay({ sceneState }: SceneStateDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   return (
-    <div className="border-b border-white/[0.06] bg-black/20">
+    <div className="border-b border-theme-subtle">
       {/* Header */}
       <div
-        className="px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-colors"
+        className="px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-theme-hover transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-ui font-medium uppercase tracking-wider text-white/30">
+          <span className="text-[10px] font-ui font-medium uppercase tracking-wider text-theme-muted">
             Scene State
           </span>
           <span className={clsx(
             'text-[10px] font-ui font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border',
-            phaseBgColors[sceneState.phase] || 'bg-white/5 border-white/10',
-            phaseColors[sceneState.phase] || 'text-white/40'
+            phaseBgColors[sceneState.phase] || 'bg-theme-hover border-theme-default',
+            phaseColors[sceneState.phase] || 'text-theme-muted'
           )}>
             {sceneState.phase}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-ui text-white/30">
+          <span className="text-[10px] font-ui text-theme-muted">
             Act {sceneState.act}
           </span>
-          <span className="text-[10px] font-ui text-white/20">
+          <span className="text-[10px] font-ui text-theme-muted">
             {focusLabels[sceneState.focus] || sceneState.focus}
           </span>
-          <button className="text-white/30 hover:text-white/60">
+          <button className="text-theme-muted hover:text-theme-secondary">
             {isExpanded ? (
               <ChevronDownRegular className="w-3.5 h-3.5" />
             ) : (
@@ -808,7 +808,7 @@ function SceneStateDisplay({ sceneState }: SceneStateDisplayProps) {
       {isExpanded && (
         <div className="px-3 pb-2 space-y-2">
           {/* Reasoning */}
-          <p className="text-[11px] text-white/40 leading-relaxed">
+          <p className="text-[11px] text-theme-muted leading-relaxed">
             {sceneState.reasoning}
           </p>
 
@@ -823,7 +823,7 @@ function SceneStateDisplay({ sceneState }: SceneStateDisplayProps) {
                 <div key={idx} className="text-[11px] text-red-400/80 bg-red-400/5 rounded px-2 py-1 border border-red-400/10">
                   <span className="font-medium uppercase text-[10px]">{exc.type}</span>
                   {exc.target && <span className="text-red-400/60"> — {exc.target}</span>}
-                  <p className="text-white/40 mt-0.5">{exc.reason}</p>
+                  <p className="text-theme-muted mt-0.5">{exc.reason}</p>
                 </div>
               ))}
             </div>
@@ -831,11 +831,11 @@ function SceneStateDisplay({ sceneState }: SceneStateDisplayProps) {
 
           {/* Allowed contributions */}
           <div className="flex items-center gap-1 flex-wrap">
-            <span className="text-[10px] font-ui text-white/30 uppercase tracking-wide mr-1">Allowed:</span>
+            <span className="text-[10px] font-ui text-theme-muted uppercase tracking-wide mr-1">Allowed:</span>
             {sceneState.allowedContributions.map(c => (
               <span
                 key={c}
-                className="text-[9px] font-ui px-1.5 py-0.5 rounded bg-white/5 text-white/40 border border-white/[0.06]"
+                className="text-[9px] font-ui px-1.5 py-0.5 rounded bg-theme-hover text-theme-muted border border-theme-subtle"
               >
                 {c}
               </span>
@@ -844,19 +844,19 @@ function SceneStateDisplay({ sceneState }: SceneStateDisplayProps) {
 
           {/* Confidence */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-ui text-white/30">Confidence:</span>
-            <div className="flex-1 h-1 bg-white/5 rounded-full overflow-hidden max-w-[100px]">
+            <span className="text-[10px] font-ui text-theme-muted">Confidence:</span>
+            <div className="flex-1 h-1 bg-theme-hover rounded-full overflow-hidden max-w-[100px]">
               <div
                 className={clsx(
                   'h-full rounded-full transition-all',
                   sceneState.confidence > 0.7 ? 'bg-green-400/60' :
-                  sceneState.confidence > 0.5 ? 'bg-amber-400/60' :
+                  sceneState.confidence > 0.5 ? 'bg-[var(--accent-gold)]/60' :
                   'bg-red-400/60'
                 )}
                 style={{ width: `${sceneState.confidence * 100}%` }}
               />
             </div>
-            <span className="text-[10px] font-mono text-white/40">
+            <span className="text-[10px] font-mono text-theme-muted">
               {Math.round(sceneState.confidence * 100)}%
             </span>
           </div>
@@ -887,13 +887,13 @@ function CharacterEligibilityDisplay({ eligibility }: CharacterEligibilityDispla
   }
 
   return (
-    <div className="border-b border-white/[0.06] bg-black/10">
+    <div className="border-b border-theme-subtle">
       <div
-        className="px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-colors"
+        className="px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-theme-hover transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-ui font-medium uppercase tracking-wider text-white/30">
+          <span className="text-[10px] font-ui font-medium uppercase tracking-wider text-theme-muted">
             Character Eligibility
           </span>
         </div>
@@ -902,15 +902,15 @@ function CharacterEligibilityDisplay({ eligibility }: CharacterEligibilityDispla
             <span className="text-[10px] font-mono text-green-400">{counts.eligible}</span>
           )}
           {counts.passive > 0 && (
-            <span className="text-[10px] font-mono text-amber-400">{counts.passive}</span>
+            <span className="text-[10px] font-mono text-theme-accent">{counts.passive}</span>
           )}
           {counts.delayed > 0 && (
-            <span className="text-[10px] font-mono text-blue-400">{counts.delayed}</span>
+            <span className="text-[10px] font-mono text-theme-secondary">{counts.delayed}</span>
           )}
           {counts.excluded > 0 && (
             <span className="text-[10px] font-mono text-red-400">{counts.excluded}</span>
           )}
-          <button className="text-white/30 hover:text-white/60">
+          <button className="text-theme-muted hover:text-theme-secondary">
             {isExpanded ? (
               <ChevronDownRegular className="w-3.5 h-3.5" />
             ) : (
@@ -930,15 +930,15 @@ function CharacterEligibilityDisplay({ eligibility }: CharacterEligibilityDispla
                 className={clsx(
                   'flex items-center justify-between px-2 py-1.5 rounded text-[11px]',
                   config.bgColor,
-                  'border border-white/[0.04]'
+                  'border border-theme-subtle'
                 )}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <PersonRegular className={clsx('w-3.5 h-3.5 shrink-0', config.color)} />
-                  <span className="text-white/80 font-medium truncate">
+                  <span className="text-theme-primary font-medium truncate">
                     {char.name}
                     {char.isLead && (
-                      <span className="text-gold-400/60 ml-1 text-[9px]">LEAD</span>
+                      <span className="text-theme-accent opacity-60 ml-1 text-[9px]">LEAD</span>
                     )}
                   </span>
                 </div>
@@ -951,10 +951,10 @@ function CharacterEligibilityDisplay({ eligibility }: CharacterEligibilityDispla
             )
           })}
           {/* Legend */}
-          <div className="flex items-center gap-3 pt-1 text-[9px] font-ui text-white/20">
+          <div className="flex items-center gap-3 pt-1 text-[9px] font-ui text-theme-muted">
             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400/60" /> can act</span>
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400/60" /> present, reactive only</span>
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-400/60" /> not yet</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-gold)]/60" /> present, reactive only</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-theme-active" /> not yet</span>
             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-400/60" /> forbidden</span>
           </div>
         </div>
@@ -976,26 +976,26 @@ function PipelineDeclineDisplay({ result, onOverride }: PipelineDeclineDisplayPr
   if (result.gatePassed || result.stage !== 'declined') return null
 
   return (
-    <div className="border-b border-white/[0.06] bg-amber-400/[0.03]">
+    <div className="border-b border-theme-subtle bg-[var(--accent-gold-glow)]">
       <div className="px-3 py-3 space-y-2">
         <div className="flex items-center gap-2">
-          <ShieldRegular className="w-4 h-4 text-amber-400/80" />
-          <span className="text-xs font-ui font-medium text-amber-400/90">
+          <ShieldRegular className="w-4 h-4 text-theme-accent opacity-80" />
+          <span className="text-xs font-ui font-medium text-theme-accent opacity-90">
             Generation Declined
           </span>
         </div>
-        <p className="text-[11px] text-white/50 leading-relaxed">
+        <p className="text-[11px] text-theme-secondary leading-relaxed">
           {result.gateReason}
         </p>
         {result.suggestion && (
-          <p className="text-[11px] text-blue-400/70 leading-relaxed">
+          <p className="text-[11px] text-theme-accent opacity-70 leading-relaxed">
             {result.suggestion}
           </p>
         )}
         {onOverride && (
           <button
             onClick={onOverride}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-ui font-medium text-amber-400/80 bg-amber-400/10 hover:bg-amber-400/20 rounded-md transition-colors border border-amber-400/20"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-ui font-medium text-theme-accent opacity-80 bg-[var(--accent-gold-muted)] hover:bg-[var(--accent-gold-border)] rounded-md transition-colors border border-[var(--accent-gold-border)]"
           >
             <PlayRegular className="w-3 h-3" />
             Override — Generate Anyway
@@ -1092,12 +1092,12 @@ export function WritingPartnerPanel() {
   if (currentProject.templateId !== 'screenplay') return null
 
   return (
-    <div className="flex flex-col h-full bg-zinc-900/50">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/[0.04]">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-theme-subtle bg-theme-header">
         <div className="flex items-center gap-2">
-          <SparkleFilled className="w-4 h-4 text-gold-400/80" />
-          <h2 className="text-xs font-ui font-medium uppercase tracking-wider text-white/40">
+          <SparkleFilled className="w-4 h-4 text-theme-accent opacity-80" />
+          <h2 className="text-xs font-ui font-medium uppercase tracking-wider text-theme-muted">
             Writing Partner
           </h2>
         </div>
@@ -1153,7 +1153,7 @@ export function WritingPartnerPanel() {
 
       {/* Filter bar - severity tabs */}
       {critiqueIssues.length > 0 && (
-        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/[0.03]">
+        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-theme-subtle">
           {/* Severity filter tabs */}
           <button
             onClick={() => setFilterSeverity('all')}
@@ -1170,7 +1170,7 @@ export function WritingPartnerPanel() {
               onClick={() => setFilterSeverity('blocking')}
               className={clsx(
                 'tab-modern flex items-center gap-1',
-                filterSeverity === 'blocking' && 'active bg-red-400/15 text-red-400'
+                filterSeverity === 'blocking' && 'active bg-red-400/10 text-red-400'
               )}
             >
               <ErrorCircleRegular className="w-3 h-3" />
@@ -1183,7 +1183,7 @@ export function WritingPartnerPanel() {
               onClick={() => setFilterSeverity('warning')}
               className={clsx(
                 'tab-modern flex items-center gap-1',
-                filterSeverity === 'warning' && 'active bg-amber-400/15 text-amber-400'
+                filterSeverity === 'warning' && 'active bg-[var(--accent-gold-muted)] text-theme-accent'
               )}
             >
               <WarningRegular className="w-3 h-3" />
@@ -1226,11 +1226,11 @@ export function WritingPartnerPanel() {
         {ui.isRunningCritique ? (
           // Loading state
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="w-12 h-12 rounded-full bg-gold-400/10 flex items-center justify-center mb-4">
-              <ArrowSyncRegular className="w-6 h-6 text-gold-400/60 animate-spin" />
+            <div className="w-12 h-12 rounded-full bg-[var(--accent-gold-muted)] flex items-center justify-center mb-4">
+              <ArrowSyncRegular className="w-6 h-6 text-theme-accent opacity-60 animate-spin" />
             </div>
-            <p className="text-sm text-white/40 font-ui mb-1">Analyzing your screenplay...</p>
-            <p className="text-xs text-white/25 font-ui">
+            <p className="text-sm text-theme-muted font-ui mb-1">Analyzing your screenplay...</p>
+            <p className="text-xs text-theme-muted font-ui">
               This may take a moment
             </p>
           </div>
@@ -1239,20 +1239,20 @@ export function WritingPartnerPanel() {
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             {critiqueIssues.length === 0 ? (
               <>
-                <div className="w-12 h-12 rounded-full bg-white/[0.03] flex items-center justify-center mb-4">
-                  <TextBulletListSquareRegular className="w-6 h-6 text-white/20" />
+                <div className="w-12 h-12 rounded-full bg-theme-hover flex items-center justify-center mb-4">
+                  <TextBulletListSquareRegular className="w-6 h-6 text-theme-muted" />
                 </div>
-                <p className="text-sm text-white/40 font-ui mb-1">No issues detected</p>
-                <p className="text-xs text-white/25 font-ui max-w-[200px]">
+                <p className="text-sm text-theme-muted font-ui mb-1">No issues detected</p>
+                <p className="text-xs text-theme-muted font-ui max-w-[200px]">
                   Click "Analyze" to check for contradictions, pacing issues, and more
                 </p>
               </>
             ) : (
               <>
-                <div className="w-10 h-10 rounded-full bg-white/[0.03] flex items-center justify-center mb-3">
-                  <FilterRegular className="w-5 h-5 text-white/20" />
+                <div className="w-10 h-10 rounded-full bg-theme-hover flex items-center justify-center mb-3">
+                  <FilterRegular className="w-5 h-5 text-theme-muted" />
                 </div>
-                <p className="text-sm text-white/40 font-ui">
+                <p className="text-sm text-theme-muted font-ui">
                   No matching issues
                 </p>
               </>
@@ -1274,7 +1274,7 @@ export function WritingPartnerPanel() {
 
       {/* Footer - accountability summary */}
       {critiqueIssues.length > 0 && !ui.isRunningCritique && (
-        <div className="px-3 py-2 border-t border-white/[0.04] text-xs font-ui">
+        <div className="px-3 py-2 border-t border-theme-subtle text-xs font-ui">
           <div className="flex items-center gap-3 flex-wrap">
             {/* Severity counts */}
             {severityCounts.blocking > 0 && (
@@ -1285,20 +1285,20 @@ export function WritingPartnerPanel() {
               </span>
             )}
             {severityCounts.warning > 0 && (
-              <span className="flex items-center gap-1 text-amber-400">
+              <span className="flex items-center gap-1 text-theme-accent">
                 <WarningRegular className="w-3.5 h-3.5" />
                 <span className="font-medium">{severityCounts.warning}</span>
-                <span className="text-amber-400/60">warnings</span>
+                <span className="text-theme-accent opacity-60">warnings</span>
               </span>
             )}
             {severityCounts.optional > 0 && (
-              <span className="flex items-center gap-1 text-white/40">
+              <span className="flex items-center gap-1 text-theme-muted">
                 <InfoRegular className="w-3.5 h-3.5" />
                 <span className="font-medium">{severityCounts.optional}</span>
-                <span className="text-white/30">optional</span>
+                <span className="text-theme-muted">optional</span>
               </span>
             )}
-            
+
             {/* Resolved count */}
             {resolvedCount > 0 && (
               <span className="flex items-center gap-1 text-green-400/70 ml-auto">

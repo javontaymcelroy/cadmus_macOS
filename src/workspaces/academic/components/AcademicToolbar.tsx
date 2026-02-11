@@ -12,28 +12,12 @@ import {
   ImageRegular,
   BookOpenRegular,
   DismissRegular,
+  TextBulletListLtrRegular,
+  TextNumberListLtrRegular,
+  TextQuoteRegular,
 } from '@fluentui/react-icons'
-import { ToolbarButton, ToolbarDivider, TextColorDropdown, FontFamilyDropdown, RunBuildButton, ReaderModeButton, OverflowToolbar } from '../../shared/components'
+import { ToolbarButton, ToolbarDivider, TextColorDropdown, FontFamilyDropdown, RunBuildButton, ReaderModeButton, InfiniteCanvasButton, OverflowToolbar } from '../../shared/components'
 import { useProjectStore } from '../../../stores/projectStore'
-
-// Inline SVG icons for lists (not available in Fluent UI)
-const BulletListIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16M2 6h.01M2 12h.01M2 18h.01" />
-  </svg>
-)
-
-const NumberedListIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7 6h13M7 12h13m-13 6h13M3 6h.01M3 12h.01M3 18h.01" />
-  </svg>
-)
-
-const BlockquoteIcon = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-  </svg>
-)
 
 interface AcademicToolbarProps {
   editor: Editor | null
@@ -208,21 +192,21 @@ export function AcademicToolbar({ editor }: AcademicToolbarProps) {
         isActive={editor.isActive('bulletList')}
         title="Bullet List"
       >
-        <BulletListIcon />
+        <TextBulletListLtrRegular className="w-4 h-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         isActive={editor.isActive('orderedList')}
         title="Numbered List"
       >
-        <NumberedListIcon />
+        <TextNumberListLtrRegular className="w-4 h-4" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         isActive={editor.isActive('blockquote')}
         title="Block Quote"
       >
-        <BlockquoteIcon />
+        <TextQuoteRegular className="w-4 h-4" />
       </ToolbarButton>
 
       <ToolbarDivider />
@@ -234,6 +218,9 @@ export function AcademicToolbar({ editor }: AcademicToolbarProps) {
       >
         <ImageRegular className="w-4 h-4" />
       </ToolbarButton>
+
+      {/* Infinite canvas toggle */}
+      <InfiniteCanvasButton />
     </OverflowToolbar>
   )
 }

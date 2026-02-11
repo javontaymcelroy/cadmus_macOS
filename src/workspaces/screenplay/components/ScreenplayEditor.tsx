@@ -756,6 +756,13 @@ export function ScreenplayEditor() {
     return () => clearTimeout(scrollTimeout)
   }, [scrollTargetRange, editor, clearScrollTargetRange])
 
+  // Reset horizontal scroll when exiting infinite canvas mode
+  useEffect(() => {
+    if (!ui.infiniteCanvas && editorContainerRef.current) {
+      editorContainerRef.current.scrollLeft = 0
+    }
+  }, [ui.infiniteCanvas])
+
   // Handle pending fix requests
   useEffect(() => {
     if (!pendingFixRequest || !editor) return
@@ -1628,13 +1635,17 @@ export function ScreenplayEditor() {
       </div>
       
       <div className={`flex-1 min-h-0 flex ${(versionHistoryMode.active || storyboardUI.mode || ui.writingPartnerPanelOpen) ? 'flex-row' : 'flex-col'} overflow-hidden`}>
-        <div className={clsx(
-          'flex-1 flex flex-col overflow-hidden min-w-0 min-h-0',
-          versionHistoryMode.active && 'w-1/2 border-r border-theme-subtle',
-          (storyboardUI.mode || ui.writingPartnerPanelOpen) && !versionHistoryMode.active && 'border-r border-theme-subtle'
-        )}>
+        <div
+          ref={editorContainerRef}
+          className={clsx(
+            'flex-1 min-w-0 min-h-0',
+            ui.infiniteCanvas ? 'overflow-auto' : 'overflow-y-auto overflow-x-hidden',
+            versionHistoryMode.active && 'w-1/2 border-r border-theme-subtle',
+            (storyboardUI.mode || ui.writingPartnerPanelOpen) && !versionHistoryMode.active && 'border-r border-theme-subtle'
+          )}
+        >
           {/* Document title */}
-          <div className="px-8 pt-6 pb-2 border-b border-theme-subtle bg-theme-header flex-shrink-0">
+          <div className="px-8 py-4 border-b border-theme-subtle bg-theme-header sticky top-0 z-10">
             {/* Title row with status dropdown */}
             <div className="flex items-center justify-between gap-4">
               {isEditingTitle ? (
@@ -1721,9 +1732,8 @@ export function ScreenplayEditor() {
           )}
 
           {/* Editor content */}
-          <div 
-            className={`flex-1 overflow-auto relative ${storyboardUI.linkMode.active ? 'cursor-crosshair' : ''}`} 
-            ref={editorContainerRef}
+          <div
+            className={`relative ${storyboardUI.linkMode.active ? 'cursor-crosshair' : ''}`}
             onClick={handleEditorClick}
           >
             {storyboardUI.linkMode.active && (
@@ -1782,13 +1792,16 @@ export function ScreenplayEditor() {
               </div>
             )}
             
-            <div 
-              className="mx-auto py-8 transition-transform duration-150 ease-out"
+            <div
+              className="py-8"
               style={{
                 transform: `scale(${ui.viewZoom / 100})`,
                 transformOrigin: 'top center',
                 width: `${100 / (ui.viewZoom / 100)}%`,
                 maxWidth: `${(768 * 100) / ui.viewZoom}%`,
+                marginLeft: ui.viewZoom < 100 ? `${-(100 / ui.viewZoom - 1) * 50}%` : 'auto',
+                marginRight: 'auto',
+                transition: 'transform 150ms ease-out, margin-left 150ms ease-out',
               }}
             >
               <div

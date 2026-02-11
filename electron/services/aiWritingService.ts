@@ -29,6 +29,9 @@ export type AIWritingCommand =
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   | 'scriptDoctor'
   | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
+  | 'customPrompt'
+  | 'ask'
+  | 'makeConsistent'
 
 // Screenplay element types
 export type ScreenplayElementType = 
@@ -84,8 +87,11 @@ export interface AIWritingRequest {
   documentTitle?: string
   templateType?: string  // 'screenplay' | 'notes-journal' | 'blog' | etc.
   toneOption?: string    // For adjustTone command: calm, tense, playful, etc.
+  customPromptText?: string  // For customPrompt command: the user's custom instruction
   supplementaryContext?: SupplementaryContext  // Background context from project docs
   sceneContext?: SceneContext  // Structured scene context (current scene heading, characters in scene, etc.)
+  targetRuntimeMinutes?: number  // Target runtime for screenplay projects
+  userQuestion?: string  // User's freeform question for the 'ask' command
 }
 
 export interface AIWritingResponse {
@@ -276,7 +282,9 @@ function getScreenplaySystemPrompt(command: AIWritingCommand, characters?: Chara
   const commandPrompts: Record<AIWritingCommand, string> = {
     continue: `${formatGuide}
 
-Your task: Continue the screenplay from where it left off.
+Your task: EXTEND the current moment of the screenplay — not advance the plot.
+
+You are doing EMPATHETIC MIMICRY. Read the energy, rhythm, and texture of what's on the page. Feel the vibe. Then produce the next few beats that the SAME WRITER would produce if they kept typing. Your output should be indistinguishable from their work.
 
 SCENE CONTEXT:
 The user prompt includes a "CURRENT SCENE" section that tells you:
@@ -284,15 +292,26 @@ The user prompt includes a "CURRENT SCENE" section that tells you:
 - Characters IN this scene - ONLY use these characters
 - Recent action - continue from THIS point
 
-RULES:
-- Characters listed in "CURRENT SCENE" are the ONLY ones you may use
-- The character list elsewhere is for name formatting only - NOT a cast list
-- NO new scene headings
-- Follow cause → effect: What just happened? What does it cause next?
-- NOT a montage - continue the narrative thread
-- One action per line, no prose flourishes
+WHAT "CONTINUE" MEANS:
+- Extend existing behavior, body language, small physical actions
+- Continue an exchange that's already happening
+- Add micro-beats: a glance, a shift in posture, a pause, breath
+- Match the current energy level — if it's quiet, stay quiet; if it's tense, stay tense
+- Let the scene BREATHE — real scenes have texture between plot points
 
-Generate 3-6 elements.`,
+FORBIDDEN — DO NOT:
+- Introduce NEW characters, props, or information not already present
+- Escalate tension or stakes beyond what's already established
+- Create a scene turn, reveal, or plot twist
+- Start a new action sequence or dramatic event
+- Add a phone ringing, radio crackling, door opening, someone arriving — no external interruptions
+- Skip ahead in time
+- Create new scene headings
+- Write prose flourishes ("as if", "in quiet composure")
+
+Think of it this way: if the writer wanted the NEXT BIG THING to happen, they'd write it themselves. They want you to fill in the CONNECTIVE TISSUE — the natural beats that exist between dramatic moments.
+
+Generate 2-4 elements. Keep it SHORT. Less is more.`,
 
     dialogue: `${formatGuide}
 
@@ -663,12 +682,70 @@ Your corrections must serve the dramatic purpose you've identified. Do NOT apply
 Output JSON with corrected screenplay elements.`,
 
     // General document commands (not typically used in screenplay mode, but included for type completeness)
-    fixGrammar: `${formatGuide}\n\nYour task is to fix grammar, spelling, and punctuation errors in the selected text. Only fix actual errors — do not rephrase or change style. Output JSON with screenplay elements.`,
+    fixGrammar: `${formatGuide}\n\nYour task is to fix grammar, spelling, punctuation, and capitalization errors in the selected text. Only fix actual errors — do not rephrase or change style. Preserve intentional capitalization in brand names, proper nouns, and stylistic choices. Output JSON with screenplay elements.`,
     makeLonger: `${formatGuide}\n\nYour task is to expand the selected text with more detail and depth while maintaining the writer's style. Output JSON with screenplay elements.`,
     makeConcise: `${formatGuide}\n\nYour task is to make the selected text more concise by removing redundancy while preserving all key information. Output JSON with screenplay elements.`,
     actionItems: `${formatGuide}\n\nYour task is to extract actionable tasks from the selected text. Output as action elements in JSON format.`,
     extractQuestions: `${formatGuide}\n\nYour task is to extract questions and unknowns from the selected text. Output as action elements in JSON format.`,
-    summarize: `${formatGuide}\n\nYour task is to synthesize and summarize the selected text. Output as action elements in JSON format.`
+    summarize: `${formatGuide}\n\nYour task is to synthesize and summarize the selected text. Output as action elements in JSON format.`,
+    customPrompt: `${formatGuide}\n\nYou will receive a custom instruction from the user about how to process the selected text. Follow their instruction precisely while maintaining proper screenplay formatting. Output JSON with screenplay elements.`,
+    ask: `${formatGuide}
+
+You are a creative writing assistant for screenwriters. The user will ask you a freeform question or request about their screenplay — they might need help continuing a dialogue exchange, introducing a character, brainstorming a scene direction, solving a story problem, or anything else.
+
+YOUR APPROACH:
+- Read the user's question carefully
+- Consider the full context: the screenplay so far, characters, props, scene context, and runtime target
+- Generate screenplay-formatted content that directly addresses their question
+- The output should be READY TO INSERT into the screenplay — not advice, not explanation, just the content itself
+
+RULES:
+- Output ONLY valid JSON with an "elements" array — no commentary, no preamble
+- Use proper screenplay formatting (scene headings, action, character, dialogue, parenthetical, transition)
+- Stay consistent with the established characters, tone, and world
+- Use @NAME syntax for character/prop references
+- If the question is about dialogue, produce dialogue. If about a scene, produce a scene. Match the output format to what they're asking for.
+- Generate 3-8 elements depending on what's needed`,
+
+    makeConsistent: `${formatGuide}
+
+Your task: Standardize the SELECTED text so every line/item follows the same formatting pattern.
+
+CRITICAL SCOPING RULE — Where to detect the pattern:
+- Detect the dominant pattern from the SELECTED TEXT ITSELF (and its immediate surrounding lines if provided)
+- Do NOT detect patterns from the document title, sidebar labels, file paths, metadata, or unrelated sections
+- The "surrounding document" is provided ONLY so you understand the project context — it is NOT a style source
+
+This is a TWO-PHASE operation. You MUST complete Phase 1 before Phase 2.
+
+=== PHASE 1: DETECT & FREEZE (from SELECTED TEXT only) ===
+Examine ONLY the selected lines. Build a style signature by checking:
+- Bullet/list marker (-, *, •, numbered, none)
+- Casing (lowercase, UPPERCASE, Title Case, Sentence case, camelCase, kebab-case, snake_case)
+- Prefix/category tokens (feat/, fix/, TODO:, [tag], etc. — ONLY if they appear in the selected lines)
+- Word separators (hyphens, underscores, slashes, spaces, dots)
+- Punctuation (trailing periods, colons, semicolons, none)
+- Phrasing style (imperative verbs, noun phrases, gerunds, full sentences, fragments)
+- Structure template (the overall shape of each line)
+
+Count how many selected lines follow each pattern variant. The MAJORITY wins.
+If the selection is too small to determine a majority (e.g., 2 lines with different patterns), use the SURROUNDING LINES (provided as context) to break the tie.
+
+FREEZE the rule as a rigid format string describing the exact structure each line must follow.
+
+=== PHASE 2: LOCKED TRANSFORM ===
+Apply the frozen rule to EVERY item in the selected text. No exceptions.
+
+- If an item already matches, keep it as-is
+- If an item is close but not exact, fix it
+- If an item has a completely different format, rewrite it to match the frozen rule
+- Preserve the semantic meaning/intent of each item — only change form, not content
+
+CRITICAL CONSTRAINTS:
+- The frozen rule comes from the SELECTED TEXT, not from document titles or metadata
+- Once frozen, the rule is ABSOLUTE. Every output line MUST comply.
+- Do NOT invent a pattern that doesn't exist in the selection (e.g., don't add prefixes if no selected lines have prefixes)
+- Output ONLY valid JSON with an "elements" array — no commentary, no reasoning, no preamble`
   }
 
   return commandPrompts[command]
@@ -679,19 +756,33 @@ Output JSON with corrected screenplay elements.`,
 const PROSE_SYSTEM_PROMPTS: Record<AIWritingCommand, string> = {
   continue: `${WRITING_PARTNER_PHILOSOPHY}
 
-Your task is to CONTINUE the narrative from where it left off.
+Your task is to EXTEND the current moment — not advance the plot.
 
-BEFORE WRITING, analyze the writer's style:
-- Sentence structure and rhythm
-- Vocabulary and tone
-- POV and narrative distance
-- Descriptive density (sparse or rich?)
+You are doing EMPATHETIC MIMICRY. Read the energy, rhythm, and texture of what's on the page. Feel the vibe. Then produce the next few sentences that the SAME WRITER would produce if they kept typing.
 
-THEN continue:
-- Match their style EXACTLY - your continuation should be indistinguishable from their writing
-- Use character knowledge from notes to inform behavior
-- Consider how this fits the larger story arc
-- Output ONLY the continuation, nothing else`,
+BEFORE WRITING:
+- Study the writer's sentence structure, rhythm, vocabulary, tone
+- Feel the POV and narrative distance
+- Read the current ENERGY LEVEL — is this quiet? tense? mundane? intimate?
+
+THEN EXTEND (not advance):
+- Continue existing behavior, observations, sensory detail
+- Match the current energy — if it's quiet, stay quiet; if it's tense, hold tension
+- Add micro-beats: a glance, a gesture, a thought, a sensory detail
+- Let the moment BREATHE
+
+FORBIDDEN — DO NOT:
+- Introduce new characters, objects, or information not already present
+- Escalate tension or stakes beyond what's established
+- Create a scene turn, reveal, or dramatic event
+- Have someone arrive, a phone ring, or any external interruption
+- Skip ahead in time
+- Summarize or recap
+
+The writer wants CONNECTIVE TISSUE — the natural beats between dramatic moments. If they wanted the next big thing to happen, they'd write it themselves.
+
+Keep it SHORT. 2-4 sentences. Less is more.
+Output ONLY the continuation, nothing else.`,
 
   dialogue: `${WRITING_PARTNER_PHILOSOPHY}
 
@@ -932,11 +1023,13 @@ APPROACH:
 
   fixGrammar: `${WRITING_PARTNER_PHILOSOPHY}
 
-Your task is to fix GRAMMAR, SPELLING, and PUNCTUATION errors in the selected text.
+Your task is to fix GRAMMAR, SPELLING, PUNCTUATION, and CAPITALIZATION errors in the selected text.
 
 APPROACH:
 - Fix spelling mistakes, typos, and grammatical errors
 - Correct punctuation (commas, periods, semicolons, apostrophes, etc.)
+- Fix capitalization errors (sentence beginnings, proper nouns, etc.)
+- Preserve intentional capitalization in brand names, person names, and stylistic choices
 - Fix subject-verb agreement, tense consistency, and pronoun references
 - Do NOT change the writer's style, word choice, or sentence structure
 - Do NOT rephrase or "improve" — only fix actual errors
@@ -1009,19 +1102,102 @@ APPROACH:
 - Include any conclusions or decisions mentioned
 - Keep the summary to roughly 20-30% of the original length
 - Don't add interpretation — stick to what's actually in the text
-- Output ONLY the summary, no explanations or preamble`
+- Output ONLY the summary, no explanations or preamble`,
+
+  customPrompt: `You are a thoughtful writing assistant that helps users process and refine their notes.
+
+You will receive:
+1. The user's SELECTED TEXT they want you to work with
+2. A CUSTOM INSTRUCTION describing what they want done
+3. The CURRENT DOCUMENT for immediate context
+4. OTHER JOURNAL ENTRIES from their project for broader context
+
+CRITICAL APPROACH — Evidence-Based (Internal Process):
+- BEFORE generating output, review ALL provided journal entries and notes
+- Look for related topics, themes, prior thinking, and relevant details across the user's notes
+- Ground your output in what the user has ALREADY WRITTEN — draw from their existing notes
+- If no relevant notes exist or notes are empty, work from the selected text alone
+- Do NOT fabricate connections or pretend notes say things they don't
+
+OUTPUT FORMAT:
+- Output ONLY the result — no reasoning, no preamble, no explanation, no outro
+- Format the output so it fits naturally into the document as if the user wrote it
+- Match the writer's voice, tone, and formatting style from the surrounding context`,
+
+  ask: `${WRITING_PARTNER_PHILOSOPHY}
+
+You are a creative writing assistant. The user will ask you a freeform question or request about their writing — they might need help continuing a dialogue, introducing a character, brainstorming a direction, solving a story problem, or anything else.
+
+YOUR APPROACH:
+- Read the user's question carefully
+- Consider the full context: the document so far, characters, props, supplementary notes
+- Generate content that directly addresses their question
+- The output should be READY TO INSERT into the document — not advice, not explanation, just the content itself
+
+RULES:
+- Output ONLY the content — no commentary, no preamble, no explanation
+- Match the writer's existing voice, tone, and style
+- Stay consistent with established characters and world
+- If the question is about dialogue, produce dialogue. If about description, produce description. Match the output to what they're asking for.
+- Use @NAME syntax for character/prop references when appropriate`,
+
+  makeConsistent: `${WRITING_PARTNER_PHILOSOPHY}
+
+Your task: Standardize the SELECTED text so every line/item follows the same formatting pattern.
+
+CRITICAL SCOPING RULE — Where to detect the pattern:
+- Detect the dominant pattern from the SELECTED TEXT ITSELF (and its immediate surrounding lines if provided)
+- Do NOT detect patterns from the document title, sidebar labels, file paths, metadata, or unrelated sections
+- The "surrounding document" is provided ONLY so you understand the project context — it is NOT a style source
+
+This is a TWO-PHASE operation. You MUST complete Phase 1 before Phase 2.
+
+=== PHASE 1: DETECT & FREEZE (from SELECTED TEXT only) ===
+Examine ONLY the selected lines. Build a style signature by checking:
+- Bullet/list marker (-, *, •, numbered, none)
+- Casing (lowercase, UPPERCASE, Title Case, Sentence case, camelCase, kebab-case, snake_case)
+- Prefix/category tokens (feat/, fix/, TODO:, [tag], etc. — ONLY if they appear in the selected lines)
+- Word separators (hyphens, underscores, slashes, spaces, dots)
+- Punctuation (trailing periods, colons, semicolons, none)
+- Phrasing style (imperative verbs, noun phrases, gerunds, full sentences, fragments)
+- Structure template (the overall shape of each line)
+
+Count how many selected lines follow each pattern variant. The MAJORITY wins.
+If the selection is too small to determine a majority (e.g., 2 lines with different patterns), use the SURROUNDING LINES (provided as context) to break the tie.
+
+FREEZE the rule as a rigid format string describing the exact structure each line must follow.
+
+=== PHASE 2: LOCKED TRANSFORM ===
+Apply the frozen rule to EVERY item in the selected text. No exceptions.
+
+- If an item already matches, keep it as-is
+- If an item is close but not exact, fix it
+- If an item has a completely different format, rewrite it to match the frozen rule
+- Preserve the semantic meaning/intent of each item — only change form, not content
+
+CRITICAL CONSTRAINTS:
+- The frozen rule comes from the SELECTED TEXT, not from document titles or metadata
+- Once frozen, the rule is ABSOLUTE. Every output line MUST comply.
+- Do NOT invent a pattern that doesn't exist in the selection (e.g., don't add prefixes if no selected lines have prefixes)
+- Output ONLY the rewritten text — no commentary, no reasoning, no preamble`
 }
 
 // User prompt builders
 function buildScreenplayUserPrompt(request: AIWritingRequest): string {
-  const { command, context, selection, characterName, characters, props, settingHint, documentTitle, toneOption, supplementaryContext, sceneContext } = request
-  
+  const { command, context, selection, characterName, characters, props, settingHint, documentTitle, toneOption, supplementaryContext, sceneContext, targetRuntimeMinutes } = request
+
   let prompt = ''
-  
-  if (documentTitle) {
+
+  // For makeConsistent, skip the document title — it pollutes pattern detection
+  if (documentTitle && command !== 'makeConsistent') {
     prompt += `Screenplay: "${documentTitle}"\n\n`
   }
-  
+
+  // Add runtime target awareness
+  if (targetRuntimeMinutes) {
+    prompt += `=== RUNTIME TARGET ===\nThis screenplay has a target runtime of ${targetRuntimeMinutes} minutes (~${targetRuntimeMinutes} pages). Keep content proportional to this target. Do not over-write.\n\n`
+  }
+
   // Add supplementary context (synopsis, character notes, etc.)
   const suppContext = buildSupplementaryContextSection(supplementaryContext)
   if (suppContext) {
@@ -1064,7 +1240,7 @@ function buildScreenplayUserPrompt(request: AIWritingRequest): string {
   
   switch (command) {
     case 'continue':
-      prompt += `=== YOUR TASK ===\nContinue the NARRATIVE THREAD. What happens NEXT because of what just happened?\n\nRefer to the "CURRENT SCENE" section above:\n- Use ONLY the characters listed there\n- Stay in the location from the scene heading\n- Continue from the recent action\n\nDO NOT:\n- Create new scene headings\n- Add characters not in "CURRENT SCENE"\n- Create parallel actions for multiple characters\n- Write prose flourishes ("as if", "in quiet composure")\n\nCause → effect. One thing, then the next. Output JSON with screenplay elements.`
+      prompt += `=== YOUR TASK ===\nEXTEND the current moment. Do NOT advance the plot.\n\nRefer to the "CURRENT SCENE" section above:\n- Use ONLY the characters listed there\n- Stay in the location from the scene heading\n- Match the ENERGY of the recent action — if it's quiet, stay quiet\n\nALLOWED MOVES:\n- Extend existing behavior (a character continues what they're doing)\n- Physical micro-beats (shifting weight, adjusting something, a glance)\n- Sensory detail the camera would catch\n- Continue an exchange already in progress\n- Silence, pause, breath\n\nFORBIDDEN:\n- New characters, props, or information\n- Escalation, reveals, plot turns\n- External interruptions (phone, radio, door, arrival)\n- New scene headings\n- Prose flourishes\n\n2-4 elements. SHORT. Output JSON with screenplay elements.`
       break
       
     case 'dialogue':
@@ -1225,6 +1401,31 @@ function buildScreenplayUserPrompt(request: AIWritingRequest): string {
       prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
       prompt += `=== YOUR TASK ===\nProcess the selected text according to the system instructions. Output JSON with screenplay elements.`
       break
+
+    case 'customPrompt':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
+      prompt += `=== USER'S INSTRUCTION ===\n${request.customPromptText || 'Process the selected text.'}\n\n`
+      prompt += `=== YOUR TASK ===\nFollow the user's instruction above. Apply it to the selected text using the surrounding context. Output JSON with screenplay elements.`
+      break
+
+    case 'makeConsistent':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SURROUNDING DOCUMENT (reference only — do NOT extract patterns from this) ===\n---\n${context}\n---\n\n`
+      prompt += `=== SELECTED TEXT (detect the dominant pattern HERE, then standardize all lines to match) ===\n---\n${selection}\n---\n\n`
+      prompt += `=== YOUR TASK ===\nPhase 1: Look at ONLY the SELECTED TEXT lines. Find the majority formatting pattern among them. Ignore the document title, sidebar, and metadata — those are not style sources. Freeze the pattern as a strict rule.\nPhase 2: Rewrite every selected line to match the frozen rule. If a line already matches, keep it. If it doesn't, transform it. Preserve meaning, enforce format.\nOutput JSON with screenplay elements.`
+      break
+
+    case 'ask':
+      prompt += `=== USER'S QUESTION ===\n${request.userQuestion || 'Help me with the next part of my screenplay.'}\n\n`
+      prompt += `=== YOUR TASK ===\nAnswer the user's question by generating screenplay-formatted content that addresses what they're asking for. Use the full context above (document, characters, props, scene context) to produce something that fits naturally into their screenplay. Output JSON with screenplay elements.`
+      break
   }
 
   prompt += `\n\nRemember:
@@ -1244,27 +1445,31 @@ function buildProseUserPrompt(request: AIWritingRequest): string {
   
   let prompt = ''
   
-  if (documentTitle) {
+  // For makeConsistent, skip the document title — it pollutes pattern detection
+  if (documentTitle && command !== 'makeConsistent') {
     prompt += `Document: "${documentTitle}"\n\n`
   }
-  
+
   // Add supplementary context (synopsis, character notes, etc.)
   const suppContext = buildSupplementaryContextSection(supplementaryContext)
   if (suppContext) {
     prompt += suppContext + '\n'
   }
-  
-  // Add style analysis framing
-  prompt += `=== THE WRITER'S WORK (study their style carefully) ===\n`
-  prompt += `Analyze their style before responding:\n`
-  prompt += `- Sentence structure and rhythm\n`
-  prompt += `- Vocabulary and tone\n`
-  prompt += `- Descriptive density\n\n`
-  prompt += `---\n${context}\n---\n\n`
+
+  // For makeConsistent, the context is added in the switch case with proper labeling
+  // For other commands, add the standard style analysis framing
+  if (command !== 'makeConsistent') {
+    prompt += `=== THE WRITER'S WORK (study their style carefully) ===\n`
+    prompt += `Analyze their style before responding:\n`
+    prompt += `- Sentence structure and rhythm\n`
+    prompt += `- Vocabulary and tone\n`
+    prompt += `- Descriptive density\n\n`
+    prompt += `---\n${context}\n---\n\n`
+  }
   
   switch (command) {
     case 'continue':
-      prompt += `=== YOUR TASK ===\nContinue from where this leaves off. Write in the SAME style as the writer - your output should be indistinguishable from their writing. Use character knowledge from the notes.`
+      prompt += `=== YOUR TASK ===\nEXTEND the current moment. Do NOT advance the plot.\n\nMatch the writer's style EXACTLY — your output should be indistinguishable from their writing.\n\nALLOWED: extend existing behavior, sensory detail, micro-beats, continue an exchange in progress.\nFORBIDDEN: new characters/objects/info, escalation, reveals, external interruptions, time skips.\n\n2-4 sentences. Keep it SHORT.`
       break
       
     case 'dialogue':
@@ -1419,7 +1624,7 @@ function buildProseUserPrompt(request: AIWritingRequest): string {
         break
       }
       prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
-      prompt += `=== YOUR TASK ===\nFix all grammar, spelling, and punctuation errors. Do NOT change the writer's style, word choice, or sentence structure. Only fix actual errors. If the text is already correct, return it unchanged.`
+      prompt += `=== YOUR TASK ===\nFix all grammar, spelling, punctuation, and capitalization errors. Preserve intentional capitalization in brand names, person names, and stylistic choices. Do NOT change the writer's style, word choice, or sentence structure. Only fix actual errors. If the text is already correct, return it unchanged.`
       break
 
     case 'makeLonger':
@@ -1465,6 +1670,31 @@ function buildProseUserPrompt(request: AIWritingRequest): string {
       }
       prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
       prompt += `=== YOUR TASK ===\nSynthesize and summarize this text. Distill the key points and main takeaways. Use bullet points if there are multiple distinct points. Keep to roughly 20-30% of the original length. Stick to what's actually in the text.`
+      break
+
+    case 'customPrompt':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SELECTED TEXT ===\n---\n${selection}\n---\n\n`
+      prompt += `=== USER'S INSTRUCTION ===\n${request.customPromptText || 'Process the selected text.'}\n\n`
+      prompt += `=== YOUR TASK ===\nFollow the user's instruction above. Review ALL journal entries provided in the context to find relevant information. Ground your output in what the user has already written. Output ONLY the result — no reasoning, no preamble, no explanation, no outro. Format it so it fits naturally into the document.`
+      break
+
+    case 'makeConsistent':
+      if (!selection) {
+        prompt += `No text selected.`
+        break
+      }
+      prompt += `=== SURROUNDING DOCUMENT (reference only — do NOT extract patterns from this) ===\n---\n${context}\n---\n\n`
+      prompt += `=== SELECTED TEXT (detect the dominant pattern HERE, then standardize all lines to match) ===\n---\n${selection}\n---\n\n`
+      prompt += `=== YOUR TASK ===\nPhase 1: Look at ONLY the SELECTED TEXT lines. Find the majority formatting pattern among them. Ignore the document title, sidebar, and metadata — those are not style sources. Freeze the pattern as a strict rule.\nPhase 2: Rewrite every selected line to match the frozen rule. If a line already matches, keep it. If it doesn't, transform it. Preserve meaning, enforce format.\nOutput ONLY the rewritten text.`
+      break
+
+    case 'ask':
+      prompt += `=== USER'S QUESTION ===\n${request.userQuestion || 'Help me with the next part of my writing.'}\n\n`
+      prompt += `=== YOUR TASK ===\nAnswer the user's question by generating content that addresses what they're asking for. Use the full context above (document, characters, notes) to produce something that fits naturally into their writing. Output ONLY the content — no commentary, no preamble.`
       break
   }
 
@@ -1542,9 +1772,14 @@ export class AIWritingService {
       // Log prompt sizes for debugging
       console.log(`[AIWriting] Prompt sizes - System: ${systemPrompt.length} chars, User: ${userPrompt.length} chars, Total: ${systemPrompt.length + userPrompt.length} chars`)
 
+      // Token budgets by command type
       // Reasoning-heavy commands need more tokens (o3-mini reasoning tokens eat into this budget)
-      const reasoningCommands: AIWritingCommand[] = ['scriptDoctor', 'negativeSpace']
-      const maxTokens = reasoningCommands.includes(request.command) ? 16384 : 4096
+      // Continue is capped low to prevent over-generation (the "next action sequence" problem)
+      const reasoningCommands: AIWritingCommand[] = ['scriptDoctor', 'negativeSpace', 'makeConsistent']
+      const shortCommands: AIWritingCommand[] = ['continue']
+      const maxTokens = reasoningCommands.includes(request.command) ? 16384
+        : shortCommands.includes(request.command) ? 2048
+        : 4096
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',

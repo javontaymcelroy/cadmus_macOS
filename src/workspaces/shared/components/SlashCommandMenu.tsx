@@ -28,6 +28,7 @@ import { contentToPlainText, extractSurroundingContext } from '../../../utils/se
 const COMMAND_ICONS: Record<string, React.ElementType> = {
   pen: PenRegular,
   chat: ChatRegular,
+  'chat-question': ChatRegular,
   location: LocationRegular,
   expand: ArrowExpandRegular,
   person: PersonRegular,
@@ -57,6 +58,7 @@ const LOADING_TEXT: Record<string, string> = {
   expand: 'Expanding...',
   pov: 'Writing from POV...',
   rework: 'Reworking...',
+  ask: 'Thinking...',
 }
 
 // Get loading text for a command
@@ -79,7 +81,11 @@ function isScreenplayEditor(editor: Editor): boolean {
 export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenuProps>(
   ({ items, command, editor, hasSelection, selectedText, selectionRange }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0)
-    
+    const [inputMode, setInputMode] = useState(false)
+    const [inputText, setInputText] = useState('')
+    const pendingCommand = useRef<SlashCommandItem | null>(null)
+    const inputRef = useRef<HTMLInputElement>(null)
+
     // Store editor ref for async operations
     const editorRef = useRef(editor)
     editorRef.current = editor
@@ -94,7 +100,7 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
     }, [items])
 
     // Execute the AI writing command
-    const executeCommand = useCallback(async (item: SlashCommandItem) => {
+    const executeCommand = useCallback(async (item: SlashCommandItem, userQuestion?: string) => {
       const currentEditor = editorRef.current
       const { state } = currentEditor
       const { from } = state.selection
@@ -280,9 +286,11 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
       currentEditor
         .chain()
         .focus()
-        .setColor('#fbbf24') // Gold color
-        .insertContent(loadingText)
-        .unsetColor()
+        .insertContent({
+          type: 'text',
+          text: loadingText,
+          marks: [{ type: 'textStyle', attrs: { color: '#fbbf24' } }]
+        })
         .run()
 
       try {
@@ -297,6 +305,8 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
           templateType: isScreenplay ? 'screenplay' : undefined,
           supplementaryContext: Object.keys(supplementaryContext).length > 0 ? supplementaryContext : undefined,
           sceneContext,
+          targetRuntimeMinutes: isScreenplay ? currentProject.settings?.targetRuntimeMinutes : undefined,
+          userQuestion: item.id === 'ask' ? userQuestion : undefined,
         })
 
         // Find the loading text in the document
@@ -329,9 +339,11 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
               .focus()
               .setTextSelection({ from: placeholderStart, to: placeholderEnd })
               .deleteSelection()
-              .setColor('#ef4444')
-              .insertContent(`[Error: ${response.error}]`)
-              .unsetColor()
+              .insertContent({
+                type: 'text',
+                text: `[Error: ${response.error}]`,
+                marks: [{ type: 'textStyle', attrs: { color: '#ef4444' } }]
+              })
               .run()
           }
           requestAnimationFrame(() => {
@@ -454,9 +466,11 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
             .focus()
             .setTextSelection({ from: placeholderStart, to: placeholderEnd })
             .deleteSelection()
-            .setColor('#ef4444')
-            .insertContent('[Generation failed - please try again]')
-            .unsetColor()
+            .insertContent({
+              type: 'text',
+              text: '[Generation failed - please try again]',
+              marks: [{ type: 'textStyle', attrs: { color: '#ef4444' } }]
+            })
             .run()
         }
       }
@@ -466,9 +480,34 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
     const selectItem = useCallback((index: number) => {
       const item = items[index]
       if (item) {
-        executeCommand(item)
+        if (item.requiresInput) {
+          pendingCommand.current = item
+          setInputMode(true)
+          setInputText('')
+          // Focus input on next tick
+          setTimeout(() => inputRef.current?.focus(), 0)
+        } else {
+          executeCommand(item)
+        }
       }
     }, [items, executeCommand])
+
+    // Submit the input for a requiresInput command
+    const submitInput = useCallback(() => {
+      if (pendingCommand.current && inputText.trim()) {
+        executeCommand(pendingCommand.current, inputText.trim())
+        pendingCommand.current = null
+        setInputMode(false)
+        setInputText('')
+      }
+    }, [executeCommand, inputText])
+
+    // Cancel input mode
+    const cancelInput = useCallback(() => {
+      pendingCommand.current = null
+      setInputMode(false)
+      setInputText('')
+    }, [])
 
     const upHandler = useCallback(() => {
       setSelectedIndex((prev) => (prev + items.length - 1) % items.length)
@@ -484,6 +523,20 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
 
     useImperativeHandle(ref, () => ({
       onKeyDown: ({ event }) => {
+        // In input mode, let the input handle most keys
+        if (inputMode) {
+          if (event.key === 'Escape') {
+            cancelInput()
+            return true
+          }
+          if (event.key === 'Enter') {
+            submitInput()
+            return true
+          }
+          // Let other keys pass through to the input
+          return true
+        }
+
         if (event.key === 'ArrowUp') {
           upHandler()
           return true
@@ -509,12 +562,49 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
 
         return false
       },
-    }), [upHandler, downHandler, enterHandler, items, selectItem])
+    }), [upHandler, downHandler, enterHandler, items, selectItem, inputMode, cancelInput, submitInput])
 
     if (items.length === 0) {
       return (
         <div className="bg-ink-900 border border-ink-600 rounded-lg shadow-2xl p-3">
           <p className="text-sm text-ink-400 font-ui">No commands found</p>
+        </div>
+      )
+    }
+
+    // Input mode: show text input for requiresInput commands
+    if (inputMode && pendingCommand.current) {
+      return (
+        <div
+          className="bg-ink-900 border border-ink-600 rounded-lg shadow-2xl py-1.5 min-w-[320px]"
+        >
+          <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-gold-400 uppercase tracking-wider border-b border-ink-700 mb-1">
+            {pendingCommand.current.name}
+          </div>
+          <div className="px-3 py-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && inputText.trim()) {
+                  e.preventDefault()
+                  submitInput()
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  cancelInput()
+                }
+                e.stopPropagation()
+              }}
+              placeholder="Ask anything about your story..."
+              className="w-full bg-ink-800 border border-ink-600 rounded px-3 py-2 text-sm text-white font-ui placeholder:text-ink-500 focus:outline-none focus:border-gold-400/50"
+              autoFocus
+            />
+          </div>
+          <div className="px-3 py-1.5 border-t border-ink-700 text-[10px] text-ink-500 font-ui">
+            <span className="text-ink-400">Enter</span> Submit • <span className="text-ink-400">Esc</span> Cancel
+          </div>
         </div>
       )
     }

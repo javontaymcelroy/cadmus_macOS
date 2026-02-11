@@ -390,6 +390,8 @@ export interface ProjectSettings {
   customImagePromptTemplate?: string
   // Image generation custom instructions - always appended to prompts as "non-negotiables"
   customImageInstructions?: string
+  // Target runtime in minutes (screenplay only) - used for status bar display and AI prompt context
+  targetRuntimeMinutes?: number
 }
 
 export interface HeadingTypography {
@@ -603,6 +605,9 @@ type AIWritingCommand =
   | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
   | 'scriptDoctor'
   | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
+  | 'customPrompt'
+  | 'ask'
+  | 'makeConsistent'
 
 type ScreenplayElementType = 
   | 'scene-heading'
@@ -648,7 +653,11 @@ interface AIWritingRequest {
   documentTitle?: string
   templateType?: string
   toneOption?: string
+  customPromptText?: string
   supplementaryContext?: SupplementaryWritingContext
+  sceneContext?: { sceneHeading?: string; charactersInScene: string[]; precedingAction?: string }
+  targetRuntimeMinutes?: number
+  userQuestion?: string
 }
 
 interface AIWritingResponse {
@@ -673,6 +682,8 @@ declare global {
       project: {
         create: (template: Template, name: string, basePath: string) => Promise<Project>
         open: (projectPath: string) => Promise<Project>
+        import: (sourcePath: string, destinationBasePath: string) => Promise<Project>
+        export: (projectPath: string, destinationBasePath: string) => Promise<string>
         save: (project: Project) => Promise<void>
         getLastOpened: () => Promise<string | null>
         setLastOpened: (path: string) => Promise<void>
@@ -730,6 +741,10 @@ declare global {
       theme: {
         get: () => Promise<'dark' | 'light'>
         set: (theme: 'dark' | 'light') => Promise<void>
+      }
+      panelWidths: {
+        get: () => Promise<Record<string, number>>
+        set: (widths: Record<string, number>) => Promise<void>
       }
       aiSuggestions: {
         generate: (documents: { id: string; title: string; content: string }[]) => Promise<Diagnostic[]>
