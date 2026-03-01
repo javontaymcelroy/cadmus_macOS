@@ -168,18 +168,18 @@ export function ShotAutocomplete({
   return (
     <div
       ref={menuRef}
-      className="fixed z-[100] bg-ink-900 border border-ink-600 rounded-lg shadow-2xl min-w-[300px] max-h-[400px] overflow-hidden focus:outline-none"
+      className="fixed z-[100] bg-[var(--bg-elevated)] border border-theme-default rounded-lg shadow-2xl min-w-[300px] max-h-[400px] overflow-hidden focus:outline-none"
       style={{
         left: position.x,
         top: position.y,
         transform: 'translateY(4px)'
       }}
     >
-      <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-ink-400 uppercase tracking-wider border-b border-ink-700">
+      <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-theme-muted uppercase tracking-wider border-b border-theme-default">
         Shot Type
       </div>
 
-      <div className="p-2 border-b border-ink-700">
+      <div className="p-2 border-b border-theme-default">
         <input
           ref={inputRef}
           type="text"
@@ -187,7 +187,7 @@ export function ShotAutocomplete({
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Search or type custom shot..."
-          className="w-full bg-ink-800 text-white text-sm font-ui px-3 py-2 rounded-md border border-ink-600 focus:border-gold-400 outline-none placeholder:text-white/30 uppercase"
+          className="w-full bg-[var(--bg-tertiary)] text-theme-primary text-sm font-ui px-3 py-2 rounded-md border border-theme-default focus:border-theme-accent outline-none placeholder:text-white/30 uppercase"
         />
       </div>
 
@@ -209,15 +209,15 @@ export function ShotAutocomplete({
                 onMouseEnter={() => setSelectedIndex(index)}
                 className={clsx(
                   'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
-                  index === selectedIndex 
-                    ? 'bg-gold-400/20' 
-                    : 'hover:bg-ink-800'
+                  index === selectedIndex
+                    ? 'bg-gold-400/20'
+                    : 'hover:bg-[var(--bg-hover)]'
                 )}
               >
                 <div
                   className={clsx(
                     'w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0',
-                    index === selectedIndex ? 'bg-gold-400/30 text-gold-400' : 'bg-ink-700 text-ink-400'
+                    index === selectedIndex ? 'bg-[var(--accent-gold-muted)] text-theme-accent' : 'bg-[var(--bg-tertiary)] text-theme-muted'
                   )}
                 >
                   <CameraIcon />
@@ -227,7 +227,7 @@ export function ShotAutocomplete({
                   <div 
                     className={clsx(
                       'text-sm font-medium',
-                      index === selectedIndex ? 'text-gold-400' : 'text-white/90'
+                      index === selectedIndex ? 'text-theme-accent' : 'text-white/90'
                     )}
                     style={{ fontFamily: 'Courier New, Courier, monospace' }}
                   >
@@ -235,7 +235,7 @@ export function ShotAutocomplete({
                   </div>
                   <div className={clsx(
                     'text-[10px] truncate',
-                    index === selectedIndex ? 'text-gold-400/70' : 'text-ink-500'
+                    index === selectedIndex ? 'text-gold-400/70' : 'text-theme-muted'
                   )}>
                     {shot.description}
                   </div>
@@ -249,10 +249,10 @@ export function ShotAutocomplete({
                 onClick={() => onSelect(inputValue.trim().toUpperCase())}
                 onMouseEnter={() => setSelectedIndex(filteredShots.length)}
                 className={clsx(
-                  'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors border-t border-ink-700',
-                  selectedIndex === filteredShots.length 
-                    ? 'bg-gold-400/20' 
-                    : 'hover:bg-ink-800'
+                  'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors border-t border-theme-default',
+                  selectedIndex === filteredShots.length
+                    ? 'bg-gold-400/20'
+                    : 'hover:bg-[var(--bg-hover)]'
                 )}
               >
                 <div
@@ -264,7 +264,7 @@ export function ShotAutocomplete({
                 <span className="text-sm font-ui">
                   <span className="text-white/60">Use </span>
                   <span 
-                    className="font-medium text-gold-400"
+                    className="font-medium text-theme-accent"
                     style={{ fontFamily: 'Courier New, Courier, monospace' }}
                   >
                     {inputValue.toUpperCase()}
@@ -276,8 +276,8 @@ export function ShotAutocomplete({
         )}
       </div>
 
-      <div className="px-3 py-1.5 border-t border-ink-700 text-[10px] text-ink-500 font-ui">
-        <span className="text-ink-400">↑↓</span> Navigate • <span className="text-ink-400">Enter</span> Select • <span className="text-ink-400">Esc</span> Close
+      <div className="px-3 py-1.5 border-t border-theme-default text-[10px] text-theme-muted font-ui">
+        <span className="text-theme-muted">↑↓</span> Navigate • <span className="text-theme-muted">Enter</span> Select • <span className="text-theme-muted">Esc</span> Close
       </div>
     </div>
   )

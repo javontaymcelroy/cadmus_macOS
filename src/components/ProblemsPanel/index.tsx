@@ -26,27 +26,8 @@ import {
   MenuTrigger,
   MenuDivider,
   FluentProvider,
-  createDarkTheme
 } from '@fluentui/react-components'
-
-const darkTheme = createDarkTheme({
-  10: '#050505',
-  20: '#1a1a1a',
-  30: '#252525',
-  40: '#333333',
-  50: '#404040',
-  60: '#4d4d4d',
-  70: '#666666',
-  80: '#808080',
-  90: '#999999',
-  100: '#b3b3b3',
-  110: '#cccccc',
-  120: '#e6e6e6',
-  130: '#f2f2f2',
-  140: '#fafafa',
-  150: '#ffffff',
-  160: '#ffffff',
-})
+import { useFluentTheme } from '../../hooks/useFluentTheme'
 
 // Pass display names
 const PASS_NAMES: Record<string, string> = {
@@ -219,6 +200,7 @@ function DiagnosticItem({ diagnostic, documentTitle, onNavigate, onApplyFix, onD
 type FilterTab = 'all' | 'error' | 'warning' | 'info'
 
 export function ProblemsPanel() {
+  const fluentTheme = useFluentTheme()
   const {
     currentProject,
     diagnostics,
@@ -385,7 +367,7 @@ export function ProblemsPanel() {
           
           {/* Overflow menu for narrow screens */}
           {showOverflow && (
-            <FluentProvider theme={darkTheme} style={{ background: 'transparent' }}>
+            <FluentProvider theme={fluentTheme} style={{ background: 'transparent' }}>
               <Menu
                 open={overflowMenuOpen}
                 onOpenChange={(_, data) => setOverflowMenuOpen(data.open)}
@@ -399,12 +381,7 @@ export function ProblemsPanel() {
                     <MoreHorizontalRegular className="w-4 h-4" />
                   </button>
                 </MenuTrigger>
-                <MenuPopover style={{ 
-                  background: 'linear-gradient(135deg, rgba(26, 26, 26, 0.98) 0%, rgba(18, 18, 18, 0.99) 100%)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)', 
-                  borderRadius: '12px',
-                  boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05), 0 4px 24px rgba(0, 0, 0, 0.5)'
-                }}>
+                <MenuPopover className="cadmus-popover">
                   <MenuList style={{ backgroundColor: 'transparent' }}>
                     {fixableDiagnostics.length > 0 && (
                       <MenuItem
@@ -413,7 +390,7 @@ export function ProblemsPanel() {
                           handleResolveAll()
                           setOverflowMenuOpen(false)
                         }}
-                        style={{ backgroundColor: 'transparent', color: 'rgba(255,255,255,0.8)' }}
+                        style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
                       >
                         Resolve All ({fixableDiagnostics.length})
                       </MenuItem>
@@ -424,7 +401,7 @@ export function ProblemsPanel() {
                         toggleBottomPanel()
                         setOverflowMenuOpen(false)
                       }}
-                      style={{ backgroundColor: 'transparent', color: 'rgba(255,255,255,0.8)' }}
+                      style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
                     >
                       Close Panel
                     </MenuItem>
@@ -448,7 +425,7 @@ export function ProblemsPanel() {
                             useProjectStore.getState().clearDiagnostics()
                             setOverflowMenuOpen(false)
                           }}
-                          style={{ backgroundColor: 'transparent', color: 'rgba(255,255,255,0.8)' }}
+                          style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
                         >
                           Clear All
                         </MenuItem>

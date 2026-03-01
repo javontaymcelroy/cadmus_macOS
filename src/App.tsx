@@ -7,19 +7,17 @@ import { useAutoSave } from './hooks/useAutoSave'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 
 function App() {
-  const { currentProject, isLoading, initialize, initializeTheme, initializeZoom, initializePanelWidths } = useProjectStore()
+  const { currentProject, isLoading, initialize, initializeTheme } = useProjectStore()
 
   // Initialize hooks
   useAutoSave()
   useKeyboardShortcuts()
 
-  // Initialize app and theme/zoom/panel widths
+  // Initialize app and theme (zoom + panel widths are now per-project via workspace state)
   useEffect(() => {
     initialize()
     initializeTheme()
-    initializeZoom()
-    initializePanelWidths()
-  }, [initialize, initializeTheme, initializeZoom, initializePanelWidths])
+  }, [initialize, initializeTheme])
 
   // Prevent default drag/drop behavior globally for Electron
   // This prevents browser navigation when files are dropped outside of dropzones

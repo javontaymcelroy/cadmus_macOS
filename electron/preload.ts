@@ -441,6 +441,149 @@ interface StoryFacts {
   openPromises: string[]
 }
 
+// Thought Partner types
+interface ThoughtPartnerMessage {
+  id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  timestamp: string
+  actions?: ThoughtPartnerAction[]
+  questions?: ThoughtPartnerQuestion[]
+}
+
+interface ContextDocument {
+  decisions: string[]
+  openQuestions: string[]
+  ideas: string[]
+  risks: string[]
+  considerations: string[]
+  lastUpdated: string
+}
+
+interface SuggestionCard {
+  id: string
+  title: string
+  description: string
+  category: 'explore' | 'question' | 'risk' | 'idea'
+  prompt: string
+}
+
+interface ConsciousContext {
+  title: string
+  content: string
+}
+
+interface SubconsciousContext {
+  projectName: string
+  templateType: string
+  documents: { title: string; content: string; isActive: boolean }[]
+  characters?: { name: string; notes?: string }[]
+  props?: { name: string; notes?: string }[]
+  settings?: { synopsis?: string }
+}
+
+interface ThoughtPartnerRequest {
+  message: string
+  conversationHistory: ThoughtPartnerMessage[]
+  consciousContext: ConsciousContext | null
+  subconsciousContext: SubconsciousContext
+  contextDocument: ContextDocument
+  agentMode?: boolean
+}
+
+interface ThoughtPartnerActionBase {
+  id: string
+  type: 'insert-content' | 'replace-content' | 'create-character' | 'create-prop'
+  status: 'pending' | 'accepted' | 'rejected' | 'executing' | 'completed' | 'failed'
+  description: string
+}
+
+interface InsertContentAction extends ThoughtPartnerActionBase {
+  type: 'insert-content'
+  content: {
+    screenplayElements?: Array<{ type: string; text: string }>
+    text?: string
+    insertionPoint?: 'cursor' | 'end' | 'after-heading'
+    afterHeading?: string
+  }
+}
+
+interface ReplaceContentAction extends ThoughtPartnerActionBase {
+  type: 'replace-content'
+  content: {
+    targetHeading: string
+    screenplayElements?: Array<{ type: string; text: string }>
+    text?: string
+  }
+}
+
+interface CreateCharacterAction extends ThoughtPartnerActionBase {
+  type: 'create-character'
+  content: { name: string; color?: string }
+}
+
+interface CreatePropAction extends ThoughtPartnerActionBase {
+  type: 'create-prop'
+  content: { name: string; icon?: string }
+}
+
+type ThoughtPartnerAction = InsertContentAction | ReplaceContentAction | CreateCharacterAction | CreatePropAction
+
+interface ThoughtPartnerQuestionOption {
+  id: string
+  label: string
+  description?: string
+}
+
+interface ThoughtPartnerQuestion {
+  id: string
+  toolCallId: string
+  questionText: string
+  options: ThoughtPartnerQuestionOption[]
+  allowCustom: boolean
+  status: 'active' | 'answered' | 'skipped'
+  selectedOptionId?: string
+  customAnswer?: string
+  category?: 'tone' | 'structure' | 'character' | 'plot' | 'style' | 'general'
+}
+
+interface ThoughtPartnerResponse {
+  message: string
+  updatedContextDocument?: ContextDocument
+  actions?: ThoughtPartnerAction[]
+  questions?: ThoughtPartnerQuestion[]
+  error?: string
+}
+
+interface ThoughtPartnerSuggestionsRequest {
+  subconsciousContext: SubconsciousContext
+}
+
+interface ThoughtPartnerConversationData {
+  messages: ThoughtPartnerMessage[]
+  contextDocument: ContextDocument
+  lastUpdated: string
+}
+
+interface ConversationMeta {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  messageCount: number
+}
+
+interface ConversationIndex {
+  activeConversationId: string | null
+  conversations: ConversationMeta[]
+}
+
+interface SuggestionsCache {
+  contentHash: string
+  suggestions: SuggestionCard[]
+  cachedAt: string
+}
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 const api = {
@@ -705,13 +848,112 @@ const api = {
       ipcRenderer.invoke('aiWriting:generate', request),
     
     hasApiKey: (): Promise<boolean> =>
-      ipcRenderer.invoke('aiWriting:hasApiKey')
+      ipcRenderer.invoke('aiWriting:hasApiKey'),
+
+    getDefaultInstructions: (): Promise<{ prose: Record<string, string>; screenplay: Record<string, string> }> =>
+      ipcRenderer.invoke('aiWriting:getDefaultInstructions')
   },
 
   // Gated Writing Pipeline (constraint-first generation)
   gatedWriting: {
     generate: (request: AIWritingRequest, storyFacts?: StoryFacts, forceOverride?: boolean): Promise<PipelineResult> =>
       ipcRenderer.invoke('gatedWriting:generate', request, storyFacts, forceOverride)
+  },
+
+  // Thought Partner operations (conversational AI thought partner)
+  thoughtPartner: {
+    sendMessage: (request: ThoughtPartnerRequest): Promise<ThoughtPartnerResponse> =>
+      ipcRenderer.invoke('thoughtPartner:sendMessage', request),
+
+    stopStreaming: (): Promise<void> =>
+      ipcRenderer.invoke('thoughtPartner:stopStreaming'),
+
+    getSuggestions: (request: ThoughtPartnerSuggestionsRequest): Promise<SuggestionCard[]> =>
+      ipcRenderer.invoke('thoughtPartner:getSuggestions', request),
+
+    loadConversationIndex: (projectPath: string): Promise<ConversationIndex> =>
+      ipcRenderer.invoke('thoughtPartner:loadConversationIndex', projectPath),
+
+    saveConversationIndex: (projectPath: string, index: ConversationIndex): Promise<void> =>
+      ipcRenderer.invoke('thoughtPartner:saveConversationIndex', projectPath, index),
+
+    loadConversation: (projectPath: string, conversationId: string): Promise<ThoughtPartnerConversationData | null> =>
+      ipcRenderer.invoke('thoughtPartner:loadConversation', projectPath, conversationId),
+
+    saveConversation: (projectPath: string, conversationId: string, data: ThoughtPartnerConversationData): Promise<void> =>
+      ipcRenderer.invoke('thoughtPartner:saveConversation', projectPath, conversationId, data),
+
+    createConversation: (projectPath: string, title?: string): Promise<ConversationMeta> =>
+      ipcRenderer.invoke('thoughtPartner:createConversation', projectPath, title),
+
+    deleteConversation: (projectPath: string, conversationId: string): Promise<ConversationIndex> =>
+      ipcRenderer.invoke('thoughtPartner:deleteConversation', projectPath, conversationId),
+
+    hasApiKey: (): Promise<boolean> =>
+      ipcRenderer.invoke('thoughtPartner:hasApiKey'),
+
+    loadSuggestionsCache: (projectPath: string): Promise<SuggestionsCache | null> =>
+      ipcRenderer.invoke('thoughtPartner:loadSuggestionsCache', projectPath),
+
+    saveSuggestionsCache: (projectPath: string, cache: SuggestionsCache): Promise<void> =>
+      ipcRenderer.invoke('thoughtPartner:saveSuggestionsCache', projectPath, cache),
+
+    executePlan: (request: any): Promise<any> =>
+      ipcRenderer.invoke('thoughtPartner:executePlan', request),
+
+    acceptReflection: (request: any): Promise<any> =>
+      ipcRenderer.invoke('thoughtPartner:acceptReflection', request),
+
+    editReflection: (request: any): Promise<any> =>
+      ipcRenderer.invoke('thoughtPartner:editReflection', request),
+
+    answerReflectionQuestions: (request: any): Promise<any> =>
+      ipcRenderer.invoke('thoughtPartner:answerReflectionQuestions', request),
+
+    exploreIdea: (request: any): Promise<any> =>
+      ipcRenderer.invoke('thoughtPartner:exploreIdea', request),
+
+    stressTestIdea: (request: any): Promise<any> =>
+      ipcRenderer.invoke('thoughtPartner:stressTestIdea', request),
+
+    turnIdeaInto: (request: any): Promise<any> =>
+      ipcRenderer.invoke('thoughtPartner:turnIdeaInto', request),
+
+    mergeIdeas: (request: any): Promise<any> =>
+      ipcRenderer.invoke('thoughtPartner:mergeIdeas', request),
+
+    onChunk: (callback: (chunk: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, chunk: string) => callback(chunk)
+      ipcRenderer.on('thoughtPartner:chunk', handler)
+      return () => ipcRenderer.removeListener('thoughtPartner:chunk', handler)
+    },
+
+    onDone: (callback: (response: ThoughtPartnerResponse) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, response: ThoughtPartnerResponse) => callback(response)
+      ipcRenderer.on('thoughtPartner:done', handler)
+      return () => ipcRenderer.removeListener('thoughtPartner:done', handler)
+    },
+
+    onPipelineState: (callback: (state: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: string) => callback(state)
+      ipcRenderer.on('thoughtPartner:pipelineState', handler)
+      return () => ipcRenderer.removeListener('thoughtPartner:pipelineState', handler)
+    }
+  },
+
+  // Behavior Policy operations (adaptive behavior layer)
+  behaviorPolicy: {
+    submitFeedback: (feedback: any): Promise<{ updatedVector: any }> =>
+      ipcRenderer.invoke('behaviorPolicy:submitFeedback', feedback),
+
+    getVector: (projectPath: string | null, context: any): Promise<any> =>
+      ipcRenderer.invoke('behaviorPolicy:getVector', projectPath, context),
+
+    reset: (projectPath: string | null, level: 'global' | 'project' | 'session'): Promise<void> =>
+      ipcRenderer.invoke('behaviorPolicy:reset', projectPath, level),
+
+    getFeedbackSummary: (projectPath: string): Promise<any> =>
+      ipcRenderer.invoke('behaviorPolicy:getFeedbackSummary', projectPath),
   },
 
   // Panel widths persistence
@@ -721,6 +963,21 @@ const api = {
 
     set: (widths: Record<string, number>): Promise<void> =>
       ipcRenderer.invoke('panelWidths:set', widths)
+  },
+
+  // Workspace state persistence (per-project UI state)
+  workspace: {
+    load: (projectPath: string): Promise<any> =>
+      ipcRenderer.invoke('workspace:load', projectPath),
+
+    saveLayout: (projectPath: string, layout: any): Promise<void> =>
+      ipcRenderer.invoke('workspace:saveLayout', projectPath, layout),
+
+    saveDocumentView: (projectPath: string, docId: string, viewState: any): Promise<void> =>
+      ipcRenderer.invoke('workspace:saveDocumentView', projectPath, docId, viewState),
+
+    removeDocumentView: (projectPath: string, docId: string): Promise<void> =>
+      ipcRenderer.invoke('workspace:removeDocumentView', projectPath, docId)
   },
 
   // Window state

@@ -62,8 +62,9 @@ export const defaultConfig: WorkspaceConfig = {
     deriveTitlesFromContent: false,
     showPageNumbers: false,
     showTimestamps: true,
+    showThoughtPartner: true,
   },
-  
+
   editor: {
     fontFamily: 'inherit',
     useScreenplayExtension: false,

@@ -11,6 +11,11 @@ import { getDocumentGenerationService, type ScriptContext, type SupplementaryDoc
 import { getDramaticCritiqueService, type EntityDoc } from './services/dramaticCritiqueService'
 import { getAIWritingService, type AIWritingRequest } from './services/aiWritingService'
 import { runGatedPipeline } from './services/gatedWritingPipeline'
+import { getThoughtPartnerService } from './services/thoughtPartnerService'
+import { getBehaviorPolicyService } from './services/behaviorPolicyService'
+import { getFeedbackLogger } from './services/feedbackLogger'
+import { WorkspaceStateService } from './services/workspaceStateService'
+import type { ThoughtPartnerRequest, ThoughtPartnerSuggestionsRequest, ThoughtPartnerConversationData, ConversationIndex, SuggestionsCache } from '../shared/thoughtPartnerTypes'
 import type { AIWritingRequest as SharedAIWritingRequest } from '../shared/aiWritingTypes'
 import type { StoryFacts } from './services/dramaticCritiqueService'
 import type { Project, BuildResult } from '../src/types/project'
@@ -19,6 +24,7 @@ import type { JSONContent } from '@tiptap/core'
 let mainWindow: BrowserWindow | null = null
 let projectStore: ProjectStore
 let passEngine: PassEngine
+let workspaceStateService: WorkspaceStateService
 
 // Initialize Pass Engine with all passes
 function initializePassEngine(): PassEngine {
@@ -35,6 +41,7 @@ function initializePassEngine(): PassEngine {
 try {
   projectStore = new ProjectStore()
   passEngine = initializePassEngine()
+  workspaceStateService = new WorkspaceStateService()
 } catch (error) {
   console.error('Failed to initialize services:', error)
   process.exit(1)
@@ -340,6 +347,23 @@ function setupIpcHandlers(): void {
     projectStore.setPanelWidths(widths)
   })
 
+  // Workspace state operations
+  ipcMain.handle('workspace:load', async (_, projectPath: string) => {
+    return workspaceStateService.load(projectPath)
+  })
+
+  ipcMain.handle('workspace:saveLayout', async (_, projectPath: string, layout) => {
+    return workspaceStateService.saveLayout(projectPath, layout)
+  })
+
+  ipcMain.handle('workspace:saveDocumentView', async (_, projectPath: string, docId: string, viewState) => {
+    return workspaceStateService.saveDocumentView(projectPath, docId, viewState)
+  })
+
+  ipcMain.handle('workspace:removeDocumentView', async (_, projectPath: string, docId: string) => {
+    return workspaceStateService.removeDocumentView(projectPath, docId)
+  })
+
   // Window bounds operations
   ipcMain.handle('windowBounds:get', async () => {
     return projectStore.getWindowBounds()
@@ -455,10 +479,260 @@ function setupIpcHandlers(): void {
     return service.hasApiKey()
   })
 
+  ipcMain.handle('aiWriting:getDefaultInstructions', async () => {
+    const { DEFAULT_PROSE_INSTRUCTIONS, DEFAULT_SCREENPLAY_INSTRUCTIONS } = await import('./services/aiWritingService')
+    return { prose: DEFAULT_PROSE_INSTRUCTIONS, screenplay: DEFAULT_SCREENPLAY_INSTRUCTIONS }
+  })
+
   // Gated Writing Pipeline operations (constraint-first generation)
   ipcMain.handle('gatedWriting:generate', async (_, request: SharedAIWritingRequest, storyFacts?: StoryFacts, forceOverride?: boolean) => {
     console.log('[Main] Gated writing pipeline requested:', request.command, 'override:', !!forceOverride)
     return runGatedPipeline(request, storyFacts, forceOverride || false)
+  })
+
+  // Thought Partner operations
+  ipcMain.handle('thoughtPartner:sendMessage', async (_, request: ThoughtPartnerRequest) => {
+    console.log('[Main] Thought Partner message received, pipeline:', !!request.usePipeline)
+    const service = getThoughtPartnerService()
+    return service.sendMessage(
+      request,
+      (chunk: string) => {
+        if (mainWindow) {
+          mainWindow.webContents.send('thoughtPartner:chunk', chunk)
+        }
+      },
+      (state: string) => {
+        if (mainWindow) {
+          mainWindow.webContents.send('thoughtPartner:pipelineState', state)
+        }
+      }
+    )
+  })
+
+  ipcMain.handle('thoughtPartner:stopStreaming', async () => {
+    const service = getThoughtPartnerService()
+    service.stopStreaming()
+  })
+
+  ipcMain.handle('thoughtPartner:executePlan', async (_, request: any) => {
+    console.log('[Main] Thought Partner plan execution requested')
+    const service = getThoughtPartnerService()
+    return service.executePlanAfterApproval(
+      request.structuredPlan,
+      request,
+      (chunk: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:chunk', chunk)
+      },
+      (state: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:pipelineState', state)
+      }
+    )
+  })
+
+  ipcMain.handle('thoughtPartner:acceptReflection', async (_, request: any) => {
+    console.log('[Main] Thought Partner reflection accepted')
+    const service = getThoughtPartnerService()
+    return service.handleReflectionAccept(
+      request.reflection,
+      request,
+      (chunk: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:chunk', chunk)
+      },
+      (state: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:pipelineState', state)
+      }
+    )
+  })
+
+  ipcMain.handle('thoughtPartner:editReflection', async (_, request: any) => {
+    console.log('[Main] Thought Partner reflection edited')
+    const service = getThoughtPartnerService()
+    return service.handleReflectionEdit(
+      request.reflection,
+      request.newInterpretation,
+      request,
+      (chunk: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:chunk', chunk)
+      },
+      (state: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:pipelineState', state)
+      }
+    )
+  })
+
+  ipcMain.handle('thoughtPartner:answerReflectionQuestions', async (_, request: any) => {
+    console.log('[Main] Thought Partner reflection questions answered')
+    const service = getThoughtPartnerService()
+    return service.handleReflectionAnswer(
+      request.reflection,
+      request.meaningAnswers || [],
+      request.executionAnswers || [],
+      request,
+      (chunk: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:chunk', chunk)
+      },
+      (state: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:pipelineState', state)
+      }
+    )
+  })
+
+  ipcMain.handle('thoughtPartner:exploreIdea', async (_, request: any) => {
+    console.log('[Main] Thought Partner exploring idea')
+    const service = getThoughtPartnerService()
+    return service.handleExploreIdea(
+      request.ideaCard,
+      request.expansionPathId || null,
+      request,
+      (chunk: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:chunk', chunk)
+      },
+      (state: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:pipelineState', state)
+      }
+    )
+  })
+
+  ipcMain.handle('thoughtPartner:stressTestIdea', async (_, request: any) => {
+    console.log('[Main] Thought Partner stress-testing idea')
+    const service = getThoughtPartnerService()
+    return service.handleStressTestIdea(
+      request.ideaCard,
+      request,
+      (chunk: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:chunk', chunk)
+      },
+      (state: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:pipelineState', state)
+      }
+    )
+  })
+
+  ipcMain.handle('thoughtPartner:turnIdeaInto', async (_, request: any) => {
+    console.log('[Main] Thought Partner converting idea')
+    const service = getThoughtPartnerService()
+    return service.handleTurnIdeaInto(
+      request.ideaCard,
+      request.targetType,
+      request,
+      (chunk: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:chunk', chunk)
+      },
+      (state: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:pipelineState', state)
+      }
+    )
+  })
+
+  ipcMain.handle('thoughtPartner:mergeIdeas', async (_, request: any) => {
+    console.log('[Main] Thought Partner merging ideas')
+    const service = getThoughtPartnerService()
+    return service.handleMergeIdeas(
+      request.ideaCardA,
+      request.ideaCardB,
+      request,
+      (chunk: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:chunk', chunk)
+      },
+      (state: string) => {
+        if (mainWindow) mainWindow.webContents.send('thoughtPartner:pipelineState', state)
+      }
+    )
+  })
+
+  ipcMain.handle('thoughtPartner:getSuggestions', async (_, request: ThoughtPartnerSuggestionsRequest) => {
+    console.log('[Main] Thought Partner suggestions requested')
+    const service = getThoughtPartnerService()
+    return service.generateSuggestions(request)
+  })
+
+  ipcMain.handle('thoughtPartner:loadConversationIndex', async (_, projectPath: string) => {
+    const service = getThoughtPartnerService()
+    return service.loadConversationIndex(projectPath)
+  })
+
+  ipcMain.handle('thoughtPartner:saveConversationIndex', async (_, projectPath: string, index: ConversationIndex) => {
+    const service = getThoughtPartnerService()
+    return service.saveConversationIndex(projectPath, index)
+  })
+
+  ipcMain.handle('thoughtPartner:loadConversation', async (_, projectPath: string, conversationId: string) => {
+    const service = getThoughtPartnerService()
+    return service.loadConversation(projectPath, conversationId)
+  })
+
+  ipcMain.handle('thoughtPartner:saveConversation', async (_, projectPath: string, conversationId: string, data: ThoughtPartnerConversationData) => {
+    const service = getThoughtPartnerService()
+    return service.saveConversation(projectPath, conversationId, data)
+  })
+
+  ipcMain.handle('thoughtPartner:createConversation', async (_, projectPath: string, title?: string) => {
+    const service = getThoughtPartnerService()
+    return service.createConversation(projectPath, title)
+  })
+
+  ipcMain.handle('thoughtPartner:deleteConversation', async (_, projectPath: string, conversationId: string) => {
+    const service = getThoughtPartnerService()
+    return service.deleteConversation(projectPath, conversationId)
+  })
+
+  ipcMain.handle('thoughtPartner:hasApiKey', async () => {
+    const service = getThoughtPartnerService()
+    return service.hasApiKey()
+  })
+
+  ipcMain.handle('thoughtPartner:loadSuggestionsCache', async (_, projectPath: string) => {
+    const service = getThoughtPartnerService()
+    return service.loadSuggestionsCache(projectPath)
+  })
+
+  ipcMain.handle('thoughtPartner:saveSuggestionsCache', async (_, projectPath: string, cache: SuggestionsCache) => {
+    const service = getThoughtPartnerService()
+    return service.saveSuggestionsCache(projectPath, cache)
+  })
+
+  // Behavior Policy operations (adaptive behavior layer)
+  ipcMain.handle('behaviorPolicy:submitFeedback', async (_, feedback) => {
+    console.log('[Main] Behavior policy feedback received:', feedback.signal)
+    const policyService = getBehaviorPolicyService()
+    const logger = getFeedbackLogger()
+
+    const entry = {
+      id: `fb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      messageId: feedback.messageId,
+      conversationId: feedback.conversationId,
+      timestamp: new Date().toISOString(),
+      signal: feedback.signal,
+      context: feedback.context,
+      behaviorVectorSnapshot: feedback.vectorSnapshot,
+      expressedDimensions: feedback.expressedDimensions,
+    }
+
+    if (feedback.projectPath) {
+      logger.logFeedback(feedback.projectPath, entry)
+    }
+
+    const updatedVector = policyService.processFeedback(feedback.projectPath, entry)
+    return { updatedVector }
+  })
+
+  ipcMain.handle('behaviorPolicy:getVector', async (_, projectPath: string | null, context) => {
+    const policyService = getBehaviorPolicyService()
+    return policyService.resolveVectorWithExploration(projectPath, context)
+  })
+
+  ipcMain.handle('behaviorPolicy:reset', async (_, projectPath: string | null, level: string) => {
+    const policyService = getBehaviorPolicyService()
+    switch (level) {
+      case 'global': policyService.resetGlobal(); break
+      case 'project': if (projectPath) policyService.resetProject(projectPath); break
+      case 'session': policyService.resetSession(); break
+    }
+  })
+
+  ipcMain.handle('behaviorPolicy:getFeedbackSummary', async (_, projectPath: string) => {
+    const logger = getFeedbackLogger()
+    return logger.getFeedbackSummary(projectPath)
   })
 
   // Build operations

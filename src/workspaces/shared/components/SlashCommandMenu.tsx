@@ -295,6 +295,7 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
 
       try {
         // Call the AI writing service with template type and entity data
+        const customInstruction = currentProject?.settings?.customAIPrompts?.[item.id]
         const response = await window.api.aiWriting.generate({
           command: item.id,
           context,
@@ -305,8 +306,9 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
           templateType: isScreenplay ? 'screenplay' : undefined,
           supplementaryContext: Object.keys(supplementaryContext).length > 0 ? supplementaryContext : undefined,
           sceneContext,
-          targetRuntimeMinutes: isScreenplay ? currentProject.settings?.targetRuntimeMinutes : undefined,
+          targetRuntimeMinutes: isScreenplay ? currentProject?.settings?.targetRuntimeMinutes : undefined,
           userQuestion: item.id === 'ask' ? userQuestion : undefined,
+          customSystemPromptInstruction: customInstruction || undefined,
         })
 
         // Find the loading text in the document
@@ -566,8 +568,8 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
 
     if (items.length === 0) {
       return (
-        <div className="bg-ink-900 border border-ink-600 rounded-lg shadow-2xl p-3">
-          <p className="text-sm text-ink-400 font-ui">No commands found</p>
+        <div className="bg-[var(--bg-elevated)] border border-theme-default rounded-lg shadow-2xl p-3">
+          <p className="text-sm text-theme-muted font-ui">No commands found</p>
         </div>
       )
     }
@@ -576,9 +578,9 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
     if (inputMode && pendingCommand.current) {
       return (
         <div
-          className="bg-ink-900 border border-ink-600 rounded-lg shadow-2xl py-1.5 min-w-[320px]"
+          className="bg-[var(--bg-elevated)] border border-theme-default rounded-lg shadow-2xl py-1.5 min-w-[320px]"
         >
-          <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-gold-400 uppercase tracking-wider border-b border-ink-700 mb-1">
+          <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-theme-accent uppercase tracking-wider border-b border-theme-default mb-1">
             {pendingCommand.current.name}
           </div>
           <div className="px-3 py-2">
@@ -598,12 +600,12 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
                 e.stopPropagation()
               }}
               placeholder="Ask anything about your story..."
-              className="w-full bg-ink-800 border border-ink-600 rounded px-3 py-2 text-sm text-white font-ui placeholder:text-ink-500 focus:outline-none focus:border-gold-400/50"
+              className="w-full bg-[var(--bg-tertiary)] border border-theme-default rounded px-3 py-2 text-sm text-theme-primary font-ui placeholder:text-theme-muted focus:outline-none focus:border-gold-400/50"
               autoFocus
             />
           </div>
-          <div className="px-3 py-1.5 border-t border-ink-700 text-[10px] text-ink-500 font-ui">
-            <span className="text-ink-400">Enter</span> Submit • <span className="text-ink-400">Esc</span> Cancel
+          <div className="px-3 py-1.5 border-t border-theme-default text-[10px] text-theme-muted font-ui">
+            <span className="text-theme-muted">Enter</span> Submit • <span className="text-theme-muted">Esc</span> Cancel
           </div>
         </div>
       )
@@ -611,11 +613,11 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
 
     return (
       <div
-        className="bg-ink-900 border border-ink-600 rounded-lg shadow-2xl py-1.5 min-w-[280px] max-h-[400px] overflow-auto"
+        className="bg-[var(--bg-elevated)] border border-theme-default rounded-lg shadow-2xl py-1.5 min-w-[280px] max-h-[400px] overflow-auto"
         role="listbox"
         aria-label="AI Writing Commands"
       >
-        <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-ink-400 uppercase tracking-wider border-b border-ink-700 mb-1">
+        <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-theme-muted uppercase tracking-wider border-b border-theme-default mb-1">
           {hasSelection ? 'Revise Selection' : 'AI Writing Tools'}
         </div>
 
@@ -631,15 +633,15 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
               className={clsx(
                 'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
                 isSelected
-                  ? 'bg-gold-400/20 text-gold-400'
-                  : 'text-white hover:bg-ink-800'
+                  ? 'bg-gold-400/20 text-theme-accent'
+                  : 'text-theme-primary hover:bg-[var(--bg-hover)]'
               )}
               role="option"
               aria-selected={isSelected}
             >
               <span className={clsx(
                 'flex-shrink-0',
-                isSelected ? 'text-gold-400' : 'text-ink-400'
+                isSelected ? 'text-theme-accent' : 'text-theme-muted'
               )}>
                 <Icon className="w-4 h-4" />
               </span>
@@ -650,7 +652,7 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
                 </div>
                 <div className={clsx(
                   'text-xs truncate',
-                  isSelected ? 'text-gold-400/70' : 'text-ink-500'
+                  isSelected ? 'text-gold-400/70' : 'text-theme-muted'
                 )}>
                   {item.description}
                 </div>
@@ -659,8 +661,8 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
               <span className={clsx(
                 'flex-shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded',
                 isSelected
-                  ? 'bg-gold-400/30 text-gold-400'
-                  : 'bg-ink-700 text-ink-400'
+                  ? 'bg-[var(--accent-gold-muted)] text-theme-accent'
+                  : 'bg-[var(--bg-tertiary)] text-theme-muted'
               )}>
                 {item.shortcut}
               </span>
@@ -668,8 +670,8 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
           )
         })}
 
-        <div className="px-3 py-1.5 mt-1 border-t border-ink-700 text-[10px] text-ink-500 font-ui">
-          <span className="text-ink-400">↑↓</span> Navigate • <span className="text-ink-400">Enter</span> Select • <span className="text-ink-400">Esc</span> Close
+        <div className="px-3 py-1.5 mt-1 border-t border-theme-default text-[10px] text-theme-muted font-ui">
+          <span className="text-theme-muted">↑↓</span> Navigate • <span className="text-theme-muted">Enter</span> Select • <span className="text-theme-muted">Esc</span> Close
         </div>
       </div>
     )

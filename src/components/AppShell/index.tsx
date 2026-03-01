@@ -8,6 +8,7 @@ import { PropsPanel } from '../PropsPanel'
 import { WebLinksPanel } from '../WebLinksPanel'
 import { ProblemsPanel } from '../ProblemsPanel'
 import { ProjectSettingsPanel } from '../ProjectSettingsPanel'
+import { ThoughtPartnerPanel } from '../ThoughtPartnerPanel'
 import { StatusBar } from './StatusBar'
 import { useWorkspace } from '../../workspaces'
 import { clsx } from 'clsx'
@@ -17,7 +18,8 @@ import {
   PanelLeftRegular,
   PanelRightRegular,
   WeatherSunnyRegular,
-  WeatherMoonRegular
+  WeatherMoonRegular,
+  HatGraduationSparkleRegular
 } from '@fluentui/react-icons'
 
 type RightSidebarTab = 'assets' | 'stickers' | 'characters' | 'props'
@@ -29,18 +31,20 @@ const MIN_SIDEBAR_WIDTH = 180
 const MAX_SIDEBAR_WIDTH = 500
 const FLOATING_PANEL_GAP = 8 // Gap between floating panels
 
-type ResizeTarget = 'bottom' | 'left' | 'right' | null
+type ResizeTarget = 'bottom' | 'left' | 'right' | 'thoughtPartner' | null
 
 export function AppShell() {
-  const { 
-    currentProject, 
+  const {
+    currentProject,
     ui,
-    toggleLeftSidebar, 
+    toggleLeftSidebar,
     toggleRightSidebar,
     toggleTheme,
     setBottomPanelHeight,
     setLeftSidebarWidth,
     setRightSidebarWidth,
+    setThoughtPartnerPanelWidth,
+    toggleThoughtPartnerPanel,
     closeProject
   } = useProjectStore()
 
@@ -85,8 +89,16 @@ export function AppShell() {
       const newWidth = containerRect.right - e.clientX - FLOATING_PANEL_GAP
       const clampedWidth = Math.min(Math.max(newWidth, MIN_SIDEBAR_WIDTH), MAX_SIDEBAR_WIDTH)
       setRightSidebarWidth(clampedWidth)
+    } else if (resizeTarget === 'thoughtPartner') {
+      const editorArea = containerRef.current.querySelector('.floating-editor-area')
+      if (editorArea) {
+        const editorRect = editorArea.getBoundingClientRect()
+        const newWidth = editorRect.right - e.clientX
+        const clampedWidth = Math.min(Math.max(newWidth, 300), 600)
+        setThoughtPartnerPanelWidth(clampedWidth)
+      }
     }
-  }, [resizeTarget, setBottomPanelHeight, setLeftSidebarWidth, setRightSidebarWidth])
+  }, [resizeTarget, setBottomPanelHeight, setLeftSidebarWidth, setRightSidebarWidth, setThoughtPartnerPanelWidth])
 
   // Handle mouse up to end resize
   const handleMouseUp = useCallback(() => {
@@ -177,6 +189,18 @@ export function AppShell() {
             )}
           </button>
 
+          {/* Toggle Thought Partner */}
+          <button
+            onClick={toggleThoughtPartnerPanel}
+            className={clsx(
+              'btn-icon-modern',
+              ui.thoughtPartnerPanelOpen && 'active'
+            )}
+            title={ui.thoughtPartnerPanelOpen ? 'Close Thought Partner' : 'Open Thought Partner'}
+          >
+            <HatGraduationSparkleRegular className="w-5 h-5" />
+          </button>
+
           {/* Toggle right sidebar */}
           <button
             onClick={toggleRightSidebar}
@@ -216,7 +240,32 @@ export function AppShell() {
 
         {/* Editor area - subtle background, not a floating card */}
         <div className="floating-editor-area">
-          {ui.settingsPanelOpen ? <ProjectSettingsPanel /> : <WorkspaceRouter />}
+          <div className="flex flex-row flex-1 min-h-0 overflow-hidden h-full">
+            {/* Main editor */}
+            <div className="flex flex-col flex-1 min-w-0 min-h-0 h-full overflow-hidden">
+              {ui.settingsPanelOpen ? <ProjectSettingsPanel /> : <WorkspaceRouter />}
+            </div>
+
+            {/* Thought Partner Panel */}
+            {ui.thoughtPartnerPanelOpen && (
+              <>
+                {/* Resize handle */}
+                <div
+                  onMouseDown={handleResizeStart('thoughtPartner')}
+                  className={clsx(
+                    'w-1 cursor-ew-resize flex-shrink-0 hover:bg-purple-500/30 transition-colors',
+                    resizeTarget === 'thoughtPartner' && 'bg-purple-500/30'
+                  )}
+                />
+                <div
+                  className="flex flex-col flex-shrink-0 overflow-hidden border-l border-theme-subtle"
+                  style={{ width: ui.thoughtPartnerPanelWidth }}
+                >
+                  <ThoughtPartnerPanel />
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Right sidebar - Assets/Characters Panel + Web Links Panel (Floating) */}

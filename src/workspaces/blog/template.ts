@@ -64,8 +64,9 @@ export const blogConfig: WorkspaceConfig = {
     deriveTitlesFromContent: false,
     showPageNumbers: false,
     showTimestamps: true,
+    showThoughtPartner: true,
   },
-  
+
   editor: {
     fontFamily: 'inherit',
     useScreenplayExtension: false,

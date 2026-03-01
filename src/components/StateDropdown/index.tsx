@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ChevronDownRegular,
   PlayCircleRegular,
@@ -13,6 +14,7 @@ interface StateConfig {
   label: string
   shortLabel: string
   color: string
+  iconColor: string
   bgColor: string
   borderColor: string
   icon: React.ComponentType<{ className?: string }>
@@ -23,6 +25,7 @@ const stateConfigs: Record<DocumentLifecycleState, StateConfig> = {
     label: 'Active (WIP)',
     shortLabel: 'Active',
     color: 'text-black',
+    iconColor: 'text-amber-400',
     bgColor: 'bg-amber-400',
     borderColor: 'border-amber-500',
     icon: PlayCircleRegular
@@ -31,6 +34,7 @@ const stateConfigs: Record<DocumentLifecycleState, StateConfig> = {
     label: 'Paused',
     shortLabel: 'Paused',
     color: 'text-black',
+    iconColor: 'text-gray-400',
     bgColor: 'bg-gray-400',
     borderColor: 'border-gray-500',
     icon: PauseCircleRegular
@@ -39,6 +43,7 @@ const stateConfigs: Record<DocumentLifecycleState, StateConfig> = {
     label: 'Ready for Review',
     shortLabel: 'Review',
     color: 'text-black',
+    iconColor: 'text-blue-400',
     bgColor: 'bg-blue-400',
     borderColor: 'border-blue-500',
     icon: EyeRegular
@@ -47,6 +52,7 @@ const stateConfigs: Record<DocumentLifecycleState, StateConfig> = {
     label: 'Completed',
     shortLabel: 'Done',
     color: 'text-black',
+    iconColor: 'text-green-400',
     bgColor: 'bg-green-400',
     borderColor: 'border-green-500',
     icon: CheckmarkCircleRegular
@@ -55,6 +61,7 @@ const stateConfigs: Record<DocumentLifecycleState, StateConfig> = {
     label: 'Archived',
     shortLabel: 'Archived',
     color: 'text-black',
+    iconColor: 'text-gray-500',
     bgColor: 'bg-gray-300',
     borderColor: 'border-gray-400',
     icon: ArchiveRegular
@@ -69,33 +76,52 @@ interface StateDropdownProps {
   showNote?: boolean // Whether to show/edit the note
 }
 
-export function StateDropdown({ 
-  value, 
-  stateNote, 
-  onChange, 
+export function StateDropdown({
+  value,
+  stateNote,
+  onChange,
   compact = false,
-  showNote = true 
+  showNote = true
 }: StateDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
   const [noteValue, setNoteValue] = useState(stateNote || '')
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const noteInputRef = useRef<HTMLInputElement>(null)
 
   const config = stateConfigs[value]
   const Icon = config.icon
 
+  // Position the menu when opened
+  const openMenu = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setMenuPos({
+        top: rect.bottom + 4,
+        left: rect.right - 192, // w-48 = 192px, align right edge
+      })
+    }
+    setIsOpen(true)
+  }, [])
+
   // Close dropdown when clicking outside
   useEffect(() => {
+    if (!isOpen) return
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (
+        buttonRef.current && !buttonRef.current.contains(target) &&
+        menuRef.current && !menuRef.current.contains(target)
+      ) {
         setIsOpen(false)
         setEditingNote(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [isOpen])
 
   // Focus note input when editing starts
   useEffect(() => {
@@ -114,7 +140,7 @@ export function StateDropdown({
       setIsOpen(false)
       return
     }
-    
+
     // When changing state, clear the note unless it's paused/review where notes are common
     if (newState === 'active' || newState === 'completed' || newState === 'archived') {
       onChange(newState, undefined)
@@ -142,42 +168,48 @@ export function StateDropdown({
   }
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       {/* Main button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={buttonRef}
+        onClick={() => isOpen ? setIsOpen(false) : openMenu()}
         className={`
-          flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all
-          ${config.bgColor} ${config.borderColor}
-          hover:brightness-110 hover:scale-[1.02] active:scale-[0.98]
+          flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all
+          bg-transparent border-theme-default
+          hover:bg-theme-hover active:scale-[0.98]
           text-xs
         `}
       >
-        <Icon className={`w-3.5 h-3.5 ${config.color}`} />
-        <span className={`font-ui font-medium ${config.color}`}>
+        <Icon className="w-3.5 h-3.5 text-theme-secondary" />
+        <span className="font-ui font-medium text-theme-secondary">
           {compact ? config.shortLabel : config.label}
         </span>
-        <ChevronDownRegular className={`w-3 h-3 ${config.color} transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDownRegular className={`w-3 h-3 text-theme-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Dropdown menu - aligned right to prevent clipping */}
-      {isOpen && (
-        <div className="absolute right-0 z-50 mt-1 w-48 py-1 rounded-lg border border-theme-default bg-theme-elevated backdrop-blur-sm shadow-xl">
+      {/* Dropdown menu - portalled to body for backdrop-filter */}
+      {isOpen && menuPos && createPortal(
+        <div
+          ref={menuRef}
+          className="menu-modern fixed z-50 w-48 py-1.5"
+          style={{ top: menuPos.top, left: menuPos.left }}
+          onClick={(e) => e.stopPropagation()}
+        >
           {(Object.keys(stateConfigs) as DocumentLifecycleState[]).map((state) => {
             const stateConfig = stateConfigs[state]
             const StateIcon = stateConfig.icon
             const isSelected = state === value
-            
+
             return (
               <button
                 key={state}
                 onClick={() => handleStateSelect(state)}
                 className={`
-                  w-full flex items-center gap-2 px-3 py-2 text-left transition-colors
-                  ${isSelected ? 'bg-theme-active' : 'hover:bg-theme-hover'}
+                  menu-modern-item w-full flex items-center gap-2 px-3 py-2 text-left
+                  ${isSelected ? 'bg-theme-active' : ''}
                 `}
               >
-                <StateIcon className={`w-4 h-4 ${stateConfig.color}`} />
+                <StateIcon className={`w-4 h-4 ${stateConfig.iconColor}`} />
                 <span className={`text-sm font-ui ${isSelected ? 'text-theme-primary' : 'text-theme-secondary'}`}>
                   {stateConfig.label}
                 </span>
@@ -206,7 +238,8 @@ export function StateDropdown({
               />
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Display note below if exists and not editing */}

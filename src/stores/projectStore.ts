@@ -34,6 +34,7 @@ import type { SceneState, CharacterEligibility, PipelineResult } from '../../sha
 import type { JSONContent } from '@tiptap/core'
 import { getWorkspaceConfig } from '../workspaces'
 import { contentToPlainText, contentToPlainTextWithPositions, plainTextOffsetToDocPos } from '../utils/selectionUtils'
+import type { WorkspaceLayoutState } from '../../shared/workspaceStateTypes'
 
 // Helper to escape special regex characters
 function escapeRegex(str: string): string {
@@ -1527,15 +1528,15 @@ export function getPageNumber(
 
 /**
  * Determines if sub-documents can be created under this document.
- * Notes cannot have children.
+ * Only explicitly-flagged notes and special docs (character/prop notes) cannot have children.
+ * Regular documents at any nesting depth can accept children.
  */
 export function canCreateSubDocument(
   doc: ProjectDocument,
-  allDocs: ProjectDocument[]
+  _allDocs: ProjectDocument[]
 ): boolean {
-  const hierarchyType = getDocumentHierarchyType(doc, allDocs)
-  // Notes cannot have children
-  return hierarchyType !== 'note'
+  if (doc.isNote || doc.isCharacterNote || doc.isPropNote) return false
+  return true
 }
 
 /**
@@ -1575,6 +1576,9 @@ interface UIState {
   settingsPanelOpen: boolean // Project settings panel
   drawingMode: boolean // Freehand drawing overlay active
   infiniteCanvas: boolean // Infinite canvas mode - free scroll in all directions
+  thoughtPartnerPanelOpen: boolean // Thought Partner chat panel
+  thoughtPartnerPanelWidth: number
+  thoughtPartnerTextSize: number // Text size in px (12-20)
 }
 
 // Citation navigation state
@@ -1673,13 +1677,14 @@ interface ProjectState {
   activeDocumentId: string | null
   documents: Record<string, DocumentState>
   assets: Asset[]
-  
+
   // Build state
   lastBuildResult: BuildResult | null
   diagnostics: Diagnostic[]
-  
+
   // UI state
   ui: UIState
+  expandedFolders: Set<string>
   isLoading: boolean
   error: string | null
   
@@ -1727,6 +1732,44 @@ interface ProjectState {
   sceneState: SceneState | null
   characterEligibility: CharacterEligibility[]
   lastPipelineResult: PipelineResult | null
+
+  // Thought Partner state (conversational AI)
+  thoughtPartner: {
+    conversationIndex: Array<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }>
+    activeConversationId: string | null
+    isConversationListOpen: boolean
+    messages: Array<{ id: string; role: 'user' | 'assistant' | 'system'; content: string; timestamp: string }>
+    contextDocument: {
+      decisions: string[]
+      openQuestions: string[]
+      ideas: string[]
+      risks: string[]
+      considerations: string[]
+      lastUpdated: string
+    }
+    suggestions: Array<{ id: string; title: string; description: string; category: string; prompt: string }>
+    isStreaming: boolean
+    streamingContent: string
+    isLoadingSuggestions: boolean
+    _suggestionsContentHash: string
+    pendingActions: any[]
+    pendingEditorInsertion: { actionId: string; mode: 'insert' | 'replace' | 'delete'; screenplayElements?: any[]; text?: string; insertionPoint: 'cursor' | 'start' | 'end' | 'after-heading'; afterHeading?: string; targetHeading?: string; targetText?: string; pipelineOps?: any[]; anchorBlockId?: string; originalText?: string; opWhy?: string } | null
+    agentMode: boolean
+    autoAcceptEdits: boolean
+    activeQuestion: any | null
+    selectionContext: { text: string; documentId: string; documentTitle: string } | null
+    // Pipeline state
+    usePipeline: boolean
+    pipelineState: string
+    documentBlockContext: import('../../shared/thoughtPartnerPipelineTypes').DocumentBlockContext | null
+    structuredMemory: import('../../shared/thoughtPartnerPipelineTypes').StructuredMemory | null
+    currentPipelineActions: import('../../shared/thoughtPartnerPipelineTypes').PipelineAction[]
+    consecutiveChatTurns: number
+    // Behavior policy (adaptive behavior layer)
+    messageFeedback: Record<string, import('../../shared/behaviorPolicyTypes').FeedbackSignal>
+    currentBehaviorVector: import('../../shared/behaviorPolicyTypes').BehaviorVector | null
+    lastResponseMeta: { expressedDimensions?: Partial<Record<string, number>>; behaviorVectorUsed?: Record<string, number> } | null
+  }
 
   // Actions
   initialize: () => Promise<void>
@@ -1778,6 +1821,15 @@ interface ProjectState {
   toggleDrawingMode: () => void
   setDrawingMode: (mode: boolean) => void
 
+  // Folder expand/collapse (Project Explorer)
+  toggleFolder: (folderId: string) => void
+  setExpandedFolders: (folders: Set<string>) => void
+
+  // Workspace state persistence
+  initializeWorkspaceState: () => Promise<void>
+  saveWorkspaceLayout: () => void
+  saveDocumentViewState: (docId: string, viewState: import('../../shared/workspaceStateTypes').DocumentViewState) => void
+
   // UI actions
   toggleLeftSidebar: () => void
   toggleRightSidebar: () => void
@@ -1807,7 +1859,59 @@ interface ProjectState {
   // Settings panel actions
   toggleSettingsPanel: () => void
   setSettingsPanelOpen: (open: boolean) => void
-  
+
+  // Thought Partner actions
+  toggleThoughtPartnerPanel: () => void
+  setThoughtPartnerPanelWidth: (width: number) => void
+  setThoughtPartnerTextSize: (size: number) => void
+  sendThoughtPartnerMessage: (text: string) => Promise<void>
+  editThoughtPartnerMessage: (messageId: string, newText: string) => Promise<void>
+  regenerateThoughtPartnerResponse: () => Promise<void>
+  loadThoughtPartnerConversationIndex: () => Promise<void>
+  loadThoughtPartnerConversation: () => Promise<void>
+  switchThoughtPartnerConversation: (conversationId: string) => Promise<void>
+  createThoughtPartnerConversation: () => Promise<void>
+  deleteThoughtPartnerConversation: (conversationId: string) => Promise<void>
+  clearThoughtPartnerConversation: () => Promise<void>
+  toggleThoughtPartnerConversationList: () => void
+  generateThoughtPartnerSuggestions: () => Promise<void>
+  appendThoughtPartnerStreamChunk: (chunk: string) => void
+  finalizeThoughtPartnerStream: (message: string, updatedContextDocument?: any, actions?: any[], questions?: any[]) => void
+  stopThoughtPartnerStreaming: () => void
+  acceptThoughtPartnerAction: (actionId: string) => Promise<void>
+  rejectThoughtPartnerAction: (actionId: string) => void
+  clearThoughtPartnerEditorInsertion: () => void
+  toggleThoughtPartnerAgentMode: () => void
+  toggleThoughtPartnerAutoAccept: () => void
+  answerThoughtPartnerQuestion: (questionId: string, optionId?: string, customText?: string) => Promise<void>
+  skipThoughtPartnerQuestion: (questionId: string) => Promise<void>
+  setThoughtPartnerSelectionContext: (context: { text: string; documentId: string; documentTitle: string } | null) => void
+  clearThoughtPartnerSelectionContext: () => void
+  // Pipeline actions
+  setThoughtPartnerUsePipeline: (enabled: boolean) => void
+  updateDocumentBlockContext: (context: import('../../shared/thoughtPartnerPipelineTypes').DocumentBlockContext) => void
+  setPipelineState: (state: string) => void
+  acceptPipelineAction: (actionId: string) => Promise<void>
+  rejectPipelineAction: (actionId: string) => void
+  approvePlan: (planId: string) => Promise<void>
+  revisePlan: (planId: string, feedback: string) => Promise<void>
+  rejectPlan: (planId: string) => void
+  acceptReflection: (reflectionId: string) => Promise<void>
+  editReflection: (reflectionId: string, newInterpretation: string) => Promise<void>
+  answerReflectionQuestions: (
+    reflectionId: string,
+    meaningAnswers: Array<{ questionText: string; answer: string }>,
+    executionAnswers: Array<{ questionText: string; answer: string }>
+  ) => Promise<void>
+  exploreIdea: (ideaCardId: string, expansionPathId?: string) => Promise<void>
+  stressTestIdea: (ideaCardId: string) => Promise<void>
+  turnIdeaInto: (ideaCardId: string, targetType: 'scene' | 'mechanic') => Promise<void>
+  mergeIdeas: (ideaCardIdA: string, ideaCardIdB: string) => Promise<void>
+  discardIdea: (ideaCardId: string) => void
+  // Behavior policy actions (adaptive behavior layer)
+  submitMessageFeedback: (messageId: string, signal: import('../../shared/behaviorPolicyTypes').FeedbackSignal) => Promise<void>
+  loadBehaviorVector: () => Promise<void>
+
   // Theme actions
   setTheme: (theme: 'dark' | 'light') => void
   toggleTheme: () => void
@@ -1938,6 +2042,10 @@ interface ProjectState {
   setLastPipelineResult: (result: PipelineResult | null) => void
 }
 
+// Debounce timers for workspace state persistence
+let _workspaceLayoutSaveTimer: ReturnType<typeof setTimeout> | null = null
+let _docViewSaveTimer: ReturnType<typeof setTimeout> | null = null
+
 export const useProjectStore = create<ProjectState>((set, get) => ({
   // Initial state
   currentProject: null,
@@ -1947,6 +2055,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   lastBuildResult: null,
   diagnostics: [],
   agendaItems: [],
+  expandedFolders: new Set<string>(),
   ui: {
     leftSidebarOpen: true,
     rightSidebarOpen: true,
@@ -1964,7 +2073,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     isRunningCritique: false,
     settingsPanelOpen: false,
     drawingMode: false,
-    infiniteCanvas: false
+    infiniteCanvas: false,
+    thoughtPartnerPanelOpen: false,
+    thoughtPartnerPanelWidth: 400,
+    thoughtPartnerTextSize: 16
   },
   isLoading: true,
   error: null,
@@ -2003,6 +2115,44 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   // Scene headings for TOC initial state
   sceneHeadings: {},
+
+  // Thought Partner initial state
+  thoughtPartner: {
+    conversationIndex: [] as Array<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }>,
+    activeConversationId: null as string | null,
+    isConversationListOpen: false,
+    messages: [] as Array<{ id: string; role: 'user' | 'assistant' | 'system'; content: string; timestamp: string }>,
+    contextDocument: {
+      decisions: [] as string[],
+      openQuestions: [] as string[],
+      ideas: [] as string[],
+      risks: [] as string[],
+      considerations: [] as string[],
+      lastUpdated: new Date().toISOString()
+    },
+    suggestions: [] as Array<{ id: string; title: string; description: string; category: string; prompt: string }>,
+    isStreaming: false,
+    streamingContent: '',
+    isLoadingSuggestions: false,
+    _suggestionsContentHash: '',
+    pendingActions: [] as any[],
+    pendingEditorInsertion: null as { actionId: string; mode: 'insert' | 'replace'; screenplayElements?: any[]; text?: string; insertionPoint: 'cursor' | 'start' | 'end' | 'after-heading'; afterHeading?: string; targetHeading?: string; targetText?: string } | null,
+    agentMode: false,
+    autoAcceptEdits: false,
+    activeQuestion: null as any | null,
+    selectionContext: null as { text: string; documentId: string; documentTitle: string } | null,
+    // Pipeline state
+    usePipeline: true,
+    pipelineState: 'idle' as string,
+    documentBlockContext: null as import('../../shared/thoughtPartnerPipelineTypes').DocumentBlockContext | null,
+    structuredMemory: null as import('../../shared/thoughtPartnerPipelineTypes').StructuredMemory | null,
+    currentPipelineActions: [] as import('../../shared/thoughtPartnerPipelineTypes').PipelineAction[],
+    consecutiveChatTurns: 0,
+    // Behavior policy (adaptive behavior layer)
+    messageFeedback: {} as Record<string, import('../../shared/behaviorPolicyTypes').FeedbackSignal>,
+    currentBehaviorVector: null as import('../../shared/behaviorPolicyTypes').BehaviorVector | null,
+    lastResponseMeta: null as { expressedDimensions?: Partial<Record<string, number>>; behaviorVectorUsed?: Record<string, number> } | null,
+  },
 
   // Writing Partner / Dramatic Critique initial state
   critiqueIssues: [],
@@ -2058,13 +2208,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
               }))
             }
             
-            // Restore last active document, or fall back to first document
-            const savedDocId = sessionStorage.getItem(`cadmus_active_document:${project.path}`)
-            const savedDocExists = savedDocId && project.documents.some(d => d.id === savedDocId)
-
-            if (savedDocExists) {
-              await get().setActiveDocument(savedDocId)
-            } else if (project.documents.length > 0) {
+            // Restore workspace state (active document, panel layout, etc.)
+            await get().initializeWorkspaceState()
+            if (!get().activeDocumentId && project.documents.length > 0) {
               const firstDoc = project.documents.find(d => d.type === 'document')
               if (firstDoc) {
                 await get().setActiveDocument(firstDoc.id)
@@ -2133,15 +2279,49 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       
       const project = await window.api.project.open(projectPath)
       
-      set({ 
+      set({
         currentProject: project,
         assets: project.assets,
         documents: {},
         activeDocumentId: null,
-        isLoading: false 
+        isLoading: false,
+        thoughtPartner: {
+          conversationIndex: [],
+          activeConversationId: null,
+          isConversationListOpen: false,
+          messages: [],
+          contextDocument: {
+            decisions: [],
+            openQuestions: [],
+            ideas: [],
+            risks: [],
+            considerations: [],
+            lastUpdated: new Date().toISOString()
+          },
+          suggestions: [],
+          isStreaming: false,
+          streamingContent: '',
+          isLoadingSuggestions: false,
+          _suggestionsContentHash: '',
+          pendingActions: [],
+          pendingEditorInsertion: null,
+          agentMode: false,
+          autoAcceptEdits: false,
+          activeQuestion: null,
+          selectionContext: null,
+          usePipeline: true,
+          pipelineState: 'idle',
+          documentBlockContext: null,
+          structuredMemory: null,
+          currentPipelineActions: [],
+          consecutiveChatTurns: 0,
+          messageFeedback: {},
+          currentBehaviorVector: null,
+          lastResponseMeta: null,
+        }
       })
-      
-      // For workspaces with derived titles, preload content for all child pages 
+
+      // For workspaces with derived titles, preload content for all child pages
       // so their derived titles are available in the sidebar
       const workspaceConfig = getWorkspaceConfig(project.templateId)
       if (workspaceConfig.features.deriveTitlesFromContent) {
@@ -2167,13 +2347,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }))
       }
 
-      // Restore last active document for this project, or fall back to first
-      const savedDocId = sessionStorage.getItem(`cadmus_active_document:${project.path}`)
-      const savedDocExists = savedDocId && project.documents.some(d => d.id === savedDocId)
-
-      if (savedDocExists) {
-        get().setActiveDocument(savedDocId)
-      } else if (project.documents.length > 0) {
+      // Restore workspace state (active document, panel layout, etc.)
+      await get().initializeWorkspaceState()
+      if (!get().activeDocumentId && project.documents.length > 0) {
         const firstDoc = project.documents.find(d => d.type === 'document')
         if (firstDoc) {
           get().setActiveDocument(firstDoc.id)
@@ -2182,7 +2358,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to open project',
-        isLoading: false 
+        isLoading: false
       })
     }
   },
@@ -2248,7 +2424,41 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       documents: {},
       assets: [],
       lastBuildResult: null,
-      diagnostics: []
+      diagnostics: [],
+      thoughtPartner: {
+        conversationIndex: [],
+        activeConversationId: null,
+        isConversationListOpen: false,
+        messages: [],
+        contextDocument: {
+          decisions: [],
+          openQuestions: [],
+          ideas: [],
+          risks: [],
+          considerations: [],
+          lastUpdated: new Date().toISOString()
+        },
+        suggestions: [],
+        isStreaming: false,
+        streamingContent: '',
+        isLoadingSuggestions: false,
+        _suggestionsContentHash: '',
+        pendingActions: [],
+        pendingEditorInsertion: null,
+        agentMode: false,
+        autoAcceptEdits: false,
+        activeQuestion: null,
+        selectionContext: null,
+        usePipeline: true,
+        pipelineState: 'idle',
+        documentBlockContext: null,
+        structuredMemory: null,
+        currentPipelineActions: [],
+        consecutiveChatTurns: 0,
+        messageFeedback: {},
+        currentBehaviorVector: null,
+        lastResponseMeta: null,
+      }
     })
   },
 
@@ -2256,11 +2466,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setActiveDocument: async (docId) => {
     set({ activeDocumentId: docId })
 
-    // Persist to sessionStorage so we can restore on refresh/project switch
-    const projectPath = get().currentProject?.path
-    if (docId && projectPath) {
-      sessionStorage.setItem(`cadmus_active_document:${projectPath}`, docId)
-    }
+    // Persist active document to workspace state (replaces sessionStorage approach)
+    get().saveWorkspaceLayout()
 
     if (docId && !get().documents[docId]?.content) {
       await get().loadDocumentContent(docId)
@@ -2447,12 +2654,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       // Update state
       const newDocs = { ...get().documents }
       delete newDocs[docId]
-      
-      set({ 
+
+      set({
         currentProject: updatedProject,
         documents: newDocs,
         activeDocumentId: activeDocumentId === docId ? null : activeDocumentId
       })
+
+      // Clean up document view state from workspace
+      window.api.workspace?.removeDocumentView(currentProject.path, docId)
     } catch (error) {
       console.error('Failed to delete document:', error)
     }
@@ -3024,16 +3234,155 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
+  // Folder expand/collapse (Project Explorer)
+  toggleFolder: (folderId) => {
+    set(state => {
+      const next = new Set(state.expandedFolders)
+      if (next.has(folderId)) next.delete(folderId)
+      else next.add(folderId)
+      return { expandedFolders: next }
+    })
+    get().saveWorkspaceLayout()
+  },
+
+  setExpandedFolders: (folders) => {
+    set({ expandedFolders: folders })
+  },
+
+  // Workspace state persistence
+  initializeWorkspaceState: async () => {
+    const { currentProject } = get()
+    if (!currentProject?.path) return
+
+    try {
+      const workspaceState = await window.api.workspace?.load(currentProject.path)
+
+      if (!workspaceState) {
+        // First time opening this project — migrate global panel widths as initial values
+        try {
+          const globalWidths = await window.api.panelWidths?.get()
+          if (globalWidths) {
+            set(state => ({
+              ui: {
+                ...state.ui,
+                ...(globalWidths.leftSidebarWidth && { leftSidebarWidth: globalWidths.leftSidebarWidth }),
+                ...(globalWidths.rightSidebarWidth && { rightSidebarWidth: globalWidths.rightSidebarWidth }),
+                ...(globalWidths.bottomPanelHeight && { bottomPanelHeight: globalWidths.bottomPanelHeight }),
+                ...(globalWidths.storyboardPanelWidth && { storyboardPanelWidth: globalWidths.storyboardPanelWidth }),
+                ...(globalWidths.thoughtPartnerPanelWidth && { thoughtPartnerPanelWidth: globalWidths.thoughtPartnerPanelWidth }),
+              }
+            }))
+          }
+
+          const globalZoom = await window.api.zoom?.get()
+          if (globalZoom && globalZoom >= 50 && globalZoom <= 200) {
+            set(state => ({ ui: { ...state.ui, viewZoom: globalZoom } }))
+          }
+        } catch (err) {
+          console.error('[ProjectStore] Migration of global widths failed:', err)
+        }
+
+        // Default: expand all parent documents (matching current ProjectExplorer behavior)
+        const parentIds = new Set<string>()
+        for (const doc of currentProject.documents) {
+          if (doc.parentId) parentIds.add(doc.parentId)
+        }
+        set({ expandedFolders: parentIds })
+        return
+      }
+
+      const { layout } = workspaceState
+
+      // Rehydrate UI layout state
+      set(state => ({
+        ui: {
+          ...state.ui,
+          leftSidebarOpen: layout.leftSidebarOpen,
+          rightSidebarOpen: layout.rightSidebarOpen,
+          bottomPanelOpen: layout.bottomPanelOpen,
+          leftSidebarWidth: layout.leftSidebarWidth,
+          rightSidebarWidth: layout.rightSidebarWidth,
+          bottomPanelHeight: layout.bottomPanelHeight,
+          storyboardPanelWidth: layout.storyboardPanelWidth,
+          writingPartnerPanelOpen: layout.writingPartnerPanelOpen,
+          settingsPanelOpen: layout.settingsPanelOpen,
+          thoughtPartnerPanelOpen: layout.thoughtPartnerPanelOpen,
+          thoughtPartnerPanelWidth: layout.thoughtPartnerPanelWidth,
+          thoughtPartnerTextSize: layout.thoughtPartnerTextSize,
+          readerMode: layout.readerMode,
+          drawingMode: layout.drawingMode,
+          infiniteCanvas: layout.infiniteCanvas,
+          viewZoom: layout.viewZoom,
+        },
+        expandedFolders: new Set(layout.expandedFolders),
+      }))
+
+      // Restore active document
+      if (layout.activeDocumentId) {
+        const docExists = currentProject.documents.some(
+          d => d.id === layout.activeDocumentId
+        )
+        if (docExists) {
+          await get().setActiveDocument(layout.activeDocumentId)
+        }
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Failed to load workspace state:', err)
+    }
+  },
+
+  saveWorkspaceLayout: () => {
+    if (_workspaceLayoutSaveTimer) clearTimeout(_workspaceLayoutSaveTimer)
+    _workspaceLayoutSaveTimer = setTimeout(() => {
+      const { currentProject, ui, activeDocumentId, expandedFolders } = get()
+      if (!currentProject?.path) return
+
+      const layout: WorkspaceLayoutState = {
+        activeDocumentId,
+        leftSidebarOpen: ui.leftSidebarOpen,
+        rightSidebarOpen: ui.rightSidebarOpen,
+        bottomPanelOpen: ui.bottomPanelOpen,
+        leftSidebarWidth: ui.leftSidebarWidth,
+        rightSidebarWidth: ui.rightSidebarWidth,
+        bottomPanelHeight: ui.bottomPanelHeight,
+        storyboardPanelWidth: ui.storyboardPanelWidth,
+        writingPartnerPanelOpen: ui.writingPartnerPanelOpen,
+        settingsPanelOpen: ui.settingsPanelOpen,
+        thoughtPartnerPanelOpen: ui.thoughtPartnerPanelOpen,
+        thoughtPartnerPanelWidth: ui.thoughtPartnerPanelWidth,
+        thoughtPartnerTextSize: ui.thoughtPartnerTextSize,
+        readerMode: ui.readerMode,
+        drawingMode: ui.drawingMode,
+        infiniteCanvas: ui.infiniteCanvas,
+        viewZoom: ui.viewZoom,
+        expandedFolders: Array.from(expandedFolders),
+      }
+
+      window.api.workspace?.saveLayout(currentProject.path, layout)
+    }, 300)
+  },
+
+  saveDocumentViewState: (docId, viewState) => {
+    if (_docViewSaveTimer) clearTimeout(_docViewSaveTimer)
+    _docViewSaveTimer = setTimeout(() => {
+      const { currentProject } = get()
+      if (!currentProject?.path) return
+      window.api.workspace?.saveDocumentView(currentProject.path, docId, viewState)
+    }, 500)
+  },
+
   toggleDrawingMode: () => {
     set(state => ({
       ui: { ...state.ui, drawingMode: !state.ui.drawingMode }
     }))
+    get().saveWorkspaceLayout()
   },
 
   setDrawingMode: (mode) => {
     set(state => ({
       ui: { ...state.ui, drawingMode: mode }
     }))
+    get().saveWorkspaceLayout()
   },
 
   // Toggle left sidebar
@@ -3041,6 +3390,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, leftSidebarOpen: !state.ui.leftSidebarOpen }
     }))
+    get().saveWorkspaceLayout()
   },
 
   // Toggle right sidebar
@@ -3048,6 +3398,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, rightSidebarOpen: !state.ui.rightSidebarOpen }
     }))
+    get().saveWorkspaceLayout()
   },
 
   // Toggle bottom panel (Problems)
@@ -3055,6 +3406,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, bottomPanelOpen: !state.ui.bottomPanelOpen }
     }))
+    get().saveWorkspaceLayout()
   },
 
   // Set bottom panel height
@@ -3062,7 +3414,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, bottomPanelHeight: height }
     }))
-    window.api.panelWidths?.set({ bottomPanelHeight: height })
+    get().saveWorkspaceLayout()
   },
 
   // Set left sidebar width
@@ -3070,7 +3422,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, leftSidebarWidth: width }
     }))
-    window.api.panelWidths?.set({ leftSidebarWidth: width })
+    get().saveWorkspaceLayout()
   },
 
   // Set right sidebar width
@@ -3078,7 +3430,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, rightSidebarWidth: width }
     }))
-    window.api.panelWidths?.set({ rightSidebarWidth: width })
+    get().saveWorkspaceLayout()
   },
 
   // Set storyboard panel width
@@ -3086,7 +3438,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, storyboardPanelWidth: width }
     }))
-    window.api.panelWidths?.set({ storyboardPanelWidth: width })
+    get().saveWorkspaceLayout()
   },
 
   // Set active modal
@@ -3103,7 +3455,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, viewZoom: clampedZoom }
     }))
-    window.api.zoom?.set(clampedZoom)
+    get().saveWorkspaceLayout()
   },
 
   zoomIn: () => {
@@ -3115,7 +3467,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, viewZoom: newZoom }
     }))
-    window.api.zoom?.set(newZoom)
+    get().saveWorkspaceLayout()
   },
 
   zoomOut: () => {
@@ -3127,14 +3479,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, viewZoom: newZoom }
     }))
-    window.api.zoom?.set(newZoom)
+    get().saveWorkspaceLayout()
   },
 
   resetZoom: () => {
     set(state => ({
       ui: { ...state.ui, viewZoom: 100 }
     }))
-    window.api.zoom?.set(100)
+    get().saveWorkspaceLayout()
   },
 
   initializeZoom: async () => {
@@ -3174,12 +3526,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, readerMode: !state.ui.readerMode }
     }))
+    get().saveWorkspaceLayout()
   },
 
   setReaderMode: (mode) => {
     set(state => ({
       ui: { ...state.ui, readerMode: mode }
     }))
+    get().saveWorkspaceLayout()
   },
 
   // Infinite canvas actions
@@ -3187,12 +3541,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, infiniteCanvas: !state.ui.infiniteCanvas }
     }))
+    get().saveWorkspaceLayout()
   },
 
   setInfiniteCanvas: (mode) => {
     set(state => ({
       ui: { ...state.ui, infiniteCanvas: mode }
     }))
+    get().saveWorkspaceLayout()
   },
 
   // Settings panel actions
@@ -3200,12 +3556,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, settingsPanelOpen: !state.ui.settingsPanelOpen }
     }))
+    get().saveWorkspaceLayout()
   },
 
   setSettingsPanelOpen: (open) => {
     set(state => ({
       ui: { ...state.ui, settingsPanelOpen: open }
     }))
+    get().saveWorkspaceLayout()
   },
 
   // Theme actions
@@ -6540,6 +6898,2147 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(state => ({
       ui: { ...state.ui, writingPartnerPanelOpen: !state.ui.writingPartnerPanelOpen }
     }))
+  },
+
+  // Thought Partner actions
+  toggleThoughtPartnerPanel: () => {
+    const wasOpen = get().ui.thoughtPartnerPanelOpen
+    set(state => ({
+      ui: { ...state.ui, thoughtPartnerPanelOpen: !state.ui.thoughtPartnerPanelOpen }
+    }))
+    if (!wasOpen) {
+      get().loadThoughtPartnerConversationIndex()
+    }
+    get().saveWorkspaceLayout()
+  },
+
+  setThoughtPartnerPanelWidth: (width: number) => {
+    set(state => ({
+      ui: { ...state.ui, thoughtPartnerPanelWidth: width }
+    }))
+    get().saveWorkspaceLayout()
+  },
+
+  setThoughtPartnerTextSize: (size: number) => {
+    const clamped = Math.min(Math.max(size, 12), 20)
+    set(state => ({
+      ui: { ...state.ui, thoughtPartnerTextSize: clamped }
+    }))
+    get().saveWorkspaceLayout()
+  },
+
+  appendThoughtPartnerStreamChunk: (chunk: string) => {
+    set(state => ({
+      thoughtPartner: {
+        ...state.thoughtPartner,
+        streamingContent: state.thoughtPartner.streamingContent + chunk
+      }
+    }))
+  },
+
+  finalizeThoughtPartnerStream: (message: string, updatedContextDocument?: any, actions?: any[], questions?: any[]) => {
+    const state = get()
+    const convId = state.thoughtPartner.activeConversationId
+    const newMessage = {
+      id: `msg-${Date.now()}-assistant`,
+      role: 'assistant' as const,
+      content: message,
+      timestamp: new Date().toISOString(),
+      ...(actions && actions.length > 0 ? { actions } : {}),
+      ...(questions && questions.length > 0 ? { questions } : {})
+    }
+    const updatedMessages = [...state.thoughtPartner.messages, newMessage]
+    const contextDoc = updatedContextDocument || state.thoughtPartner.contextDocument
+
+    // Auto-title: if this is the first exchange (1 user + 1 assistant = 2 messages total)
+    let updatedIndex = state.thoughtPartner.conversationIndex
+    if (updatedMessages.length === 2 && convId) {
+      const firstUserMsg = updatedMessages.find(m => m.role === 'user')
+      if (firstUserMsg) {
+        const autoTitle = firstUserMsg.content.slice(0, 50).replace(/\n/g, ' ').trim() + (firstUserMsg.content.length > 50 ? '...' : '')
+        updatedIndex = updatedIndex.map(c =>
+          c.id === convId ? { ...c, title: autoTitle, updatedAt: new Date().toISOString(), messageCount: updatedMessages.length } : c
+        )
+      }
+    } else if (convId) {
+      updatedIndex = updatedIndex.map(c =>
+        c.id === convId ? { ...c, updatedAt: new Date().toISOString(), messageCount: updatedMessages.length } : c
+      )
+    }
+
+    set({
+      thoughtPartner: {
+        ...state.thoughtPartner,
+        messages: updatedMessages,
+        contextDocument: contextDoc,
+        conversationIndex: updatedIndex,
+        isStreaming: false,
+        streamingContent: '',
+        pendingActions: [
+          ...state.thoughtPartner.pendingActions,
+          ...(actions || [])
+        ],
+        activeQuestion: questions && questions.length > 0 ? questions[0] : null
+      }
+    })
+
+    // Reset pipeline state to idle if no pending pipeline actions
+    const hasActivePipelineActions = (state.thoughtPartner.currentPipelineActions || []).some(
+      (a: any) => a.status === 'pending'
+    )
+    if (!hasActivePipelineActions) {
+      set(prev => ({
+        thoughtPartner: { ...prev.thoughtPartner, pipelineState: 'idle' }
+      }))
+    }
+
+    // Auto-save conversation
+    if (state.currentProject?.path && convId) {
+      window.api.thoughtPartner?.saveConversation(state.currentProject.path, convId, {
+        messages: updatedMessages,
+        contextDocument: contextDoc,
+        lastUpdated: new Date().toISOString()
+      })
+      // Also save updated index (for title/messageCount updates)
+      window.api.thoughtPartner?.saveConversationIndex(state.currentProject.path, {
+        activeConversationId: convId,
+        conversations: updatedIndex
+      })
+    }
+  },
+
+  stopThoughtPartnerStreaming: () => {
+    window.api.thoughtPartner?.stopStreaming()
+    set(state => ({
+      thoughtPartner: {
+        ...state.thoughtPartner,
+        isStreaming: false,
+        streamingContent: ''
+      }
+    }))
+  },
+
+  sendThoughtPartnerMessage: async (text: string) => {
+    const state = get()
+    if (!state.currentProject || state.thoughtPartner.isStreaming) return
+
+    // Pipeline state lock: block new sends while pipeline is in a non-idle active state
+    const lockedStates = ['orchestrating', 'reflecting', 'planning', 'context_gathering', 'reading', 'patching', 'verifying', 'repairing', 'applying']
+    if (lockedStates.includes(state.thoughtPartner.pipelineState)) return
+
+    // If no active conversation, create one first
+    if (!state.thoughtPartner.activeConversationId) {
+      await get().createThoughtPartnerConversation()
+    }
+
+    const userMessage = {
+      id: `msg-${Date.now()}-user`,
+      role: 'user' as const,
+      content: text,
+      timestamp: new Date().toISOString()
+    }
+    const messagesWithUser = [...get().thoughtPartner.messages, userMessage]
+
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        messages: messagesWithUser,
+        isStreaming: true,
+        streamingContent: '',
+        suggestions: []
+      }
+    }))
+
+    // Build conscious context from active document
+    let consciousContext: { title: string; content: string } | null = null
+    if (state.activeDocumentId) {
+      const activeDoc = state.currentProject.documents.find(d => d.id === state.activeDocumentId)
+      const docState = state.documents[state.activeDocumentId]
+      if (activeDoc && docState?.content) {
+        consciousContext = {
+          title: activeDoc.title,
+          content: contentToPlainText(docState.content)
+        }
+      }
+    }
+
+    // Build subconscious context from full project
+    const subconsciousContext = {
+      projectName: state.currentProject.name,
+      templateType: state.currentProject.templateId,
+      documents: state.currentProject.documents
+        .filter(d => d.type === 'document')
+        .map(d => {
+          const ds = state.documents[d.id]
+          return {
+            title: d.title,
+            content: ds?.content ? contentToPlainText(ds.content) : '',
+            isActive: d.id === state.activeDocumentId
+          }
+        }),
+      characters: state.currentProject.characters?.map(c => {
+        const noteDoc = c.noteDocumentId ? state.documents[c.noteDocumentId] : null
+        return { name: c.name, notes: noteDoc?.content ? contentToPlainText(noteDoc.content) : undefined }
+      }),
+      props: state.currentProject.props?.map(p => {
+        const noteDoc = p.noteDocumentId ? state.documents[p.noteDocumentId] : null
+        return { name: p.name, notes: noteDoc?.content ? contentToPlainText(noteDoc.content) : undefined }
+      }),
+      settings: {
+        synopsis: (() => {
+          const synopsisDoc = state.currentProject!.documents.find(d => d.title?.toLowerCase().includes('synopsis'))
+          if (!synopsisDoc) return undefined
+          const ds = state.documents[synopsisDoc.id]
+          return ds?.content ? contentToPlainText(ds.content) : undefined
+        })()
+      }
+    }
+
+    try {
+      const currentState = get()
+
+      // Gather blocks from ALL project documents for the context gather phase
+      let allDocumentBlockContext: import('../../shared/contextGatherTypes').MultiDocumentBlockContext | null = null
+      if (currentState.thoughtPartner.usePipeline && currentState.currentProject) {
+        const docs: import('../../shared/contextGatherTypes').MultiDocumentBlockContext['documents'] = []
+        for (const doc of currentState.currentProject.documents.filter(d => d.type === 'document')) {
+          const docState = currentState.documents[doc.id]
+          if (!docState?.content?.content) continue
+          const blocks: import('../../shared/contextGatherTypes').DocumentBlock[] = []
+          for (const node of docState.content.content) {
+            const blockId = (node.attrs as any)?.blockId as string
+            if (!blockId) continue
+            let text = ''
+            const extractText = (n: any): void => {
+              if (n.type === 'text' && n.text) { text += n.text; return }
+              if (n.content) n.content.forEach(extractText)
+            }
+            extractText(node)
+            if (!text.trim()) continue
+            // djb2 hash
+            let hash = 5381
+            for (let i = 0; i < text.length; i++) {
+              hash = ((hash << 5) + hash) + text.charCodeAt(i)
+              hash = hash & hash
+            }
+            blocks.push({
+              blockId,
+              type: node.type || 'paragraph',
+              text,
+              textHash: (hash >>> 0).toString(16),
+            })
+          }
+          if (blocks.length > 0) {
+            docs.push({ documentId: doc.id, documentTitle: doc.title, blocks })
+          }
+        }
+        if (docs.length > 0) {
+          allDocumentBlockContext = { documents: docs }
+        }
+      }
+
+      const response = await (window.api as any).thoughtPartner?.sendMessage({
+        message: text,
+        conversationHistory: currentState.thoughtPartner.messages.filter(m => m.role !== 'system'),
+        consciousContext,
+        subconsciousContext,
+        contextDocument: currentState.thoughtPartner.contextDocument,
+        agentMode: currentState.thoughtPartner.agentMode,
+        selectionContext: currentState.thoughtPartner.selectionContext,
+        // Pipeline fields
+        usePipeline: currentState.thoughtPartner.usePipeline,
+        documentBlockContext: currentState.thoughtPartner.documentBlockContext,
+        structuredMemory: currentState.thoughtPartner.structuredMemory,
+        allDocumentBlockContext,
+        // Intent classification context
+        currentPipelineActions: currentState.thoughtPartner.currentPipelineActions,
+        consecutiveChatTurns: currentState.thoughtPartner.consecutiveChatTurns,
+        // Behavior policy vector
+        behaviorVector: currentState.thoughtPartner.currentBehaviorVector || undefined,
+      })
+
+      if (!response) {
+        get().finalizeThoughtPartnerStream('Thought Partner API is not available. Please restart the app.', undefined)
+        return
+      }
+
+      if (response.error) {
+        get().finalizeThoughtPartnerStream(response.error, undefined)
+      } else if (response.message !== undefined) {
+        const actions = (response as any).actions as any[] | undefined
+        const questions = (response as any).questions as any[] | undefined
+        const pipelineActions = (response as any).pipelineActions as any[] | undefined
+        const updatedStructuredMemory = (response as any).updatedStructuredMemory
+
+        // Capture current auto-accept state BEFORE we auto-enable agent mode
+        const { agentMode: wasAgentMode, autoAcceptEdits } = get().thoughtPartner
+
+        get().finalizeThoughtPartnerStream(response.message, response.updatedContextDocument, actions, questions)
+
+        // Handle pipeline-specific response data
+        if (pipelineActions && pipelineActions.length > 0) {
+          set(prev => ({
+            thoughtPartner: {
+              ...prev.thoughtPartner,
+              currentPipelineActions: pipelineActions,
+              pipelineState: 'awaiting_approval',
+            }
+          }))
+        }
+
+        if (updatedStructuredMemory) {
+          set(prev => ({
+            thoughtPartner: {
+              ...prev.thoughtPartner,
+              structuredMemory: updatedStructuredMemory,
+            }
+          }))
+        }
+
+        // Always auto-send content actions (insert/replace) to the editor as AIPreview.
+        // Non-content actions (create-character, create-prop) still require agent mode or explicit accept.
+        if (actions && actions.length > 0) {
+          for (const action of actions) {
+            const isContentAction = action.type === 'insert-content' || action.type === 'replace-content'
+            if (isContentAction || wasAgentMode || autoAcceptEdits) {
+              await get().acceptThoughtPartnerAction(action.id)
+            }
+          }
+        }
+
+        // Always auto-send pipeline edit actions to the editor.
+        // Plan actions are NEVER auto-accepted — they require explicit user approval.
+        // Non-edit pipeline actions still require agent mode or explicit accept.
+        if (pipelineActions && pipelineActions.length > 0) {
+          for (const pa of pipelineActions) {
+            if (pa.type === 'plan') continue // Plans require explicit approval
+            if (pa.type === 'reflection') continue // Reflections require explicit confirmation
+            if (pa.type === 'idea') continue // Ideas require explicit interaction
+            if (autoAcceptEdits) {
+              await get().acceptPipelineAction(pa.id)
+            }
+          }
+        }
+
+        // Capture behavior policy response metadata for the feedback loop
+        const expressedDimensions = (response as any).expressedDimensions
+        const behaviorVectorUsed = (response as any).behaviorVectorUsed
+        if (expressedDimensions || behaviorVectorUsed) {
+          set(prev => ({
+            thoughtPartner: {
+              ...prev.thoughtPartner,
+              lastResponseMeta: { expressedDimensions, behaviorVectorUsed },
+            }
+          }))
+        }
+
+        // Update consecutive chat turns streak counter
+        const hadEditActions = pipelineActions?.some((pa: any) => pa.type === 'edit')
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            consecutiveChatTurns: hadEditActions ? 0 : prev.thoughtPartner.consecutiveChatTurns + 1,
+          }
+        }))
+      }
+    } catch (err: any) {
+      get().finalizeThoughtPartnerStream(
+        `Error: ${err.message || 'Failed to get response'}`,
+        undefined
+      )
+    }
+  },
+
+  editThoughtPartnerMessage: async (messageId: string, newText: string) => {
+    const state = get()
+    if (!state.currentProject || state.thoughtPartner.isStreaming) return
+
+    // Find the message index
+    const msgIndex = state.thoughtPartner.messages.findIndex(m => m.id === messageId)
+    if (msgIndex === -1) return
+
+    // Truncate: keep only messages BEFORE the edited message
+    const truncatedMessages = state.thoughtPartner.messages.slice(0, msgIndex)
+
+    // Clear stale state from truncated messages and set truncated history
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        messages: truncatedMessages,
+        pendingActions: [],
+        pendingEditorInsertion: null,
+        activeQuestion: null,
+        currentPipelineActions: [],
+        pipelineState: 'idle',
+      }
+    }))
+
+    // Auto-save the truncated conversation
+    const convId = state.thoughtPartner.activeConversationId
+    if (convId && state.currentProject?.path) {
+      window.api.thoughtPartner?.saveConversation(state.currentProject.path, convId, {
+        messages: truncatedMessages,
+        contextDocument: state.thoughtPartner.contextDocument,
+        lastUpdated: new Date().toISOString(),
+      })
+    }
+
+    // Send the edited message — this appends the new user message + gets AI response
+    await get().sendThoughtPartnerMessage(newText)
+  },
+
+  regenerateThoughtPartnerResponse: async () => {
+    const state = get()
+    if (!state.currentProject || state.thoughtPartner.isStreaming) return
+    if (state.thoughtPartner.messages.length === 0) return
+
+    // Find the last user message
+    let lastUserMsg: typeof state.thoughtPartner.messages[0] | null = null
+    for (let i = state.thoughtPartner.messages.length - 1; i >= 0; i--) {
+      if (state.thoughtPartner.messages[i].role === 'user') {
+        lastUserMsg = state.thoughtPartner.messages[i]
+        break
+      }
+    }
+    if (!lastUserMsg) return
+
+    // Resend by editing the last user message with the same content
+    await get().editThoughtPartnerMessage(lastUserMsg.id, lastUserMsg.content)
+  },
+
+  loadThoughtPartnerConversationIndex: async () => {
+    const state = get()
+    if (!state.currentProject?.path) return
+
+    try {
+      const index = await window.api.thoughtPartner?.loadConversationIndex(state.currentProject.path)
+      if (!index) return
+
+      set(prev => ({
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          conversationIndex: index.conversations,
+          activeConversationId: index.activeConversationId
+        }
+      }))
+
+      // Load the active conversation, or create one if none exist
+      if (index.activeConversationId) {
+        get().loadThoughtPartnerConversation()
+      } else if (index.conversations.length === 0) {
+        await get().createThoughtPartnerConversation()
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Failed to load thought partner index:', err)
+    }
+  },
+
+  loadThoughtPartnerConversation: async () => {
+    const state = get()
+    const convId = state.thoughtPartner.activeConversationId
+    if (!state.currentProject?.path || !convId) return
+
+    try {
+      const saved = await window.api.thoughtPartner?.loadConversation(state.currentProject.path, convId)
+      if (saved) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            messages: saved.messages,
+            contextDocument: saved.contextDocument
+          }
+        }))
+      }
+
+      // Generate suggestions if no messages yet
+      if (!saved || saved.messages.length === 0) {
+        get().generateThoughtPartnerSuggestions()
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Failed to load thought partner conversation:', err)
+    }
+  },
+
+  switchThoughtPartnerConversation: async (conversationId: string) => {
+    const state = get()
+    if (!state.currentProject?.path) return
+    if (conversationId === state.thoughtPartner.activeConversationId) return
+
+    // Stop streaming if active
+    if (state.thoughtPartner.isStreaming) {
+      get().stopThoughtPartnerStreaming()
+    }
+
+    // Update active ID in state and on disk
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        activeConversationId: conversationId,
+        messages: [],
+        contextDocument: { decisions: [], openQuestions: [], ideas: [], risks: [], considerations: [], lastUpdated: new Date().toISOString() },
+        suggestions: [],
+        isStreaming: false,
+        streamingContent: '',
+        isConversationListOpen: false
+      }
+    }))
+
+    // Save updated index
+    const updatedState = get()
+    window.api.thoughtPartner?.saveConversationIndex(state.currentProject.path, {
+      activeConversationId: conversationId,
+      conversations: updatedState.thoughtPartner.conversationIndex
+    })
+
+    // Load the conversation data
+    get().loadThoughtPartnerConversation()
+  },
+
+  createThoughtPartnerConversation: async () => {
+    const state = get()
+    if (!state.currentProject?.path) return
+
+    // Stop streaming if active
+    if (state.thoughtPartner.isStreaming) {
+      get().stopThoughtPartnerStreaming()
+    }
+
+    try {
+      const meta = await window.api.thoughtPartner?.createConversation(state.currentProject.path)
+      if (!meta) return
+
+      set(prev => ({
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          conversationIndex: [meta, ...prev.thoughtPartner.conversationIndex],
+          activeConversationId: meta.id,
+          messages: [],
+          contextDocument: { decisions: [], openQuestions: [], ideas: [], risks: [], considerations: [], lastUpdated: new Date().toISOString() },
+          suggestions: [],
+          isStreaming: false,
+          streamingContent: '',
+          isConversationListOpen: false,
+          consecutiveChatTurns: 0,
+        }
+      }))
+
+      // Generate suggestions for the new conversation
+      get().generateThoughtPartnerSuggestions()
+    } catch (err) {
+      console.error('[ProjectStore] Failed to create thought partner conversation:', err)
+    }
+  },
+
+  deleteThoughtPartnerConversation: async (conversationId: string) => {
+    const state = get()
+    if (!state.currentProject?.path) return
+
+    // Stop streaming if deleting the active conversation
+    if (conversationId === state.thoughtPartner.activeConversationId && state.thoughtPartner.isStreaming) {
+      get().stopThoughtPartnerStreaming()
+    }
+
+    try {
+      const updatedIndex = await window.api.thoughtPartner?.deleteConversation(state.currentProject.path, conversationId)
+      if (!updatedIndex) return
+
+      const wasActive = conversationId === state.thoughtPartner.activeConversationId
+
+      set(prev => ({
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          conversationIndex: updatedIndex.conversations,
+          activeConversationId: wasActive ? updatedIndex.activeConversationId : prev.thoughtPartner.activeConversationId,
+          ...(wasActive ? {
+            messages: [],
+            contextDocument: { decisions: [], openQuestions: [], ideas: [], risks: [], considerations: [], lastUpdated: new Date().toISOString() },
+            suggestions: [],
+            isStreaming: false,
+            streamingContent: ''
+          } : {})
+        }
+      }))
+
+      // If we deleted the active one, load the new active or create a new one
+      if (wasActive) {
+        if (updatedIndex.activeConversationId) {
+          get().loadThoughtPartnerConversation()
+        } else {
+          await get().createThoughtPartnerConversation()
+        }
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Failed to delete thought partner conversation:', err)
+    }
+  },
+
+  clearThoughtPartnerConversation: async () => {
+    const state = get()
+    const convId = state.thoughtPartner.activeConversationId
+    if (!state.currentProject?.path || !convId) return
+
+    // Delete the current conversation and create a fresh one
+    await get().deleteThoughtPartnerConversation(convId)
+  },
+
+  toggleThoughtPartnerConversationList: () => {
+    set(state => ({
+      thoughtPartner: {
+        ...state.thoughtPartner,
+        isConversationListOpen: !state.thoughtPartner.isConversationListOpen
+      }
+    }))
+  },
+
+  generateThoughtPartnerSuggestions: async () => {
+    const state = get()
+    if (!state.currentProject) return
+
+    // Build context for hashing
+    const subconsciousContext = {
+      projectName: state.currentProject.name,
+      templateType: state.currentProject.templateId,
+      documents: state.currentProject.documents
+        .filter(d => d.type === 'document')
+        .map(d => {
+          const ds = state.documents[d.id]
+          return {
+            title: d.title,
+            content: ds?.content ? contentToPlainText(ds.content) : '',
+            isActive: d.id === state.activeDocumentId
+          }
+        }),
+      characters: state.currentProject.characters?.map(c => ({ name: c.name })),
+      props: state.currentProject.props?.map(p => ({ name: p.name }))
+    }
+
+    // Compute a simple content hash to detect changes
+    const hashSource = JSON.stringify({
+      name: subconsciousContext.projectName,
+      template: subconsciousContext.templateType,
+      docs: subconsciousContext.documents.map(d => d.title + ':' + d.content.slice(0, 500)),
+      chars: subconsciousContext.characters?.map(c => c.name),
+      props: subconsciousContext.props?.map(p => p.name)
+    })
+    let contentHash = 0
+    for (let i = 0; i < hashSource.length; i++) {
+      contentHash = ((contentHash << 5) - contentHash + hashSource.charCodeAt(i)) | 0
+    }
+    const hashStr = contentHash.toString(36)
+
+    // Check in-memory cache first
+    if (hashStr === state.thoughtPartner._suggestionsContentHash && state.thoughtPartner.suggestions.length > 0) {
+      return
+    }
+
+    set(prev => ({
+      thoughtPartner: { ...prev.thoughtPartner, isLoadingSuggestions: true }
+    }))
+
+    try {
+      // Check disk cache before making API call
+      const projectPath = state.currentProject.path
+      if (projectPath) {
+        const diskCache = await (window.api as any).thoughtPartner?.loadSuggestionsCache(projectPath)
+        if (diskCache && diskCache.contentHash === hashStr && diskCache.suggestions.length > 0) {
+          set(prev => ({
+            thoughtPartner: {
+              ...prev.thoughtPartner,
+              suggestions: diskCache.suggestions,
+              isLoadingSuggestions: false,
+              _suggestionsContentHash: hashStr
+            }
+          }))
+          return
+        }
+      }
+
+      // Cache miss — call API
+      const suggestions = await window.api.thoughtPartner?.getSuggestions({ subconsciousContext })
+      const result = suggestions || []
+
+      set(prev => ({
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          suggestions: result,
+          isLoadingSuggestions: false,
+          _suggestionsContentHash: hashStr
+        }
+      }))
+
+      // Persist to disk for next session
+      if (projectPath && result.length > 0) {
+        ;(window.api as any).thoughtPartner?.saveSuggestionsCache(projectPath, {
+          contentHash: hashStr,
+          suggestions: result,
+          cachedAt: new Date().toISOString()
+        })
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Failed to generate suggestions:', err)
+      set(prev => ({
+        thoughtPartner: { ...prev.thoughtPartner, isLoadingSuggestions: false }
+      }))
+    }
+  },
+
+  acceptThoughtPartnerAction: async (actionId: string) => {
+    const state = get()
+    const action = state.thoughtPartner.pendingActions.find((a: any) => a.id === actionId)
+    if (!action) return
+
+    // Mark as executing
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        pendingActions: prev.thoughtPartner.pendingActions.map((a: any) =>
+          a.id === actionId ? { ...a, status: 'executing' } : a
+        )
+      }
+    }))
+
+    try {
+      switch (action.type) {
+        case 'create-character': {
+          const { name, color } = action.content
+          // Dedup check
+          const existing = state.currentProject?.characters?.find(
+            (c: any) => c.name.toLowerCase() === name.toLowerCase()
+          )
+          if (!existing) {
+            await get().addCharacter(name, color)
+          }
+          break
+        }
+        case 'create-prop': {
+          const { name, icon } = action.content
+          // Dedup check
+          const existing = state.currentProject?.props?.find(
+            (p: any) => p.name.toLowerCase() === name.toLowerCase()
+          )
+          if (!existing) {
+            await get().addProp(name, icon)
+          }
+          break
+        }
+        case 'insert-content': {
+          // Set pending editor insertion — the editor component picks this up
+          set(prev => ({
+            thoughtPartner: {
+              ...prev.thoughtPartner,
+              pendingEditorInsertion: {
+                actionId,
+                mode: 'insert',
+                screenplayElements: action.content.screenplayElements,
+                text: action.content.text,
+                insertionPoint: action.content.insertionPoint || 'end',
+                afterHeading: action.content.afterHeading
+              }
+            }
+          }))
+          break
+        }
+        case 'replace-content': {
+          // Set pending editor replacement — the editor finds the block(s) and replaces them
+          set(prev => ({
+            thoughtPartner: {
+              ...prev.thoughtPartner,
+              pendingEditorInsertion: {
+                actionId,
+                mode: 'replace',
+                screenplayElements: action.content.screenplayElements,
+                text: action.content.text,
+                insertionPoint: 'after-heading',
+                targetHeading: action.content.targetHeading,
+                targetText: action.content.targetText
+              }
+            }
+          }))
+          break
+        }
+      }
+
+      // Mark as completed (for insert-content, this means "dispatched to editor")
+      // and update the action on the message too
+      const finalStatus = (action.type === 'insert-content' || action.type === 'replace-content') ? 'accepted' : 'completed'
+      set(prev => ({
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          pendingActions: prev.thoughtPartner.pendingActions.map((a: any) =>
+            a.id === actionId ? { ...a, status: finalStatus } : a
+          ),
+          messages: prev.thoughtPartner.messages.map((m: any) => {
+            if (!m.actions) return m
+            return {
+              ...m,
+              actions: m.actions.map((a: any) =>
+                a.id === actionId ? { ...a, status: finalStatus } : a
+              )
+            }
+          })
+        }
+      }))
+
+      // Auto-save so the accepted/completed status persists across refreshes
+      const convId = state.thoughtPartner.activeConversationId
+      if (state.currentProject?.path && convId) {
+        const updatedState = get()
+        window.api.thoughtPartner?.saveConversation(state.currentProject.path, convId, {
+          messages: updatedState.thoughtPartner.messages,
+          contextDocument: updatedState.thoughtPartner.contextDocument,
+          lastUpdated: new Date().toISOString()
+        })
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Failed to execute thought partner action:', err)
+      set(prev => ({
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          pendingActions: prev.thoughtPartner.pendingActions.map((a: any) =>
+            a.id === actionId ? { ...a, status: 'failed' } : a
+          ),
+          messages: prev.thoughtPartner.messages.map((m: any) => {
+            if (!m.actions) return m
+            return {
+              ...m,
+              actions: m.actions.map((a: any) =>
+                a.id === actionId ? { ...a, status: 'failed' } : a
+              )
+            }
+          })
+        }
+      }))
+
+      // Also persist failed status so it doesn't revert to pending on refresh
+      const convId = state.thoughtPartner.activeConversationId
+      if (state.currentProject?.path && convId) {
+        const updatedState = get()
+        window.api.thoughtPartner?.saveConversation(state.currentProject.path, convId, {
+          messages: updatedState.thoughtPartner.messages,
+          contextDocument: updatedState.thoughtPartner.contextDocument,
+          lastUpdated: new Date().toISOString()
+        })
+      }
+    }
+  },
+
+  rejectThoughtPartnerAction: (actionId: string) => {
+    const state = get()
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        pendingActions: prev.thoughtPartner.pendingActions.map((a: any) =>
+          a.id === actionId ? { ...a, status: 'rejected' } : a
+        ),
+        messages: prev.thoughtPartner.messages.map((m: any) => {
+          if (!m.actions) return m
+          return {
+            ...m,
+            actions: m.actions.map((a: any) =>
+              a.id === actionId ? { ...a, status: 'rejected' } : a
+            )
+          }
+        })
+      }
+    }))
+
+    // Auto-save so the rejected status persists across refreshes
+    const convId = state.thoughtPartner.activeConversationId
+    if (state.currentProject?.path && convId) {
+      const updatedState = get()
+      window.api.thoughtPartner?.saveConversation(state.currentProject.path, convId, {
+        messages: updatedState.thoughtPartner.messages,
+        contextDocument: updatedState.thoughtPartner.contextDocument,
+        lastUpdated: new Date().toISOString()
+      })
+    }
+  },
+
+  clearThoughtPartnerEditorInsertion: () => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        pendingEditorInsertion: null
+      }
+    }))
+  },
+
+  toggleThoughtPartnerAgentMode: () => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        agentMode: !prev.thoughtPartner.agentMode
+      }
+    }))
+  },
+
+  toggleThoughtPartnerAutoAccept: () => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        autoAcceptEdits: !prev.thoughtPartner.autoAcceptEdits
+      }
+    }))
+  },
+
+  answerThoughtPartnerQuestion: async (questionId: string, optionId?: string, customText?: string) => {
+    const state = get()
+    // Find the question on the active question or in messages
+    const activeQ = state.thoughtPartner.activeQuestion
+    if (!activeQ || activeQ.id !== questionId || activeQ.status !== 'active') return
+
+    // Determine the answer text
+    const answerText = optionId
+      ? activeQ.options.find((o: any) => o.id === optionId)?.label || customText || ''
+      : customText || ''
+
+    // Mark the question as answered on the message that contains it, and clear activeQuestion
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        activeQuestion: null,
+        messages: prev.thoughtPartner.messages.map((m: any) => {
+          if (!m.questions) return m
+          return {
+            ...m,
+            questions: m.questions.map((q: any) =>
+              q.id === questionId
+                ? { ...q, status: 'answered', selectedOptionId: optionId || undefined, customAnswer: customText || undefined }
+                : q
+            )
+          }
+        })
+      }
+    }))
+
+    // Auto-save the updated conversation
+    const convId = state.thoughtPartner.activeConversationId
+    if (state.currentProject?.path && convId) {
+      const updatedState = get()
+      window.api.thoughtPartner?.saveConversation(state.currentProject.path, convId, {
+        messages: updatedState.thoughtPartner.messages,
+        contextDocument: updatedState.thoughtPartner.contextDocument,
+        lastUpdated: new Date().toISOString()
+      })
+    }
+
+    // Now continue the conversation — send the answer as a follow-up message
+    // The conversation builder will reconstruct the tool response from the answered question
+    await get().sendThoughtPartnerMessage(answerText)
+  },
+
+  skipThoughtPartnerQuestion: async (questionId: string) => {
+    const state = get()
+    const activeQ = state.thoughtPartner.activeQuestion
+    if (!activeQ || activeQ.id !== questionId) return
+
+    // Mark the question as skipped on the message that contains it
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        activeQuestion: null,
+        messages: prev.thoughtPartner.messages.map((m: any) => {
+          if (!m.questions) return m
+          return {
+            ...m,
+            questions: m.questions.map((q: any) =>
+              q.id === questionId ? { ...q, status: 'skipped' } : q
+            )
+          }
+        })
+      }
+    }))
+
+    // Auto-save
+    const convId = state.thoughtPartner.activeConversationId
+    if (state.currentProject?.path && convId) {
+      const updatedState = get()
+      window.api.thoughtPartner?.saveConversation(state.currentProject.path, convId, {
+        messages: updatedState.thoughtPartner.messages,
+        contextDocument: updatedState.thoughtPartner.contextDocument,
+        lastUpdated: new Date().toISOString()
+      })
+    }
+
+    // Continue conversation with a skip note
+    await get().sendThoughtPartnerMessage("I'd prefer to skip this question and move on.")
+  },
+
+  setThoughtPartnerSelectionContext: (context) => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        selectionContext: context
+      }
+    }))
+  },
+
+  clearThoughtPartnerSelectionContext: () => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        selectionContext: null
+      }
+    }))
+  },
+
+  // Pipeline actions
+  setThoughtPartnerUsePipeline: (enabled: boolean) => {
+    set(prev => ({
+      thoughtPartner: { ...prev.thoughtPartner, usePipeline: enabled }
+    }))
+  },
+
+  updateDocumentBlockContext: (context) => {
+    set(prev => ({
+      thoughtPartner: { ...prev.thoughtPartner, documentBlockContext: context }
+    }))
+  },
+
+  setPipelineState: (state: string) => {
+    set(prev => ({
+      thoughtPartner: { ...prev.thoughtPartner, pipelineState: state }
+    }))
+  },
+
+  acceptPipelineAction: async (actionId: string) => {
+    const state = get()
+    const action = state.thoughtPartner.currentPipelineActions.find(a => a.id === actionId)
+    if (!action) return
+
+    if (action.type === 'create-character' && action.content?.name) {
+      // Same as legacy create-character handling
+      const name = action.content.name
+      if (state.currentProject?.characters?.some(c => c.name.toUpperCase() === name.toUpperCase())) {
+        console.log('[Pipeline] Character already exists:', name)
+      } else {
+        const newChar = { id: `char-${Date.now()}`, name, color: '#808080', noteDocumentId: '' }
+        set(prev => ({
+          currentProject: prev.currentProject ? {
+            ...prev.currentProject,
+            characters: [...(prev.currentProject.characters || []), newChar]
+          } : prev.currentProject
+        }))
+      }
+    } else if (action.type === 'create-prop' && action.content?.name) {
+      const name = action.content.name
+      if (state.currentProject?.props?.some(p => p.name.toUpperCase() === name.toUpperCase())) {
+        console.log('[Pipeline] Prop already exists:', name)
+      } else {
+        const newProp = { id: `prop-${Date.now()}`, name, icon: 'Box24Regular', noteDocumentId: '' }
+        set(prev => ({
+          currentProject: prev.currentProject ? {
+            ...prev.currentProject,
+            props: [...(prev.currentProject.props || []), newProp]
+          } : prev.currentProject
+        }))
+      }
+    } else if (action.type === 'edit' && action.patchList) {
+      // Build pendingEditorInsertion from pipeline patch ops
+      const ops = action.patchList.ops
+      if (ops.length > 0) {
+        const firstOp = ops[0]
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            pendingEditorInsertion: {
+              actionId,
+              mode: firstOp.type === 'delete' ? 'delete' : firstOp.type === 'insert' ? 'insert' : 'replace',
+              text: firstOp.content,
+              screenplayElements: firstOp.screenplayElements,
+              insertionPoint: 'cursor' as const,
+              pipelineOps: ops,
+              anchorBlockId: firstOp.anchor?.blockId,
+              originalText: firstOp.anchor?.textSnapshot,
+              targetText: firstOp.anchor?.textSnapshot,
+              opWhy: firstOp.why,
+            }
+          }
+        }))
+      }
+    }
+
+    // Mark action as accepted and reset chat streak
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.id === actionId ? { ...a, status: 'accepted' as const } : a
+        ),
+        pipelineState: 'applying',
+        consecutiveChatTurns: 0,
+      }
+    }))
+  },
+
+  rejectPipelineAction: (actionId: string) => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.id === actionId ? { ...a, status: 'rejected' as const } : a
+        ),
+        pipelineState: 'completed',
+      }
+    }))
+  },
+
+  approvePlan: async (planId: string) => {
+    const state = get()
+    const planAction = state.thoughtPartner.currentPipelineActions.find(
+      a => a.type === 'plan' && a.structuredPlan?.id === planId
+    )
+    if (!planAction?.structuredPlan || !state.currentProject) return
+
+    // Mark plan as approved
+    const approvedPlan = { ...planAction.structuredPlan, status: 'approved' as const }
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.id === planAction.id ? { ...a, structuredPlan: approvedPlan } : a
+        ),
+        pipelineState: 'context_gathering',
+      }
+    }))
+
+    // Build context for the IPC call (same pattern as sendThoughtPartnerMessage)
+    const currentState = get()
+    const subconsciousContext = {
+      projectName: currentState.currentProject!.name,
+      templateType: currentState.currentProject!.templateId,
+      documents: [],
+      characters: [],
+      props: [],
+      settings: {},
+    }
+
+    // Gather blocks from all project documents
+    let allDocumentBlockContext: import('../../shared/contextGatherTypes').MultiDocumentBlockContext | null = null
+    if (currentState.currentProject) {
+      const docs: import('../../shared/contextGatherTypes').MultiDocumentBlockContext['documents'] = []
+      for (const doc of currentState.currentProject.documents.filter(d => d.type === 'document')) {
+        const docState = currentState.documents[doc.id]
+        if (!docState?.content?.content) continue
+        const blocks: import('../../shared/contextGatherTypes').DocumentBlock[] = []
+        for (const node of docState.content.content) {
+          const blockId = (node.attrs as any)?.blockId as string
+          if (!blockId) continue
+          let text = ''
+          const extractText = (n: any): void => {
+            if (n.type === 'text' && n.text) { text += n.text; return }
+            if (n.content) n.content.forEach(extractText)
+          }
+          extractText(node)
+          if (!text.trim()) continue
+          let hash = 5381
+          for (let i = 0; i < text.length; i++) {
+            hash = ((hash << 5) + hash) + text.charCodeAt(i)
+            hash = hash & hash
+          }
+          blocks.push({ blockId, type: node.type || 'paragraph', text, textHash: (hash >>> 0).toString(16) })
+        }
+        if (blocks.length > 0) {
+          docs.push({ documentId: doc.id, documentTitle: doc.title, blocks })
+        }
+      }
+      if (docs.length > 0) {
+        allDocumentBlockContext = { documents: docs }
+      }
+    }
+
+    // Execute the plan via IPC
+    try {
+      const response = await (window.api as any).thoughtPartner?.executePlan({
+        structuredPlan: approvedPlan,
+        message: currentState.thoughtPartner.messages[currentState.thoughtPartner.messages.length - 1]?.content || '',
+        subconsciousContext,
+        documentBlockContext: currentState.thoughtPartner.documentBlockContext,
+        allDocumentBlockContext,
+        structuredMemory: currentState.thoughtPartner.structuredMemory,
+        usePipeline: true,
+      })
+
+      if (response?.pipelineActions?.length > 0) {
+        // Auto-accept edit actions from approved plans
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            currentPipelineActions: [
+              ...prev.thoughtPartner.currentPipelineActions,
+              ...response.pipelineActions,
+            ],
+            pipelineState: 'awaiting_approval',
+          }
+        }))
+
+        for (const pa of response.pipelineActions) {
+          if (pa.type === 'edit' && get().thoughtPartner.autoAcceptEdits) {
+            await get().acceptPipelineAction(pa.id)
+          }
+        }
+      } else if (response?.error) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            pipelineState: 'failed',
+          }
+        }))
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Plan execution failed:', err)
+      set(prev => ({
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          pipelineState: 'failed',
+        }
+      }))
+    }
+  },
+
+  revisePlan: async (planId: string, feedback: string) => {
+    const state = get()
+    const planAction = state.thoughtPartner.currentPipelineActions.find(
+      a => a.type === 'plan' && a.structuredPlan?.id === planId
+    )
+    if (!planAction?.structuredPlan) return
+
+    // Mark plan as revised
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.id === planAction.id
+            ? { ...a, structuredPlan: { ...a.structuredPlan!, status: 'revised' as const } }
+            : a
+        ),
+      }
+    }))
+
+    // Send revision as a follow-up message
+    await get().sendThoughtPartnerMessage(
+      `I'd like to revise the plan. Feedback: ${feedback}\n\nPlease update the plan using produce_plan again with these changes.`
+    )
+  },
+
+  rejectPlan: (planId: string) => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.type === 'plan' && a.structuredPlan?.id === planId
+            ? { ...a, status: 'rejected' as const, structuredPlan: { ...a.structuredPlan!, status: 'rejected' as const } }
+            : a
+        ),
+        pipelineState: 'idle',
+      }
+    }))
+  },
+
+  acceptReflection: async (reflectionId: string) => {
+    const state = get()
+    const reflectionAction = state.thoughtPartner.currentPipelineActions.find(
+      a => a.type === 'reflection' && a.reflection?.id === reflectionId
+    )
+    if (!reflectionAction?.reflection || !state.currentProject) return
+
+    // Mark reflection as accepted
+    const acceptedReflection = { ...reflectionAction.reflection, status: 'accepted' as const }
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.id === reflectionAction.id ? { ...a, reflection: acceptedReflection } : a
+        ),
+        pipelineState: 'orchestrating',
+      }
+    }))
+
+    // Build context (same pattern as approvePlan)
+    const currentState = get()
+    const subconsciousContext = {
+      projectName: currentState.currentProject!.name,
+      templateType: currentState.currentProject!.templateId,
+      documents: [],
+      characters: [],
+      props: [],
+      settings: {},
+    }
+
+    let allDocumentBlockContext: import('../../shared/contextGatherTypes').MultiDocumentBlockContext | null = null
+    if (currentState.currentProject) {
+      const docs: import('../../shared/contextGatherTypes').MultiDocumentBlockContext['documents'] = []
+      for (const doc of currentState.currentProject.documents.filter(d => d.type === 'document')) {
+        const docState = currentState.documents[doc.id]
+        if (!docState?.content?.content) continue
+        const blocks: import('../../shared/contextGatherTypes').DocumentBlock[] = []
+        for (const node of docState.content.content) {
+          const blockId = (node.attrs as any)?.blockId as string
+          if (!blockId) continue
+          let text = ''
+          const extractText = (n: any): void => {
+            if (n.type === 'text' && n.text) { text += n.text; return }
+            if (n.content) n.content.forEach(extractText)
+          }
+          extractText(node)
+          if (!text.trim()) continue
+          let hash = 5381
+          for (let i = 0; i < text.length; i++) {
+            hash = ((hash << 5) + hash) + text.charCodeAt(i)
+            hash = hash & hash
+          }
+          blocks.push({ blockId, type: node.type || 'paragraph', text, textHash: (hash >>> 0).toString(16) })
+        }
+        if (blocks.length > 0) {
+          docs.push({ documentId: doc.id, documentTitle: doc.title, blocks })
+        }
+      }
+      if (docs.length > 0) {
+        allDocumentBlockContext = { documents: docs }
+      }
+    }
+
+    try {
+      const response = await (window.api as any).thoughtPartner?.acceptReflection({
+        reflection: acceptedReflection,
+        message: currentState.thoughtPartner.messages[currentState.thoughtPartner.messages.length - 1]?.content || '',
+        subconsciousContext,
+        documentBlockContext: currentState.thoughtPartner.documentBlockContext,
+        allDocumentBlockContext,
+        structuredMemory: currentState.thoughtPartner.structuredMemory,
+        usePipeline: true,
+        conversationHistory: currentState.thoughtPartner.messages.filter(m => m.role !== 'system'),
+        consciousContext: null,
+        contextDocument: currentState.thoughtPartner.contextDocument,
+        agentMode: currentState.thoughtPartner.agentMode,
+        selectionContext: currentState.thoughtPartner.selectionContext,
+      })
+
+      if (response?.pipelineActions?.length > 0) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            currentPipelineActions: [
+              ...prev.thoughtPartner.currentPipelineActions,
+              ...response.pipelineActions,
+            ],
+            pipelineState: response.pipelineActions.some((a: any) => a.type === 'plan') ? 'planning' :
+                           response.pipelineActions.some((a: any) => a.type === 'reflection') ? 'reflecting' :
+                           'awaiting_approval',
+          }
+        }))
+
+        // Auto-accept edit actions, skip plans and reflections
+        for (const pa of response.pipelineActions) {
+          if (pa.type === 'plan' || pa.type === 'reflection') continue
+          if (pa.type === 'edit' && get().thoughtPartner.autoAcceptEdits) {
+            await get().acceptPipelineAction(pa.id)
+          }
+        }
+      }
+
+      if (response?.updatedStructuredMemory) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            structuredMemory: response.updatedStructuredMemory,
+          }
+        }))
+      }
+
+      if (response?.message) {
+        get().finalizeThoughtPartnerStream(response.message, response.updatedContextDocument)
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Reflection acceptance failed:', err)
+      set(prev => ({
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          pipelineState: 'failed',
+        }
+      }))
+    }
+  },
+
+  editReflection: async (reflectionId: string, newInterpretation: string) => {
+    const state = get()
+    const reflectionAction = state.thoughtPartner.currentPipelineActions.find(
+      a => a.type === 'reflection' && a.reflection?.id === reflectionId
+    )
+    if (!reflectionAction?.reflection || !state.currentProject) return
+
+    // Mark reflection as edited
+    const editedReflection = {
+      ...reflectionAction.reflection,
+      status: 'edited' as const,
+      editedInterpretation: newInterpretation,
+    }
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.id === reflectionAction.id ? { ...a, reflection: editedReflection } : a
+        ),
+        pipelineState: 'orchestrating',
+      }
+    }))
+
+    // Build context (same pattern)
+    const currentState = get()
+    const subconsciousContext = {
+      projectName: currentState.currentProject!.name,
+      templateType: currentState.currentProject!.templateId,
+      documents: [],
+      characters: [],
+      props: [],
+      settings: {},
+    }
+
+    let allDocumentBlockContext: import('../../shared/contextGatherTypes').MultiDocumentBlockContext | null = null
+    if (currentState.currentProject) {
+      const docs: import('../../shared/contextGatherTypes').MultiDocumentBlockContext['documents'] = []
+      for (const doc of currentState.currentProject.documents.filter(d => d.type === 'document')) {
+        const docState = currentState.documents[doc.id]
+        if (!docState?.content?.content) continue
+        const blocks: import('../../shared/contextGatherTypes').DocumentBlock[] = []
+        for (const node of docState.content.content) {
+          const blockId = (node.attrs as any)?.blockId as string
+          if (!blockId) continue
+          let text = ''
+          const extractText = (n: any): void => {
+            if (n.type === 'text' && n.text) { text += n.text; return }
+            if (n.content) n.content.forEach(extractText)
+          }
+          extractText(node)
+          if (!text.trim()) continue
+          let hash = 5381
+          for (let i = 0; i < text.length; i++) {
+            hash = ((hash << 5) + hash) + text.charCodeAt(i)
+            hash = hash & hash
+          }
+          blocks.push({ blockId, type: node.type || 'paragraph', text, textHash: (hash >>> 0).toString(16) })
+        }
+        if (blocks.length > 0) {
+          docs.push({ documentId: doc.id, documentTitle: doc.title, blocks })
+        }
+      }
+      if (docs.length > 0) {
+        allDocumentBlockContext = { documents: docs }
+      }
+    }
+
+    try {
+      const response = await (window.api as any).thoughtPartner?.editReflection({
+        reflection: editedReflection,
+        newInterpretation,
+        message: currentState.thoughtPartner.messages[currentState.thoughtPartner.messages.length - 1]?.content || '',
+        subconsciousContext,
+        documentBlockContext: currentState.thoughtPartner.documentBlockContext,
+        allDocumentBlockContext,
+        structuredMemory: currentState.thoughtPartner.structuredMemory,
+        usePipeline: true,
+        conversationHistory: currentState.thoughtPartner.messages.filter(m => m.role !== 'system'),
+        consciousContext: null,
+        contextDocument: currentState.thoughtPartner.contextDocument,
+        agentMode: currentState.thoughtPartner.agentMode,
+        selectionContext: currentState.thoughtPartner.selectionContext,
+      })
+
+      if (response?.pipelineActions?.length > 0) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            currentPipelineActions: [
+              ...prev.thoughtPartner.currentPipelineActions,
+              ...response.pipelineActions,
+            ],
+            pipelineState: response.pipelineActions.some((a: any) => a.type === 'plan') ? 'planning' :
+                           response.pipelineActions.some((a: any) => a.type === 'reflection') ? 'reflecting' :
+                           'awaiting_approval',
+          }
+        }))
+
+        for (const pa of response.pipelineActions) {
+          if (pa.type === 'plan' || pa.type === 'reflection') continue
+          if (pa.type === 'edit' && get().thoughtPartner.autoAcceptEdits) {
+            await get().acceptPipelineAction(pa.id)
+          }
+        }
+      }
+
+      if (response?.updatedStructuredMemory) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            structuredMemory: response.updatedStructuredMemory,
+          }
+        }))
+      }
+
+      if (response?.message) {
+        get().finalizeThoughtPartnerStream(response.message, response.updatedContextDocument)
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Reflection edit failed:', err)
+      set(prev => ({
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          pipelineState: 'failed',
+        }
+      }))
+    }
+  },
+
+  answerReflectionQuestions: async (
+    reflectionId: string,
+    meaningAnswers: Array<{ questionText: string; answer: string }>,
+    executionAnswers: Array<{ questionText: string; answer: string }>
+  ) => {
+    const state = get()
+    const reflectionAction = state.thoughtPartner.currentPipelineActions.find(
+      a => a.type === 'reflection' && a.reflection?.id === reflectionId
+    )
+    if (!reflectionAction?.reflection || !state.currentProject) return
+
+    // Mark reflection as answered
+    const answeredReflection = { ...reflectionAction.reflection, status: 'answered' as const }
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.id === reflectionAction.id ? { ...a, reflection: answeredReflection } : a
+        ),
+        pipelineState: 'orchestrating',
+      }
+    }))
+
+    // Build context (same pattern)
+    const currentState = get()
+    const subconsciousContext = {
+      projectName: currentState.currentProject!.name,
+      templateType: currentState.currentProject!.templateId,
+      documents: [],
+      characters: [],
+      props: [],
+      settings: {},
+    }
+
+    let allDocumentBlockContext: import('../../shared/contextGatherTypes').MultiDocumentBlockContext | null = null
+    if (currentState.currentProject) {
+      const docs: import('../../shared/contextGatherTypes').MultiDocumentBlockContext['documents'] = []
+      for (const doc of currentState.currentProject.documents.filter(d => d.type === 'document')) {
+        const docState = currentState.documents[doc.id]
+        if (!docState?.content?.content) continue
+        const blocks: import('../../shared/contextGatherTypes').DocumentBlock[] = []
+        for (const node of docState.content.content) {
+          const blockId = (node.attrs as any)?.blockId as string
+          if (!blockId) continue
+          let text = ''
+          const extractText = (n: any): void => {
+            if (n.type === 'text' && n.text) { text += n.text; return }
+            if (n.content) n.content.forEach(extractText)
+          }
+          extractText(node)
+          if (!text.trim()) continue
+          let hash = 5381
+          for (let i = 0; i < text.length; i++) {
+            hash = ((hash << 5) + hash) + text.charCodeAt(i)
+            hash = hash & hash
+          }
+          blocks.push({ blockId, type: node.type || 'paragraph', text, textHash: (hash >>> 0).toString(16) })
+        }
+        if (blocks.length > 0) {
+          docs.push({ documentId: doc.id, documentTitle: doc.title, blocks })
+        }
+      }
+      if (docs.length > 0) {
+        allDocumentBlockContext = { documents: docs }
+      }
+    }
+
+    try {
+      const response = await (window.api as any).thoughtPartner?.answerReflectionQuestions({
+        reflection: answeredReflection,
+        meaningAnswers,
+        executionAnswers,
+        message: currentState.thoughtPartner.messages[currentState.thoughtPartner.messages.length - 1]?.content || '',
+        subconsciousContext,
+        documentBlockContext: currentState.thoughtPartner.documentBlockContext,
+        allDocumentBlockContext,
+        structuredMemory: currentState.thoughtPartner.structuredMemory,
+        usePipeline: true,
+        conversationHistory: currentState.thoughtPartner.messages.filter(m => m.role !== 'system'),
+        consciousContext: null,
+        contextDocument: currentState.thoughtPartner.contextDocument,
+        agentMode: currentState.thoughtPartner.agentMode,
+        selectionContext: currentState.thoughtPartner.selectionContext,
+      })
+
+      if (response?.pipelineActions?.length > 0) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            currentPipelineActions: [
+              ...prev.thoughtPartner.currentPipelineActions,
+              ...response.pipelineActions,
+            ],
+            pipelineState: response.pipelineActions.some((a: any) => a.type === 'plan') ? 'planning' :
+                           response.pipelineActions.some((a: any) => a.type === 'reflection') ? 'reflecting' :
+                           'awaiting_approval',
+          }
+        }))
+
+        for (const pa of response.pipelineActions) {
+          if (pa.type === 'plan' || pa.type === 'reflection') continue
+          if (pa.type === 'edit' && get().thoughtPartner.autoAcceptEdits) {
+            await get().acceptPipelineAction(pa.id)
+          }
+        }
+      }
+
+      if (response?.updatedStructuredMemory) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            structuredMemory: response.updatedStructuredMemory,
+          }
+        }))
+      }
+
+      if (response?.message) {
+        get().finalizeThoughtPartnerStream(response.message, response.updatedContextDocument)
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Reflection questions answer failed:', err)
+      set(prev => ({
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          pipelineState: 'failed',
+        }
+      }))
+    }
+  },
+
+  // ===== Idea Card Actions =====
+
+  exploreIdea: async (ideaCardId: string, expansionPathId?: string) => {
+    const state = get()
+    const ideaAction = state.thoughtPartner.currentPipelineActions.find(
+      a => a.type === 'idea' && a.ideaCards?.some(ic => ic.id === ideaCardId)
+    )
+    if (!ideaAction?.ideaCards || !state.currentProject) return
+
+    const ideaCard = ideaAction.ideaCards.find(ic => ic.id === ideaCardId)
+    if (!ideaCard) return
+
+    // Mark the idea as exploring
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.id === ideaAction.id ? {
+            ...a,
+            ideaCards: a.ideaCards?.map(ic =>
+              ic.id === ideaCardId ? { ...ic, status: 'exploring' as const, exploringPathId: expansionPathId } : ic
+            )
+          } : a
+        ),
+        pipelineState: 'orchestrating',
+        isStreaming: true,
+        streamingContent: '',
+      }
+    }))
+
+    // Build context (same pattern as reflection actions)
+    const currentState = get()
+    const subconsciousContext = {
+      projectName: currentState.currentProject!.name,
+      templateType: currentState.currentProject!.templateId,
+      documents: [], characters: [], props: [], settings: {},
+    }
+
+    let allDocumentBlockContext: import('../../shared/contextGatherTypes').MultiDocumentBlockContext | null = null
+    if (currentState.currentProject) {
+      const docs: import('../../shared/contextGatherTypes').MultiDocumentBlockContext['documents'] = []
+      for (const doc of currentState.currentProject.documents.filter(d => d.type === 'document')) {
+        const docState = currentState.documents[doc.id]
+        if (!docState?.content?.content) continue
+        const blocks: import('../../shared/contextGatherTypes').DocumentBlock[] = []
+        for (const node of docState.content.content) {
+          const blockId = (node.attrs as any)?.blockId as string
+          if (!blockId) continue
+          let text = ''
+          const extractText = (n: any): void => {
+            if (n.type === 'text' && n.text) { text += n.text; return }
+            if (n.content) n.content.forEach(extractText)
+          }
+          extractText(node)
+          if (!text.trim()) continue
+          let hash = 5381
+          for (let i = 0; i < text.length; i++) { hash = ((hash << 5) + hash) + text.charCodeAt(i); hash = hash & hash }
+          blocks.push({ blockId, type: node.type || 'paragraph', text, textHash: (hash >>> 0).toString(16) })
+        }
+        if (blocks.length > 0) docs.push({ documentId: doc.id, documentTitle: doc.title, blocks })
+      }
+      if (docs.length > 0) allDocumentBlockContext = { documents: docs }
+    }
+
+    try {
+      const response = await (window.api as any).thoughtPartner?.exploreIdea({
+        ideaCard,
+        expansionPathId: expansionPathId || null,
+        message: currentState.thoughtPartner.messages[currentState.thoughtPartner.messages.length - 1]?.content || '',
+        subconsciousContext,
+        documentBlockContext: currentState.thoughtPartner.documentBlockContext,
+        allDocumentBlockContext,
+        structuredMemory: currentState.thoughtPartner.structuredMemory,
+        usePipeline: true,
+        conversationHistory: currentState.thoughtPartner.messages.filter(m => m.role !== 'system'),
+        consciousContext: null,
+        contextDocument: currentState.thoughtPartner.contextDocument,
+        agentMode: currentState.thoughtPartner.agentMode,
+        selectionContext: currentState.thoughtPartner.selectionContext,
+      })
+
+      if (response?.pipelineActions?.length > 0) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            currentPipelineActions: [...prev.thoughtPartner.currentPipelineActions, ...response.pipelineActions],
+            pipelineState: response.pipelineActions.some((a: any) => a.type === 'plan') ? 'planning' :
+                           response.pipelineActions.some((a: any) => a.type === 'reflection') ? 'reflecting' :
+                           'awaiting_approval',
+          }
+        }))
+        for (const pa of response.pipelineActions) {
+          if (pa.type === 'plan' || pa.type === 'reflection' || pa.type === 'idea') continue
+          if (pa.type === 'edit' && get().thoughtPartner.autoAcceptEdits) await get().acceptPipelineAction(pa.id)
+        }
+      }
+      if (response?.updatedStructuredMemory) {
+        set(prev => ({ thoughtPartner: { ...prev.thoughtPartner, structuredMemory: response.updatedStructuredMemory } }))
+      }
+      if (response?.message) {
+        get().finalizeThoughtPartnerStream(response.message, response.updatedContextDocument)
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Idea exploration failed:', err)
+      set(prev => ({ thoughtPartner: { ...prev.thoughtPartner, pipelineState: 'failed', isStreaming: false } }))
+    }
+  },
+
+  stressTestIdea: async (ideaCardId: string) => {
+    const state = get()
+    const ideaAction = state.thoughtPartner.currentPipelineActions.find(
+      a => a.type === 'idea' && a.ideaCards?.some(ic => ic.id === ideaCardId)
+    )
+    if (!ideaAction?.ideaCards || !state.currentProject) return
+
+    const ideaCard = ideaAction.ideaCards.find(ic => ic.id === ideaCardId)
+    if (!ideaCard) return
+
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.id === ideaAction.id ? {
+            ...a, ideaCards: a.ideaCards?.map(ic =>
+              ic.id === ideaCardId ? { ...ic, status: 'stress-testing' as const } : ic
+            )
+          } : a
+        ),
+        pipelineState: 'orchestrating',
+        isStreaming: true,
+        streamingContent: '',
+      }
+    }))
+
+    const currentState = get()
+    const subconsciousContext = {
+      projectName: currentState.currentProject!.name,
+      templateType: currentState.currentProject!.templateId,
+      documents: [], characters: [], props: [], settings: {},
+    }
+
+    let allDocumentBlockContext: import('../../shared/contextGatherTypes').MultiDocumentBlockContext | null = null
+    if (currentState.currentProject) {
+      const docs: import('../../shared/contextGatherTypes').MultiDocumentBlockContext['documents'] = []
+      for (const doc of currentState.currentProject.documents.filter(d => d.type === 'document')) {
+        const docState = currentState.documents[doc.id]
+        if (!docState?.content?.content) continue
+        const blocks: import('../../shared/contextGatherTypes').DocumentBlock[] = []
+        for (const node of docState.content.content) {
+          const blockId = (node.attrs as any)?.blockId as string
+          if (!blockId) continue
+          let text = ''
+          const extractText = (n: any): void => {
+            if (n.type === 'text' && n.text) { text += n.text; return }
+            if (n.content) n.content.forEach(extractText)
+          }
+          extractText(node)
+          if (!text.trim()) continue
+          let hash = 5381
+          for (let i = 0; i < text.length; i++) { hash = ((hash << 5) + hash) + text.charCodeAt(i); hash = hash & hash }
+          blocks.push({ blockId, type: node.type || 'paragraph', text, textHash: (hash >>> 0).toString(16) })
+        }
+        if (blocks.length > 0) docs.push({ documentId: doc.id, documentTitle: doc.title, blocks })
+      }
+      if (docs.length > 0) allDocumentBlockContext = { documents: docs }
+    }
+
+    try {
+      const response = await (window.api as any).thoughtPartner?.stressTestIdea({
+        ideaCard,
+        message: currentState.thoughtPartner.messages[currentState.thoughtPartner.messages.length - 1]?.content || '',
+        subconsciousContext,
+        documentBlockContext: currentState.thoughtPartner.documentBlockContext,
+        allDocumentBlockContext,
+        structuredMemory: currentState.thoughtPartner.structuredMemory,
+        usePipeline: true,
+        conversationHistory: currentState.thoughtPartner.messages.filter(m => m.role !== 'system'),
+        consciousContext: null,
+        contextDocument: currentState.thoughtPartner.contextDocument,
+        agentMode: currentState.thoughtPartner.agentMode,
+        selectionContext: currentState.thoughtPartner.selectionContext,
+      })
+
+      if (response?.pipelineActions?.length > 0) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            currentPipelineActions: [...prev.thoughtPartner.currentPipelineActions, ...response.pipelineActions],
+            pipelineState: 'awaiting_approval',
+          }
+        }))
+        for (const pa of response.pipelineActions) {
+          if (pa.type === 'plan' || pa.type === 'reflection' || pa.type === 'idea') continue
+          if (pa.type === 'edit' && get().thoughtPartner.autoAcceptEdits) await get().acceptPipelineAction(pa.id)
+        }
+      }
+      if (response?.updatedStructuredMemory) {
+        set(prev => ({ thoughtPartner: { ...prev.thoughtPartner, structuredMemory: response.updatedStructuredMemory } }))
+      }
+      if (response?.message) {
+        get().finalizeThoughtPartnerStream(response.message, response.updatedContextDocument)
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Idea stress test failed:', err)
+      set(prev => ({ thoughtPartner: { ...prev.thoughtPartner, pipelineState: 'failed', isStreaming: false } }))
+    }
+  },
+
+  turnIdeaInto: async (ideaCardId: string, targetType: 'scene' | 'mechanic') => {
+    const state = get()
+    const ideaAction = state.thoughtPartner.currentPipelineActions.find(
+      a => a.type === 'idea' && a.ideaCards?.some(ic => ic.id === ideaCardId)
+    )
+    if (!ideaAction?.ideaCards || !state.currentProject) return
+
+    const ideaCard = ideaAction.ideaCards.find(ic => ic.id === ideaCardId)
+    if (!ideaCard) return
+
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.id === ideaAction.id ? {
+            ...a, ideaCards: a.ideaCards?.map(ic =>
+              ic.id === ideaCardId ? { ...ic, status: 'converted' as const } : ic
+            )
+          } : a
+        ),
+        pipelineState: 'orchestrating',
+        isStreaming: true,
+        streamingContent: '',
+      }
+    }))
+
+    const currentState = get()
+    const subconsciousContext = {
+      projectName: currentState.currentProject!.name,
+      templateType: currentState.currentProject!.templateId,
+      documents: [], characters: [], props: [], settings: {},
+    }
+
+    let allDocumentBlockContext: import('../../shared/contextGatherTypes').MultiDocumentBlockContext | null = null
+    if (currentState.currentProject) {
+      const docs: import('../../shared/contextGatherTypes').MultiDocumentBlockContext['documents'] = []
+      for (const doc of currentState.currentProject.documents.filter(d => d.type === 'document')) {
+        const docState = currentState.documents[doc.id]
+        if (!docState?.content?.content) continue
+        const blocks: import('../../shared/contextGatherTypes').DocumentBlock[] = []
+        for (const node of docState.content.content) {
+          const blockId = (node.attrs as any)?.blockId as string
+          if (!blockId) continue
+          let text = ''
+          const extractText = (n: any): void => {
+            if (n.type === 'text' && n.text) { text += n.text; return }
+            if (n.content) n.content.forEach(extractText)
+          }
+          extractText(node)
+          if (!text.trim()) continue
+          let hash = 5381
+          for (let i = 0; i < text.length; i++) { hash = ((hash << 5) + hash) + text.charCodeAt(i); hash = hash & hash }
+          blocks.push({ blockId, type: node.type || 'paragraph', text, textHash: (hash >>> 0).toString(16) })
+        }
+        if (blocks.length > 0) docs.push({ documentId: doc.id, documentTitle: doc.title, blocks })
+      }
+      if (docs.length > 0) allDocumentBlockContext = { documents: docs }
+    }
+
+    try {
+      const response = await (window.api as any).thoughtPartner?.turnIdeaInto({
+        ideaCard,
+        targetType,
+        message: currentState.thoughtPartner.messages[currentState.thoughtPartner.messages.length - 1]?.content || '',
+        subconsciousContext,
+        documentBlockContext: currentState.thoughtPartner.documentBlockContext,
+        allDocumentBlockContext,
+        structuredMemory: currentState.thoughtPartner.structuredMemory,
+        usePipeline: true,
+        conversationHistory: currentState.thoughtPartner.messages.filter(m => m.role !== 'system'),
+        consciousContext: null,
+        contextDocument: currentState.thoughtPartner.contextDocument,
+        agentMode: currentState.thoughtPartner.agentMode,
+        selectionContext: currentState.thoughtPartner.selectionContext,
+      })
+
+      if (response?.pipelineActions?.length > 0) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            currentPipelineActions: [...prev.thoughtPartner.currentPipelineActions, ...response.pipelineActions],
+            pipelineState: response.pipelineActions.some((a: any) => a.type === 'plan') ? 'planning' : 'awaiting_approval',
+          }
+        }))
+        for (const pa of response.pipelineActions) {
+          if (pa.type === 'plan' || pa.type === 'reflection' || pa.type === 'idea') continue
+          if (pa.type === 'edit' && get().thoughtPartner.autoAcceptEdits) await get().acceptPipelineAction(pa.id)
+        }
+      }
+      if (response?.updatedStructuredMemory) {
+        set(prev => ({ thoughtPartner: { ...prev.thoughtPartner, structuredMemory: response.updatedStructuredMemory } }))
+      }
+      if (response?.message) {
+        get().finalizeThoughtPartnerStream(response.message, response.updatedContextDocument)
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Idea conversion failed:', err)
+      set(prev => ({ thoughtPartner: { ...prev.thoughtPartner, pipelineState: 'failed', isStreaming: false } }))
+    }
+  },
+
+  mergeIdeas: async (ideaCardIdA: string, ideaCardIdB: string) => {
+    const state = get()
+    if (!state.currentProject) return
+
+    // Find both cards across all idea actions
+    let ideaCardA: import('../../shared/thoughtPartnerPipelineTypes').IdeaCard | undefined
+    let ideaCardB: import('../../shared/thoughtPartnerPipelineTypes').IdeaCard | undefined
+    for (const a of state.thoughtPartner.currentPipelineActions) {
+      if (a.type !== 'idea' || !a.ideaCards) continue
+      for (const ic of a.ideaCards) {
+        if (ic.id === ideaCardIdA) ideaCardA = ic
+        if (ic.id === ideaCardIdB) ideaCardB = ic
+      }
+    }
+    if (!ideaCardA || !ideaCardB) return
+
+    // Mark both as merged
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.type === 'idea' && a.ideaCards ? {
+            ...a, ideaCards: a.ideaCards.map(ic => {
+              if (ic.id === ideaCardIdA) return { ...ic, status: 'merged' as const }
+              if (ic.id === ideaCardIdB) return { ...ic, status: 'merged' as const, mergedWith: ideaCardIdA }
+              return ic
+            })
+          } : a
+        ),
+        pipelineState: 'orchestrating',
+        isStreaming: true,
+        streamingContent: '',
+      }
+    }))
+
+    const currentState = get()
+    const subconsciousContext = {
+      projectName: currentState.currentProject!.name,
+      templateType: currentState.currentProject!.templateId,
+      documents: [], characters: [], props: [], settings: {},
+    }
+
+    let allDocumentBlockContext: import('../../shared/contextGatherTypes').MultiDocumentBlockContext | null = null
+    if (currentState.currentProject) {
+      const docs: import('../../shared/contextGatherTypes').MultiDocumentBlockContext['documents'] = []
+      for (const doc of currentState.currentProject.documents.filter(d => d.type === 'document')) {
+        const docState = currentState.documents[doc.id]
+        if (!docState?.content?.content) continue
+        const blocks: import('../../shared/contextGatherTypes').DocumentBlock[] = []
+        for (const node of docState.content.content) {
+          const blockId = (node.attrs as any)?.blockId as string
+          if (!blockId) continue
+          let text = ''
+          const extractText = (n: any): void => {
+            if (n.type === 'text' && n.text) { text += n.text; return }
+            if (n.content) n.content.forEach(extractText)
+          }
+          extractText(node)
+          if (!text.trim()) continue
+          let hash = 5381
+          for (let i = 0; i < text.length; i++) { hash = ((hash << 5) + hash) + text.charCodeAt(i); hash = hash & hash }
+          blocks.push({ blockId, type: node.type || 'paragraph', text, textHash: (hash >>> 0).toString(16) })
+        }
+        if (blocks.length > 0) docs.push({ documentId: doc.id, documentTitle: doc.title, blocks })
+      }
+      if (docs.length > 0) allDocumentBlockContext = { documents: docs }
+    }
+
+    try {
+      const response = await (window.api as any).thoughtPartner?.mergeIdeas({
+        ideaCardA,
+        ideaCardB,
+        message: currentState.thoughtPartner.messages[currentState.thoughtPartner.messages.length - 1]?.content || '',
+        subconsciousContext,
+        documentBlockContext: currentState.thoughtPartner.documentBlockContext,
+        allDocumentBlockContext,
+        structuredMemory: currentState.thoughtPartner.structuredMemory,
+        usePipeline: true,
+        conversationHistory: currentState.thoughtPartner.messages.filter(m => m.role !== 'system'),
+        consciousContext: null,
+        contextDocument: currentState.thoughtPartner.contextDocument,
+        agentMode: currentState.thoughtPartner.agentMode,
+        selectionContext: currentState.thoughtPartner.selectionContext,
+      })
+
+      if (response?.pipelineActions?.length > 0) {
+        set(prev => ({
+          thoughtPartner: {
+            ...prev.thoughtPartner,
+            currentPipelineActions: [...prev.thoughtPartner.currentPipelineActions, ...response.pipelineActions],
+            pipelineState: 'awaiting_approval',
+          }
+        }))
+      }
+      if (response?.updatedStructuredMemory) {
+        set(prev => ({ thoughtPartner: { ...prev.thoughtPartner, structuredMemory: response.updatedStructuredMemory } }))
+      }
+      if (response?.message) {
+        get().finalizeThoughtPartnerStream(response.message, response.updatedContextDocument)
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Idea merge failed:', err)
+      set(prev => ({ thoughtPartner: { ...prev.thoughtPartner, pipelineState: 'failed', isStreaming: false } }))
+    }
+  },
+
+  discardIdea: (ideaCardId: string) => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        currentPipelineActions: prev.thoughtPartner.currentPipelineActions.map(a =>
+          a.type === 'idea' && a.ideaCards?.some(ic => ic.id === ideaCardId) ? {
+            ...a,
+            ideaCards: a.ideaCards?.map(ic =>
+              ic.id === ideaCardId ? { ...ic, status: 'discarded' as const } : ic
+            )
+          } : a
+        ),
+      }
+    }))
+  },
+
+  // Behavior policy actions (adaptive behavior layer)
+  submitMessageFeedback: async (messageId: string, signal: import('../../shared/behaviorPolicyTypes').FeedbackSignal) => {
+    const state = get()
+    const currentFeedback = state.thoughtPartner.messageFeedback[messageId]
+
+    // Toggle: if same signal clicked again, clear it
+    if (currentFeedback === signal) {
+      const updated = { ...state.thoughtPartner.messageFeedback }
+      delete updated[messageId]
+      set(prev => ({
+        thoughtPartner: { ...prev.thoughtPartner, messageFeedback: updated }
+      }))
+      return
+    }
+
+    // Set new signal
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        messageFeedback: { ...prev.thoughtPartner.messageFeedback, [messageId]: signal }
+      }
+    }))
+
+    // Build context for the bandit
+    const meta = state.thoughtPartner.lastResponseMeta
+    const projectPath = state.currentProject?.path || null
+    const context = {
+      intentPolicy: 'chat-only',
+      hasSelection: !!state.thoughtPartner.selectionContext,
+      consecutiveChatTurns: state.thoughtPartner.consecutiveChatTurns,
+      messageLength: (state.thoughtPartner.messages.find(m => m.role === 'user' && state.thoughtPartner.messages.indexOf(m) < state.thoughtPartner.messages.map(m2 => m2.id).indexOf(messageId))?.content.length || 0) < 50 ? 'short' as const : 'medium' as const,
+      templateType: state.currentProject?.templateId || 'default',
+      pipelineState: state.thoughtPartner.pipelineState,
+      hasActions: state.thoughtPartner.currentPipelineActions.some(a => (a as any).type === 'edit'),
+      hasQuestions: false,
+      hasPlan: state.thoughtPartner.currentPipelineActions.some(a => (a as any).type === 'plan'),
+      hasReflection: state.thoughtPartner.currentPipelineActions.some(a => (a as any).type === 'reflection'),
+      hasIdeas: state.thoughtPartner.currentPipelineActions.some(a => (a as any).type === 'idea'),
+    }
+
+    try {
+      const result = await (window.api as any).behaviorPolicy?.submitFeedback({
+        messageId,
+        conversationId: state.thoughtPartner.activeConversationId,
+        signal,
+        projectPath,
+        context,
+        vectorSnapshot: state.thoughtPartner.currentBehaviorVector || {
+          initiative: 0.5, toolUsage: 0.5, verbosity: 0.5, structuralStyle: 0.5,
+          tone: 0.5, riskTolerance: 0.5, autonomy: 0.5, clarificationFreq: 0.5,
+        },
+        expressedDimensions: meta?.expressedDimensions || {},
+      })
+      if (result?.updatedVector) {
+        set(prev => ({
+          thoughtPartner: { ...prev.thoughtPartner, currentBehaviorVector: result.updatedVector }
+        }))
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Failed to submit feedback:', err)
+    }
+  },
+
+  loadBehaviorVector: async () => {
+    const state = get()
+    const projectPath = state.currentProject?.path || null
+    const context = {
+      intentPolicy: 'chat-only',
+      hasSelection: false,
+      consecutiveChatTurns: 0,
+      messageLength: 'medium' as const,
+      templateType: state.currentProject?.templateId || 'default',
+      pipelineState: 'idle',
+      hasActions: false,
+      hasQuestions: false,
+      hasPlan: false,
+      hasReflection: false,
+      hasIdeas: false,
+    }
+    try {
+      const vector = await (window.api as any).behaviorPolicy?.getVector(projectPath, context)
+      if (vector) {
+        set(prev => ({
+          thoughtPartner: { ...prev.thoughtPartner, currentBehaviorVector: vector }
+        }))
+      }
+    } catch (err) {
+      console.error('[ProjectStore] Failed to load behavior vector:', err)
+    }
   },
 
   runCritique: async () => {

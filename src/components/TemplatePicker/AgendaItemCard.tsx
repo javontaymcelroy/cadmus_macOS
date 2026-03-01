@@ -14,10 +14,9 @@ import {
   DialogActions,
   Button,
   FluentProvider,
-  createDarkTheme
 } from '@fluentui/react-components'
-import type { BrandVariants } from '@fluentui/react-components'
 import type { AgendaItem, TodoItem, DocumentLifecycleState } from '../../types/project'
+import { useFluentTheme } from '../../hooks/useFluentTheme'
 import { stateConfigs } from '../StateDropdown'
 import {
   MoreHorizontalRegular,
@@ -30,40 +29,6 @@ import {
   ArchiveRegular,
   CheckmarkRegular
 } from '@fluentui/react-icons'
-
-// Custom brand colors matching the gold theme
-const customBrand: BrandVariants = {
-  10: '#1a1a1a',
-  20: '#1a1a1a',
-  30: '#1a1a1a',
-  40: '#1a1a1a',
-  50: '#1a1a1a',
-  60: '#1a1a1a',
-  70: '#fbbf24',
-  80: '#fbbf24',
-  90: '#fbbf24',
-  100: '#fbbf24',
-  110: '#fbbf24',
-  120: '#fbbf24',
-  130: '#fbbf24',
-  140: '#fbbf24',
-  150: '#fbbf24',
-  160: '#fbbf24'
-}
-
-const darkTheme = {
-  ...createDarkTheme(customBrand),
-  colorNeutralBackground1: 'transparent',
-  colorNeutralBackground1Hover: '#2a2a2a',
-  colorNeutralBackground1Pressed: '#333333',
-  colorNeutralBackground2: 'transparent',
-  colorNeutralBackground3: 'transparent',
-  colorSubtleBackground: 'transparent',
-  colorSubtleBackgroundHover: '#2a2a2a',
-  colorNeutralForeground1: '#ffffff',
-  colorNeutralForeground2: 'rgba(255,255,255,0.8)',
-  colorNeutralStroke1: '#333333'
-}
 
 // State icons for menu
 const stateIcons: Record<DocumentLifecycleState, React.ComponentType<{ className?: string }>> = {
@@ -97,6 +62,7 @@ export function AgendaItemCard({
   delay = 0,
   isAttachedToProject = false
 }: AgendaItemCardProps) {
+  const fluentTheme = useFluentTheme()
   const [isHovered, setIsHovered] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -162,7 +128,7 @@ export function AgendaItemCard({
   }
 
   return (
-    <FluentProvider theme={darkTheme} style={{ background: 'transparent' }}>
+    <FluentProvider theme={fluentTheme} style={{ background: 'transparent' }}>
       <Menu
         open={isMenuOpen}
         onOpenChange={(_, data) => setIsMenuOpen(data.open)}
@@ -312,13 +278,7 @@ export function AgendaItemCard({
           </div>
         </MenuTrigger>
 
-        <MenuPopover style={{ 
-          background: 'linear-gradient(135deg, rgba(26, 26, 26, 0.98) 0%, rgba(18, 18, 18, 0.99) 100%)',
-          border: '1px solid rgba(255, 255, 255, 0.08)', 
-          borderRadius: '12px',
-          boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05), 0 4px 24px rgba(0, 0, 0, 0.5), 0 8px 48px rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(20px)'
-        }}>
+        <MenuPopover className="cadmus-popover">
           <MenuList style={{ backgroundColor: 'transparent' }}>
             <MenuItem
               icon={<EditRegular />}
@@ -327,7 +287,7 @@ export function AgendaItemCard({
                 setIsEditing(true)
                 setIsMenuOpen(false)
               }}
-              style={{ backgroundColor: 'transparent', color: 'rgba(255,255,255,0.8)' }}
+              style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
             >
               Rename
             </MenuItem>
@@ -367,7 +327,7 @@ export function AgendaItemCard({
                 setIsDeleteDialogOpen(true)
                 setIsMenuOpen(false)
               }}
-              style={{ backgroundColor: 'transparent', color: 'rgba(255,255,255,0.8)' }}
+              style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
             >
               Delete
             </MenuItem>
@@ -380,26 +340,21 @@ export function AgendaItemCard({
         open={isDeleteDialogOpen}
         onOpenChange={(_, data) => setIsDeleteDialogOpen(data.open)}
       >
-        <DialogSurface style={{ 
-          background: 'linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(10, 10, 10, 0.99) 100%)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '16px',
-          boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 40px rgba(0, 0, 0, 0.6)'
-        }}>
+        <DialogSurface className="cadmus-dialog">
           <DialogBody>
-            <DialogTitle style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>Remove from Agenda?</DialogTitle>
-            <DialogContent style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+            <DialogTitle style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Remove from Agenda?</DialogTitle>
+            <DialogContent style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
               Are you sure you want to remove "{item.documentTitle}" from your agenda? The todos will remain in the document.
             </DialogContent>
             <DialogActions>
               <Button
                 appearance="secondary"
                 onClick={() => setIsDeleteDialogOpen(false)}
-                style={{ 
+                style={{
                   background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  border: '1px solid var(--border-default)',
                   borderRadius: '10px',
-                  color: 'rgba(255,255,255,0.8)'
+                  color: 'var(--text-secondary)'
                 }}
               >
                 Cancel
@@ -407,9 +362,9 @@ export function AgendaItemCard({
               <Button
                 appearance="primary"
                 onClick={handleDeleteConfirm}
-                style={{ 
+                style={{
                   background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                  color: '#050505',
+                  color: 'var(--text-inverted)',
                   borderRadius: '10px',
                   fontWeight: 600
                 }}
@@ -432,17 +387,12 @@ export function AgendaItemCard({
           }
         }}
       >
-        <DialogSurface style={{ 
-          background: 'linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(10, 10, 10, 0.99) 100%)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '16px',
-          boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 40px rgba(0, 0, 0, 0.6)'
-        }}>
+        <DialogSurface className="cadmus-dialog">
           <DialogBody>
-            <DialogTitle style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>
+            <DialogTitle style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
               {pendingState === 'paused' ? 'Pause Item' : 'Mark for Review'}
             </DialogTitle>
-            <DialogContent style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+            <DialogContent style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
               <p className="mb-4">
                 {pendingState === 'paused' 
                   ? 'Add an optional note about why this is paused.'
@@ -470,11 +420,11 @@ export function AgendaItemCard({
                   setPendingState(null)
                   setNoteInput('')
                 }}
-                style={{ 
+                style={{
                   background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  border: '1px solid var(--border-default)',
                   borderRadius: '10px',
-                  color: 'rgba(255,255,255,0.8)'
+                  color: 'var(--text-secondary)'
                 }}
               >
                 Cancel
@@ -482,9 +432,9 @@ export function AgendaItemCard({
               <Button
                 appearance="primary"
                 onClick={handleNoteConfirm}
-                style={{ 
+                style={{
                   background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                  color: '#050505',
+                  color: 'var(--text-inverted)',
                   borderRadius: '10px',
                   fontWeight: 600
                 }}

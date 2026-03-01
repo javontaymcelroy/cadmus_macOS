@@ -27,7 +27,8 @@ export function useWorkspace(): UseWorkspaceResult {
     todoListsOnlyInNotes: config.features.todoListsOnlyInNotes,
     deriveTitlesFromContent: config.features.deriveTitlesFromContent,
     showPageNumbers: config.features.showPageNumbers,
-    
+    showThoughtPartner: config.features.showThoughtPartner,
+
     // Editor config (convenience accessors)
     editorFontFamily: config.editor.fontFamily,
     useScreenplayExtension: config.editor.useScreenplayExtension,
@@ -65,7 +66,8 @@ export interface UseWorkspaceResult {
   todoListsOnlyInNotes: boolean
   deriveTitlesFromContent: boolean
   showPageNumbers: boolean
-  
+  showThoughtPartner: boolean
+
   // Editor config
   editorFontFamily: string
   useScreenplayExtension: boolean

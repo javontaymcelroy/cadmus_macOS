@@ -17,10 +17,9 @@ import {
   DialogActions,
   Button,
   FluentProvider,
-  createDarkTheme
 } from '@fluentui/react-components'
-import type { BrandVariants } from '@fluentui/react-components'
 import { DeleteRegular } from '@fluentui/react-icons'
+import { useFluentTheme } from '../../hooks/useFluentTheme'
 
 // Auto-discover all sticker SVGs from the stickers directory
 // Just drop new .svg files into the folder and they'll be picked up automatically
@@ -61,41 +60,8 @@ const DEFAULT_STICKERS: DefaultSticker[] = Object.entries(stickerModules)
 export { DEFAULT_STICKERS }
 export type { DefaultSticker }
 
-// Custom brand colors matching the gold theme
-const customBrand: BrandVariants = {
-  10: '#1a1a1a',
-  20: '#1a1a1a',
-  30: '#1a1a1a',
-  40: '#1a1a1a',
-  50: '#1a1a1a',
-  60: '#1a1a1a',
-  70: '#fbbf24',
-  80: '#fbbf24',
-  90: '#fbbf24',
-  100: '#fbbf24',
-  110: '#fbbf24',
-  120: '#fbbf24',
-  130: '#fbbf24',
-  140: '#fbbf24',
-  150: '#fbbf24',
-  160: '#fbbf24'
-}
-
-const darkTheme = {
-  ...createDarkTheme(customBrand),
-  colorNeutralBackground1: 'transparent',
-  colorNeutralBackground1Hover: '#2a2a2a',
-  colorNeutralBackground1Pressed: '#333333',
-  colorNeutralBackground2: 'transparent',
-  colorNeutralBackground3: 'transparent',
-  colorSubtleBackground: 'transparent',
-  colorSubtleBackgroundHover: '#2a2a2a',
-  colorNeutralForeground1: '#ffffff',
-  colorNeutralForeground2: 'rgba(255,255,255,0.8)',
-  colorNeutralStroke1: '#333333'
-}
-
 export function StickersPanel() {
+  const fluentTheme = useFluentTheme()
   const { currentProject, assets, addAsset, addAssetFromBuffer, removeAsset } = useProjectStore()
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
   const [menuOpenAssetId, setMenuOpenAssetId] = useState<string | null>(null)
@@ -240,7 +206,7 @@ export function StickersPanel() {
   if (!currentProject) return null
 
   return (
-    <FluentProvider theme={darkTheme} style={{ background: 'transparent', height: '100%' }}>
+    <FluentProvider theme={fluentTheme} style={{ background: 'transparent', height: '100%' }}>
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-theme-subtle bg-theme-header">
@@ -268,7 +234,7 @@ export function StickersPanel() {
                 onDragEnd={handleStickerDragEnd}
                 onClick={() => setSelectedAsset(sticker.id === selectedAsset ? null : sticker.id)}
                 className={clsx(
-                  'relative group rounded-xl overflow-hidden bg-ink-800/30 cursor-grab active:cursor-grabbing transition-all duration-200',
+                  'relative group rounded-xl overflow-hidden bg-theme-hover cursor-grab active:cursor-grabbing transition-all duration-200',
                   selectedAsset === sticker.id && 'ring-2 ring-gold-400',
                   draggingAssetId === sticker.id && 'opacity-50'
                 )}
@@ -306,7 +272,7 @@ export function StickersPanel() {
                   onDragEnd={handleStickerDragEnd}
                   onClick={() => setSelectedAsset(asset.id === selectedAsset ? null : asset.id)}
                   className={clsx(
-                    'relative group rounded-xl overflow-hidden bg-ink-800/30 cursor-grab active:cursor-grabbing transition-all duration-200',
+                    'relative group rounded-xl overflow-hidden bg-theme-hover cursor-grab active:cursor-grabbing transition-all duration-200',
                     selectedAsset === asset.id && 'ring-2 ring-gold-400',
                     draggingAssetId === asset.id && 'opacity-50'
                   )}
@@ -342,12 +308,7 @@ export function StickersPanel() {
                         </svg>
                       </button>
                     </MenuTrigger>
-                    <MenuPopover style={{ 
-                      background: 'linear-gradient(135deg, rgba(26, 26, 26, 0.98) 0%, rgba(18, 18, 18, 0.99) 100%)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)', 
-                      borderRadius: '12px',
-                      boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05), 0 4px 24px rgba(0, 0, 0, 0.5)'
-                    }}>
+                    <MenuPopover className="cadmus-popover">
                       <MenuList style={{ backgroundColor: 'transparent' }}>
                         <MenuItem
                           icon={<DeleteRegular />}
@@ -356,7 +317,7 @@ export function StickersPanel() {
                             setDeleteDialogAssetId(asset.id)
                             setMenuOpenAssetId(null)
                           }}
-                          style={{ backgroundColor: 'transparent', color: 'rgba(255,255,255,0.8)' }}
+                          style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
                         >
                           Delete
                         </MenuItem>
@@ -452,26 +413,21 @@ export function StickersPanel() {
         if (!data.open) setDeleteDialogAssetId(null)
       }}
     >
-      <DialogSurface style={{ 
-        background: 'linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(10, 10, 10, 0.99) 100%)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '16px',
-        boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 40px rgba(0, 0, 0, 0.6)'
-      }}>
+      <DialogSurface className="cadmus-dialog">
         <DialogBody>
-          <DialogTitle style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>Delete Sticker?</DialogTitle>
-          <DialogContent style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+          <DialogTitle style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Delete Sticker?</DialogTitle>
+          <DialogContent style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
             Are you sure you want to delete "{assetToDelete?.name}"?
           </DialogContent>
           <DialogActions>
             <Button
               appearance="secondary"
               onClick={() => setDeleteDialogAssetId(null)}
-              style={{ 
+              style={{
                 background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                border: '1px solid var(--border-default)',
                 borderRadius: '10px',
-                color: 'rgba(255,255,255,0.8)'
+                color: 'var(--text-secondary)'
               }}
             >
               Cancel
@@ -479,9 +435,9 @@ export function StickersPanel() {
             <Button
               appearance="primary"
               onClick={handleDeleteConfirm}
-              style={{ 
+              style={{
                 background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                color: '#050505',
+                color: 'var(--text-inverted)',
                 borderRadius: '10px',
                 fontWeight: 600
               }}

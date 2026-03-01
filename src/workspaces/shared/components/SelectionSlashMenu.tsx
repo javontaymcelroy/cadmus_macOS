@@ -223,6 +223,12 @@ export function SelectionSlashMenu({
       setSubmenuIndex(0)
       setCustomInputMode(false)
       setCustomInputText('')
+      // Scroll to top after layout settles (double rAF to wait for position refinement)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          menuRef.current?.scrollTo(0, 0)
+        })
+      })
     }
   }, [isOpen])
 
@@ -593,6 +599,7 @@ export function SelectionSlashMenu({
     }
 
     try {
+      const customInstruction = currentProject?.settings?.customAIPrompts?.[item.id]
       const request = {
         command: item.id,
         context,
@@ -604,7 +611,8 @@ export function SelectionSlashMenu({
         props: isScreenplay && props.length > 0 ? props : undefined,
         templateType: isScreenplay ? 'screenplay' : undefined,
         supplementaryContext: Object.keys(supplementaryContext).length > 0 ? supplementaryContext : undefined,
-        targetRuntimeMinutes: isScreenplay ? currentProject.settings?.targetRuntimeMinutes : undefined,
+        targetRuntimeMinutes: isScreenplay ? currentProject?.settings?.targetRuntimeMinutes : undefined,
+        customSystemPromptInstruction: customInstruction || undefined,
       }
 
       if (item.gated) {
@@ -719,12 +727,12 @@ export function SelectionSlashMenu({
       {/* Main menu */}
       <div
         ref={menuRef}
-        className="fixed bg-ink-900 border border-ink-600 rounded-lg shadow-2xl py-1.5 min-w-[280px] max-h-[500px] overflow-auto z-[100]"
+        className="fixed bg-[var(--bg-elevated)] border border-theme-default rounded-lg shadow-2xl py-1.5 min-w-[280px] max-h-[500px] overflow-auto z-[100]"
         style={{ top: position.top, left: position.left }}
         role="listbox"
         aria-label="AI Editing Tools"
       >
-        <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-ink-400 uppercase tracking-wider border-b border-ink-700 mb-1">
+        <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-theme-muted uppercase tracking-wider border-b border-theme-default mb-1">
           Edit Selection
         </div>
 
@@ -740,11 +748,11 @@ export function SelectionSlashMenu({
             <div key={itemKey}>
               {/* Separator */}
               {item.separator && (
-                <div className="h-px bg-ink-700 mx-2 my-1" />
+                <div className="h-px bg-[var(--bg-tertiary)] mx-2 my-1" />
               )}
               {/* Section header for Script Doctor */}
               {item.id === 'scriptDoctor' && (
-                <div className="px-3 py-1 text-[10px] font-ui font-semibold text-ink-400 uppercase tracking-wider">
+                <div className="px-3 py-1 text-[10px] font-ui font-semibold text-theme-muted uppercase tracking-wider">
                   Screenplay Craft
                 </div>
               )}
@@ -769,8 +777,8 @@ export function SelectionSlashMenu({
                 className={clsx(
                   'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
                   isSelected || isSubmenuOpen
-                    ? (item.gated ? 'bg-cyan-400/20 text-cyan-400' : 'bg-gold-400/20 text-gold-400')
-                    : 'text-white hover:bg-ink-800'
+                    ? (item.gated ? 'bg-cyan-400/20 text-cyan-400' : 'bg-gold-400/20 text-theme-accent')
+                    : 'text-theme-primary hover:bg-[var(--bg-hover)]'
                 )}
                 role="option"
                 aria-selected={isSelected}
@@ -781,7 +789,7 @@ export function SelectionSlashMenu({
                   'flex-shrink-0',
                   item.gated
                     ? (isSelected || isSubmenuOpen ? 'text-cyan-400' : 'text-cyan-400/60')
-                    : (isSelected || isSubmenuOpen ? 'text-gold-400' : 'text-ink-400')
+                    : (isSelected || isSubmenuOpen ? 'text-theme-accent' : 'text-theme-muted')
                 )}>
                   <Icon className="w-4 h-4" />
                 </span>
@@ -793,8 +801,8 @@ export function SelectionSlashMenu({
                   <div className={clsx(
                     'text-xs truncate',
                     item.gated
-                      ? (isSelected || isSubmenuOpen ? 'text-cyan-400/70' : 'text-ink-500')
-                      : (isSelected || isSubmenuOpen ? 'text-gold-400/70' : 'text-ink-500')
+                      ? (isSelected || isSubmenuOpen ? 'text-cyan-400/70' : 'text-theme-muted')
+                      : (isSelected || isSubmenuOpen ? 'text-gold-400/70' : 'text-theme-muted')
                   )}>
                     {item.description}
                   </div>
@@ -803,14 +811,14 @@ export function SelectionSlashMenu({
                 {hasSubmenu ? (
                   <ChevronRightRegular className={clsx(
                     'w-4 h-4 flex-shrink-0',
-                    isSelected || isSubmenuOpen ? 'text-gold-400' : 'text-ink-400'
+                    isSelected || isSubmenuOpen ? 'text-theme-accent' : 'text-theme-muted'
                   )} />
                 ) : (
                   <span className={clsx(
                     'flex-shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded',
                     isSelected
-                      ? (item.gated ? 'bg-cyan-400/30 text-cyan-400' : 'bg-gold-400/30 text-gold-400')
-                      : 'bg-ink-700 text-ink-400'
+                      ? (item.gated ? 'bg-cyan-400/30 text-cyan-400' : 'bg-[var(--accent-gold-muted)] text-theme-accent')
+                      : 'bg-[var(--bg-tertiary)] text-theme-muted'
                   )}>
                     {item.shortcut}
                   </span>
@@ -821,8 +829,8 @@ export function SelectionSlashMenu({
         })}
 
         {customInputMode ? (
-          <div className="px-3 py-2 border-t border-ink-700 mt-1">
-            <div className="text-[10px] font-ui font-semibold text-gold-400 uppercase tracking-wider mb-2">
+          <div className="px-3 py-2 border-t border-theme-default mt-1">
+            <div className="text-[10px] font-ui font-semibold text-theme-accent uppercase tracking-wider mb-2">
               Custom Prompt
             </div>
             <input
@@ -843,16 +851,15 @@ export function SelectionSlashMenu({
                 }
               }}
               placeholder="Describe what to do with the selected text..."
-              className="w-full bg-ink-800 border border-ink-600 rounded-md px-3 py-2 text-sm font-ui text-white placeholder-ink-500 focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
-              autoFocus
+              className="w-full bg-[var(--bg-tertiary)] border border-theme-default rounded-md px-3 py-2 text-sm font-ui text-theme-primary placeholder-theme-muted focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
             />
-            <div className="mt-2 text-[10px] text-ink-500 font-ui">
-              <span className="text-ink-400">Enter</span> Submit • <span className="text-ink-400">Esc</span> Back
+            <div className="mt-2 text-[10px] text-theme-muted font-ui">
+              <span className="text-theme-muted">Enter</span> Submit • <span className="text-theme-muted">Esc</span> Back
             </div>
           </div>
         ) : (
-          <div className="px-3 py-1.5 mt-1 border-t border-ink-700 text-[10px] text-ink-500 font-ui">
-            <span className="text-ink-400">↑↓</span> Navigate • <span className="text-ink-400">Enter</span> Select • <span className="text-ink-400">Esc</span> Close
+          <div className="px-3 py-1.5 mt-1 border-t border-theme-default text-[10px] text-theme-muted font-ui">
+            <span className="text-theme-muted">↑↓</span> Navigate • <span className="text-theme-muted">Enter</span> Select • <span className="text-theme-muted">Esc</span> Close
           </div>
         )}
       </div>
@@ -861,12 +868,12 @@ export function SelectionSlashMenu({
       {activeSubmenu && currentSubmenu && submenuPosition && (
         <div
           ref={submenuRef}
-          className="fixed bg-ink-900 border border-ink-600 rounded-lg shadow-2xl py-1.5 min-w-[220px] max-h-[400px] overflow-auto z-[101]"
+          className="fixed bg-[var(--bg-elevated)] border border-theme-default rounded-lg shadow-2xl py-1.5 min-w-[220px] max-h-[400px] overflow-auto z-[101]"
           style={{ top: submenuPosition.top, left: submenuPosition.left }}
           role="menu"
           aria-label="Tone Options"
         >
-          <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-ink-400 uppercase tracking-wider border-b border-ink-700 mb-1">
+          <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-theme-muted uppercase tracking-wider border-b border-theme-default mb-1">
             Select Tone
           </div>
 
@@ -881,8 +888,8 @@ export function SelectionSlashMenu({
                 className={clsx(
                   'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
                   isSelected
-                    ? 'bg-gold-400/20 text-gold-400'
-                    : 'text-white hover:bg-ink-800'
+                    ? 'bg-gold-400/20 text-theme-accent'
+                    : 'text-theme-primary hover:bg-[var(--bg-hover)]'
                 )}
                 role="menuitem"
               >
@@ -892,7 +899,7 @@ export function SelectionSlashMenu({
                   </div>
                   <div className={clsx(
                     'text-xs truncate',
-                    isSelected ? 'text-gold-400/70' : 'text-ink-500'
+                    isSelected ? 'text-gold-400/70' : 'text-theme-muted'
                   )}>
                     {tone.description}
                   </div>
@@ -901,8 +908,8 @@ export function SelectionSlashMenu({
             )
           })}
 
-          <div className="px-3 py-1.5 mt-1 border-t border-ink-700 text-[10px] text-ink-500 font-ui">
-            <span className="text-ink-400">←</span> Back • <span className="text-ink-400">Enter</span> Select
+          <div className="px-3 py-1.5 mt-1 border-t border-theme-default text-[10px] text-theme-muted font-ui">
+            <span className="text-theme-muted">←</span> Back • <span className="text-theme-muted">Enter</span> Select
           </div>
         </div>
       )}

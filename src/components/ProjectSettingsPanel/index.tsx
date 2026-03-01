@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { clsx } from 'clsx'
-import { ArrowResetRegular, CheckmarkRegular, DismissRegular } from '@fluentui/react-icons'
+import { ArrowResetRegular, CheckmarkRegular, DismissRegular, ChevronDownRegular } from '@fluentui/react-icons'
 import { useProjectStore } from '../../stores/projectStore'
 import { FONT_FAMILIES } from '../../workspaces/shared/extensions/FontFamily'
+import { SLASH_COMMANDS_GENERATE, SLASH_COMMANDS_SELECTION, SLASH_COMMANDS_SELECTION_GENERAL } from '../../workspaces/shared/extensions/SlashCommand'
 import type { FormattingRules, HeadingTypography } from '../../types/project'
 
 // Interface scale steps
@@ -31,6 +32,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'h2', label: 'Heading 2' },
   { id: 'h3', label: 'Heading 3' },
   { id: 'layout', label: 'Layout' },
+  { id: 'aiPrompts', label: 'AI Prompts' },
 ] as const
 
 // Setting row component
@@ -118,60 +120,60 @@ function ColorPicker({ value, onChange, label }: {
   onChange: (val: string | undefined) => void
   label: string
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [showPicker, setShowPicker] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
 
+  // Close on click outside
   useEffect(() => {
-    if (!isOpen) return
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false)
+    if (!showPicker) return
+    const handleClick = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowPicker(false)
       }
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [isOpen])
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showPicker])
 
   return (
-    <div ref={containerRef} className="relative">
+    <div className="relative" ref={pickerRef}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme-default hover:border-theme-strong transition-colors"
-        title={label}
+        onClick={() => setShowPicker(!showPicker)}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme-subtle hover:bg-theme-hover transition-colors"
       >
         <div
-          className="w-5 h-5 rounded border border-theme-subtle"
+          className="w-4 h-4 rounded-sm border border-theme-subtle"
           style={{ backgroundColor: value || 'var(--text-primary)' }}
         />
-        <span className="text-xs text-theme-secondary">
+        <span className="text-xs text-theme-secondary font-mono">
           {value || 'Default'}
         </span>
       </button>
 
-      {isOpen && (
-        <div className="absolute top-full right-0 mt-1 p-3 bg-theme-elevated border border-theme-default rounded-lg shadow-lg z-50 min-w-[200px]">
-          <div className="grid grid-cols-4 gap-1.5 mb-3">
-            {COLOR_PRESETS.map((color) => (
+      {showPicker && (
+        <div className="absolute right-0 top-full mt-1 z-20 p-3 rounded-lg border border-theme-default bg-theme-elevated shadow-xl min-w-[200px]">
+          <div className="grid grid-cols-6 gap-1.5 mb-3">
+            {COLOR_PRESETS.map((preset) => (
               <button
-                key={color.name}
+                key={preset.value || 'default'}
                 onClick={() => {
-                  onChange(color.value || undefined)
-                  setIsOpen(false)
+                  onChange(preset.value || undefined)
+                  setShowPicker(false)
                 }}
+                title={preset.name}
                 className={clsx(
-                  'w-8 h-8 rounded-md border transition-all',
-                  value === color.value || (!value && !color.value)
-                    ? 'border-theme-accent ring-1 ring-gold-400 scale-110'
-                    : 'border-theme-subtle hover:border-theme-default hover:scale-105'
+                  'w-6 h-6 rounded-sm border transition-transform hover:scale-110',
+                  (value || '') === preset.value
+                    ? 'ring-2 ring-gold-400 border-gold-400'
+                    : 'border-theme-subtle'
                 )}
                 style={{
-                  backgroundColor: color.value || 'var(--text-primary)',
+                  backgroundColor: preset.value || 'var(--text-primary)',
                 }}
-                title={color.name}
               />
             ))}
           </div>
-          <div className="flex items-center gap-2 pt-2 border-t border-theme-subtle">
+          <div className="flex items-center gap-2">
             <span className="text-xs text-theme-muted">Custom:</span>
             <input
               type="color"
@@ -265,6 +267,21 @@ function hasChanges(a: EditableFields, b: EditableFields): boolean {
   return JSON.stringify(a) !== JSON.stringify(b)
 }
 
+// Commands to exclude from the prompt editor (user-driven, not customizable)
+const EXCLUDED_COMMANDS = new Set(['customPrompt', 'ask'])
+
+// Get unique, non-gated, non-excluded commands for prompt editing
+function getEditableCommands(isScreenplay: boolean) {
+  const selectionCommands = isScreenplay ? SLASH_COMMANDS_SELECTION : SLASH_COMMANDS_SELECTION_GENERAL
+  const allCommands = [...SLASH_COMMANDS_GENERATE, ...selectionCommands]
+  const seen = new Set<string>()
+  return allCommands.filter(cmd => {
+    if (seen.has(cmd.id) || cmd.gated || EXCLUDED_COMMANDS.has(cmd.id)) return false
+    seen.add(cmd.id)
+    return true
+  })
+}
+
 export function ProjectSettingsPanel() {
   const { currentProject, updateProjectSettings, setSettingsPanelOpen } = useProjectStore()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -281,6 +298,31 @@ export function ProjectSettingsPanel() {
   const [draftTargetRuntime, setDraftTargetRuntime] = useState<number | undefined>(
     currentProject.settings.targetRuntimeMinutes
   )
+
+  // Draft state for custom AI prompts
+  const [draftCustomPrompts, setDraftCustomPrompts] = useState<Record<string, string>>(
+    () => {
+      const prompts: Record<string, string> = {}
+      const saved = currentProject.settings.customAIPrompts
+      if (saved) {
+        for (const [key, val] of Object.entries(saved)) {
+          if (val !== undefined) prompts[key] = val
+        }
+      }
+      return prompts
+    }
+  )
+
+  // Default instruction text fetched from the AI service
+  const [defaultInstructions, setDefaultInstructions] = useState<{ prose: Record<string, string>; screenplay: Record<string, string> } | null>(null)
+
+  // Expanded prompt editor state
+  const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null)
+
+  // Fetch default instructions on mount
+  useEffect(() => {
+    window.api.aiWriting.getDefaultInstructions().then(setDefaultInstructions).catch(() => {})
+  }, [])
 
   // Interface scale state (applied immediately, not part of the save/cancel flow)
   const [interfaceScale, setInterfaceScale] = useState(100)
@@ -300,8 +342,10 @@ export function ProjectSettingsPanel() {
   }
 
   // Track whether we have unsaved changes
+  const customPromptsChanged = JSON.stringify(draftCustomPrompts) !== JSON.stringify(currentProject.settings.customAIPrompts || {})
   const dirty = hasChanges(draft, getEditableFields(rules))
     || draftTargetRuntime !== currentProject.settings.targetRuntimeMinutes
+    || customPromptsChanged
 
   const updateDraft = (partial: Partial<EditableFields>) => {
     setDraft(prev => ({ ...prev, ...partial }))
@@ -314,10 +358,23 @@ export function ProjectSettingsPanel() {
     }))
   }
 
+  const handleUpdatePrompt = (commandId: string, text: string | undefined) => {
+    setDraftCustomPrompts(prev => {
+      if (text === undefined) {
+        const next = { ...prev }
+        delete next[commandId]
+        return next
+      }
+      return { ...prev, [commandId]: text }
+    })
+  }
+
   const handleSave = () => {
+    const customPrompts = Object.keys(draftCustomPrompts).length > 0 ? draftCustomPrompts : undefined
     updateProjectSettings({
       formattingRules: { ...rules, ...draft },
       targetRuntimeMinutes: draftTargetRuntime,
+      customAIPrompts: customPrompts,
     })
     setSettingsPanelOpen(false)
   }
@@ -341,7 +398,11 @@ export function ProjectSettingsPanel() {
       h3: undefined,
     })
     setDraftTargetRuntime(undefined)
+    setDraftCustomPrompts({})
   }
+
+  const editableCommands = getEditableCommands(isScreenplay)
+  const instructions = isScreenplay ? defaultInstructions?.screenplay : defaultInstructions?.prose
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -597,6 +658,67 @@ export function ProjectSettingsPanel() {
               </div>
             </section>
           )}
+
+          {/* AI Prompts Section */}
+          <section id="settings-aiPrompts">
+            <h3 className="text-xs font-ui font-semibold text-theme-accent uppercase tracking-wider mb-2">
+              AI Prompts
+            </h3>
+            <p className="text-xs text-theme-muted mb-4">
+              Customize the instruction prompts for each AI writing command. The base writing philosophy and format guides are prepended automatically.
+            </p>
+            <div className="space-y-1">
+              {editableCommands.map(cmd => {
+                const isExpanded = expandedPrompt === cmd.id
+                const currentValue = draftCustomPrompts[cmd.id]
+                const defaultValue = instructions?.[cmd.id] || ''
+                const isCustomized = currentValue !== undefined
+
+                return (
+                  <div key={cmd.id} className="border border-theme-subtle rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => setExpandedPrompt(isExpanded ? null : cmd.id)}
+                      className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-theme-hover transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium text-theme-primary">{cmd.name}</span>
+                        {isCustomized && (
+                          <span className="text-[10px] font-ui font-semibold text-gold-400 uppercase tracking-wider">
+                            Customized
+                          </span>
+                        )}
+                      </div>
+                      <ChevronDownRegular className={clsx(
+                        'w-3.5 h-3.5 text-theme-muted transition-transform shrink-0',
+                        isExpanded && 'rotate-180'
+                      )} />
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-3 pb-3 space-y-2 border-t border-theme-subtle">
+                        <p className="text-xs text-theme-muted pt-2">{cmd.description}</p>
+                        <textarea
+                          value={currentValue ?? defaultValue}
+                          onChange={(e) => handleUpdatePrompt(cmd.id, e.target.value)}
+                          className="w-full h-48 text-xs font-mono bg-[var(--bg-tertiary)] border border-theme-subtle rounded-lg p-3 resize-y text-theme-primary placeholder-theme-muted focus:outline-none focus:border-gold-400/50 focus:ring-1 focus:ring-gold-400/30"
+                          placeholder="Enter custom instruction..."
+                        />
+                        {isCustomized && (
+                          <button
+                            onClick={() => handleUpdatePrompt(cmd.id, undefined)}
+                            className="flex items-center gap-1 text-xs text-theme-muted hover:text-theme-accent transition-colors"
+                          >
+                            <ArrowResetRegular className="w-3 h-3" />
+                            Reset to Default
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
 
           {/* Reset */}
           <div className="pt-4 border-t border-theme-subtle">

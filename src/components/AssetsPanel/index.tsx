@@ -18,49 +18,15 @@ import {
   DialogActions,
   Button,
   FluentProvider,
-  createDarkTheme
 } from '@fluentui/react-components'
-import type { BrandVariants } from '@fluentui/react-components'
 import { DeleteRegular, VideoClipRegular, ImageRegular } from '@fluentui/react-icons'
-
-// Custom brand colors matching the gold theme
-const customBrand: BrandVariants = {
-  10: '#1a1a1a',
-  20: '#1a1a1a',
-  30: '#1a1a1a',
-  40: '#1a1a1a',
-  50: '#1a1a1a',
-  60: '#1a1a1a',
-  70: '#fbbf24',
-  80: '#fbbf24',
-  90: '#fbbf24',
-  100: '#fbbf24',
-  110: '#fbbf24',
-  120: '#fbbf24',
-  130: '#fbbf24',
-  140: '#fbbf24',
-  150: '#fbbf24',
-  160: '#fbbf24'
-}
-
-const darkTheme = {
-  ...createDarkTheme(customBrand),
-  colorNeutralBackground1: 'transparent',
-  colorNeutralBackground1Hover: '#2a2a2a',
-  colorNeutralBackground1Pressed: '#333333',
-  colorNeutralBackground2: 'transparent',
-  colorNeutralBackground3: 'transparent',
-  colorSubtleBackground: 'transparent',
-  colorSubtleBackgroundHover: '#2a2a2a',
-  colorNeutralForeground1: '#ffffff',
-  colorNeutralForeground2: 'rgba(255,255,255,0.8)',
-  colorNeutralStroke1: '#333333'
-}
+import { useFluentTheme } from '../../hooks/useFluentTheme'
 
 // Asset section type for the panel
 type AssetSection = 'general' | 'storyboard'
 
 export function AssetsPanel() {
+  const fluentTheme = useFluentTheme()
   const { currentProject, assets, addAsset, addAssetFromBuffer, removeAsset, updateAssetCategory } = useProjectStore()
   const { showStoryboardPanel } = useWorkspace()
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
@@ -247,7 +213,7 @@ export function AssetsPanel() {
       // For images, show a thumbnail using the custom cadmus-asset protocol
       const assetUrl = window.api.utils.getAssetUrl(currentProject.path, asset.path)
       return (
-        <div className="w-10 h-10 rounded bg-ink-800 overflow-hidden flex items-center justify-center">
+        <div className="w-10 h-10 rounded bg-[var(--bg-tertiary)] overflow-hidden flex items-center justify-center">
           <img 
             src={assetUrl} 
             alt={asset.name}
@@ -262,7 +228,7 @@ export function AssetsPanel() {
     }
     
     return (
-      <div className="w-10 h-10 rounded bg-ink-700 flex items-center justify-center text-ink-300">
+      <div className="w-10 h-10 rounded bg-[var(--bg-tertiary)] flex items-center justify-center text-theme-muted">
         {getAssetIcon(asset)}
       </div>
     )
@@ -378,12 +344,7 @@ export function AssetsPanel() {
                     </svg>
                   </button>
                 </MenuTrigger>
-                <MenuPopover style={{ 
-                  background: 'linear-gradient(135deg, rgba(26, 26, 26, 0.98) 0%, rgba(18, 18, 18, 0.99) 100%)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)', 
-                  borderRadius: '12px',
-                  boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05), 0 4px 24px rgba(0, 0, 0, 0.5)'
-                }}>
+                <MenuPopover className="cadmus-popover">
                   <MenuList style={{ backgroundColor: 'transparent' }}>
                     <MenuItem
                       icon={<DeleteRegular />}
@@ -395,7 +356,7 @@ export function AssetsPanel() {
                           setSelectedAsset(null)
                         }
                       }}
-                      style={{ backgroundColor: 'transparent', color: 'rgba(255,255,255,0.8)' }}
+                      style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
                     >
                       Delete
                     </MenuItem>
@@ -443,7 +404,7 @@ export function AssetsPanel() {
   if (!currentProject) return null
 
   return (
-    <FluentProvider theme={darkTheme} style={{ background: 'transparent', height: '100%' }}>
+    <FluentProvider theme={fluentTheme} style={{ background: 'transparent', height: '100%' }}>
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-theme-subtle bg-theme-header">
@@ -624,15 +585,10 @@ export function AssetsPanel() {
         if (!data.open) setDeleteDialogAssetId(null)
       }}
     >
-      <DialogSurface style={{ 
-        background: 'linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(10, 10, 10, 0.99) 100%)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '16px',
-        boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 40px rgba(0, 0, 0, 0.6)'
-      }}>
+      <DialogSurface className="cadmus-dialog">
         <DialogBody>
-          <DialogTitle style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>Delete Asset?</DialogTitle>
-          <DialogContent style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+          <DialogTitle style={{ color: 'var(--text-primary)', fontWeight: 500 }}>Delete Asset?</DialogTitle>
+          <DialogContent style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
             Are you sure you want to delete "{assetToDelete?.name}"? 
             {assetToDelete && assetToDelete.references.length > 0 && (
               <span className="block mt-2 text-gold-400/80">
@@ -645,11 +601,11 @@ export function AssetsPanel() {
             <Button
               appearance="secondary"
               onClick={() => setDeleteDialogAssetId(null)}
-              style={{ 
+              style={{
                 background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                border: '1px solid var(--border-default)',
                 borderRadius: '10px',
-                color: 'rgba(255,255,255,0.8)'
+                color: 'var(--text-secondary)'
               }}
             >
               Cancel
@@ -657,9 +613,9 @@ export function AssetsPanel() {
             <Button
               appearance="primary"
               onClick={handleDeleteConfirm}
-              style={{ 
+              style={{
                 background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                color: '#050505',
+                color: 'var(--text-inverted)',
                 borderRadius: '10px',
                 fontWeight: 600
               }}

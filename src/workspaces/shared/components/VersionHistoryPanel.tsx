@@ -291,35 +291,35 @@ export function VersionHistoryPanel({ versions, selectedVersionId, onClose, useM
   
   if (!selectedVersion) {
     return (
-      <div className="flex-1 flex flex-col bg-ink-900 border-l border-ink-700">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-ink-700">
-          <h3 className="text-sm font-medium text-white">Version History</h3>
+      <div className="flex-1 flex flex-col bg-[var(--bg-elevated)] border-l border-theme-default">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-theme-default">
+          <h3 className="text-sm font-medium text-theme-primary">Version History</h3>
           <button
             onClick={onClose}
-            className="p-1 text-ink-400 hover:text-white transition-colors"
+            className="p-1 text-theme-muted hover:text-theme-primary transition-colors"
             title="Close version history"
           >
             <DismissRegular className="w-5 h-5" />
           </button>
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-ink-400 text-sm">No versions saved yet</p>
+          <p className="text-theme-muted text-sm">No versions saved yet</p>
         </div>
       </div>
     )
   }
   
   return (
-    <div className="flex-1 flex flex-col bg-ink-900 border-l border-ink-700 min-w-0">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-ink-700 bg-ink-800/50">
-        <HistoryRegular className="w-5 h-5 text-gold-400" />
-        <h3 className="text-sm font-medium text-white">Version History</h3>
+    <div className="flex-1 flex flex-col bg-[var(--bg-elevated)] border-l border-theme-default min-w-0">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-theme-default bg-ink-800/50">
+        <HistoryRegular className="w-5 h-5 text-theme-accent" />
+        <h3 className="text-sm font-medium text-theme-primary">Version History</h3>
         
         <div className="relative flex-1 max-w-[280px]">
           <select
             value={selectedVersion.id}
             onChange={(e) => handleVersionSelect(e.target.value)}
-            className="w-full appearance-none bg-ink-700 border border-ink-600 rounded-md px-3 py-1.5 pr-8 text-sm text-white focus:outline-none focus:ring-2 focus:ring-gold-400/50"
+            className="w-full appearance-none bg-[var(--bg-tertiary)] border border-theme-default rounded-md px-3 py-1.5 pr-8 text-sm text-theme-primary focus:outline-none focus:ring-2 focus:ring-gold-400/50"
           >
             {versions.map((version) => (
               <option key={version.id} value={version.id}>
@@ -328,7 +328,7 @@ export function VersionHistoryPanel({ versions, selectedVersionId, onClose, useM
               </option>
             ))}
           </select>
-          <ChevronDownRegular className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none" />
+          <ChevronDownRegular className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted pointer-events-none" />
         </div>
         
         <div className="flex items-center gap-2 ml-auto">
@@ -351,7 +351,7 @@ export function VersionHistoryPanel({ versions, selectedVersionId, onClose, useM
           
           <button
             onClick={onClose}
-            className="p-1.5 text-ink-400 hover:text-white transition-colors"
+            className="p-1.5 text-theme-muted hover:text-theme-primary transition-colors"
             title="Close version history"
           >
             <DismissRegular className="w-5 h-5" />
@@ -360,14 +360,14 @@ export function VersionHistoryPanel({ versions, selectedVersionId, onClose, useM
       </div>
       
       <div className="px-4 py-2 border-b border-ink-700/50 bg-ink-800/30">
-        <div className="flex items-center gap-4 text-xs text-ink-400">
+        <div className="flex items-center gap-4 text-xs text-theme-muted">
           <span>{formatDate(selectedVersion.timestamp)}</span>
           <span>•</span>
           <span>{selectedVersion.wordCount.toLocaleString()} words</span>
           {selectedVersion.label && (
             <>
               <span>•</span>
-              <span className="text-gold-400">{selectedVersion.label}</span>
+              <span className="text-theme-accent">{selectedVersion.label}</span>
             </>
           )}
         </div>
@@ -386,7 +386,7 @@ export function VersionHistoryPanel({ versions, selectedVersionId, onClose, useM
                   <HeadingTag 
                     key={paraIndex}
                     className={clsx(
-                      "font-bold text-white",
+                      "font-bold text-theme-primary",
                       para.level === 1 && "text-2xl",
                       para.level === 2 && "text-xl",
                       para.level === 3 && "text-lg"
@@ -404,7 +404,7 @@ export function VersionHistoryPanel({ versions, selectedVersionId, onClose, useM
               )
             })}
             {paragraphDiffs.length === 0 && (
-              <p className="text-ink-400 italic">No differences found</p>
+              <p className="text-theme-muted italic">No differences found</p>
             )}
           </div>
         </div>

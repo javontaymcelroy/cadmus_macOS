@@ -120,7 +120,7 @@ export const MentionSuggestion = forwardRef<MentionSuggestionRef, MentionSuggest
 
     if (totalItems === 0) {
       return (
-        <div className="bg-ink-900 border border-ink-600 rounded-lg shadow-2xl p-3 min-w-[200px]">
+        <div className="bg-[var(--bg-elevated)] border border-theme-default rounded-lg shadow-2xl p-3 min-w-[200px]">
           <p className="text-sm text-white/40 font-ui text-center">
             No matches found
           </p>
@@ -133,11 +133,11 @@ export const MentionSuggestion = forwardRef<MentionSuggestionRef, MentionSuggest
     const props = items.filter(item => item.type === 'prop')
 
     return (
-      <div className="bg-ink-900 border border-ink-600 rounded-lg shadow-2xl py-1 min-w-[240px] max-h-[320px] overflow-auto">
+      <div className="bg-[var(--bg-elevated)] border border-theme-default rounded-lg shadow-2xl py-1 min-w-[240px] max-h-[320px] overflow-auto">
         {/* Characters section */}
         {characters.length > 0 && (
           <>
-            <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-ink-400 uppercase tracking-wider border-b border-ink-700 mb-1">
+            <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-theme-muted uppercase tracking-wider border-b border-theme-default mb-1">
               Characters
             </div>
             {characters.map((item) => {
@@ -151,7 +151,7 @@ export const MentionSuggestion = forwardRef<MentionSuggestionRef, MentionSuggest
                     'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
                     itemIndex === selectedIndex
                       ? 'bg-gold-400/20'
-                      : 'hover:bg-ink-800'
+                      : 'hover:bg-[var(--bg-hover)]'
                   )}
                 >
                   <div
@@ -179,7 +179,7 @@ export const MentionSuggestion = forwardRef<MentionSuggestionRef, MentionSuggest
         {props.length > 0 && (
           <>
             <div className={clsx(
-              "px-3 py-1.5 text-[10px] font-ui font-semibold text-ink-400 uppercase tracking-wider border-b border-ink-700 mb-1",
+              "px-3 py-1.5 text-[10px] font-ui font-semibold text-theme-muted uppercase tracking-wider border-b border-theme-default mb-1",
               characters.length > 0 && "border-t mt-1"
             )}>
               Props
@@ -196,14 +196,14 @@ export const MentionSuggestion = forwardRef<MentionSuggestionRef, MentionSuggest
                     'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
                     itemIndex === selectedIndex
                       ? 'bg-gold-400/20'
-                      : 'hover:bg-ink-800'
+                      : 'hover:bg-[var(--bg-hover)]'
                   )}
                 >
                   <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 bg-gold-400/20">
-                    <IconComponent className="w-3.5 h-3.5 text-gold-400" />
+                    <IconComponent className="w-3.5 h-3.5 text-theme-accent" />
                   </div>
                   <span
-                    className="text-sm font-medium truncate text-gold-400"
+                    className="text-sm font-medium truncate text-theme-accent"
                     style={{ fontFamily: 'Courier New, Courier, monospace' }}
                   >
                     {item.label}
@@ -218,7 +218,7 @@ export const MentionSuggestion = forwardRef<MentionSuggestionRef, MentionSuggest
         {(showCreateCharacter || showCreateProp) && (
           <>
             <div className={clsx(
-              "px-3 py-1.5 text-[10px] font-ui font-semibold text-ink-400 uppercase tracking-wider border-b border-ink-700 mb-1",
+              "px-3 py-1.5 text-[10px] font-ui font-semibold text-theme-muted uppercase tracking-wider border-b border-theme-default mb-1",
               (characters.length > 0 || props.length > 0) && "border-t mt-1"
             )}>
               Create New
@@ -232,16 +232,16 @@ export const MentionSuggestion = forwardRef<MentionSuggestionRef, MentionSuggest
                   'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
                   selectedIndex === createCharacterIndex
                     ? 'bg-gold-400/20'
-                    : 'hover:bg-ink-800'
+                    : 'hover:bg-[var(--bg-hover)]'
                 )}
               >
                 <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 bg-gold-400/20 border border-gold-400/30">
-                  <AddRegular className="w-3.5 h-3.5 text-gold-400" />
+                  <AddRegular className="w-3.5 h-3.5 text-theme-accent" />
                 </div>
                 <span className="text-sm font-ui">
                   <span className="text-white/60">Character: </span>
                   <span
-                    className="font-medium text-gold-400"
+                    className="font-medium text-theme-accent"
                     style={{ fontFamily: 'Courier New, Courier, monospace' }}
                   >
                     {trimmedQuery.toUpperCase()}
@@ -258,16 +258,16 @@ export const MentionSuggestion = forwardRef<MentionSuggestionRef, MentionSuggest
                   'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
                   selectedIndex === createPropIndex
                     ? 'bg-gold-400/20'
-                    : 'hover:bg-ink-800'
+                    : 'hover:bg-[var(--bg-hover)]'
                 )}
               >
                 <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 bg-gold-400/20 border border-gold-400/30">
-                  <AddRegular className="w-3.5 h-3.5 text-gold-400" />
+                  <AddRegular className="w-3.5 h-3.5 text-theme-accent" />
                 </div>
                 <span className="text-sm font-ui">
                   <span className="text-white/60">Prop: </span>
                   <span
-                    className="font-medium text-gold-400"
+                    className="font-medium text-theme-accent"
                     style={{ fontFamily: 'Courier New, Courier, monospace' }}
                   >
                     {trimmedQuery.toUpperCase()}
@@ -278,8 +278,8 @@ export const MentionSuggestion = forwardRef<MentionSuggestionRef, MentionSuggest
           </>
         )}
 
-        <div className="px-3 py-1.5 mt-1 border-t border-ink-700 text-[10px] text-ink-500 font-ui">
-          <span className="text-ink-400">↑↓</span> Navigate • <span className="text-ink-400">Enter</span> Select • <span className="text-ink-400">Esc</span> Close
+        <div className="px-3 py-1.5 mt-1 border-t border-theme-default text-[10px] text-theme-muted font-ui">
+          <span className="text-theme-muted">↑↓</span> Navigate • <span className="text-theme-muted">Enter</span> Select • <span className="text-theme-muted">Esc</span> Close
         </div>
       </div>
     )

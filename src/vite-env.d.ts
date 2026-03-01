@@ -76,6 +76,7 @@ interface AIWritingRequest {
   sceneContext?: AISceneContext
   targetRuntimeMinutes?: number
   userQuestion?: string
+  customSystemPromptInstruction?: string
 }
 
 interface AIWritingResponse {
@@ -233,6 +234,7 @@ interface ElectronAPI {
   aiWriting: {
     generate: (request: AIWritingRequest) => Promise<AIWritingResponse>
     hasApiKey: () => Promise<boolean>
+    getDefaultInstructions: () => Promise<{ prose: Record<string, string>; screenplay: Record<string, string> }>
   }
   gatedWriting: {
     generate: (request: AIWritingRequest, storyFacts?: any, forceOverride?: boolean) => Promise<PipelineResultAPI>
@@ -251,8 +253,28 @@ interface ElectronAPI {
     get: () => Promise<number>
     set: (scale: number) => Promise<void>
   }
+  panelWidths?: {
+    get: () => Promise<Record<string, number>>
+    set: (widths: Record<string, number>) => Promise<void>
+  }
+  theme?: {
+    get: () => Promise<'dark' | 'light'>
+    set: (theme: 'dark' | 'light') => Promise<void>
+  }
   window: {
     onFullScreenChange: (callback: (isFullScreen: boolean) => void) => () => void
+  }
+  workspace?: {
+    load: (projectPath: string) => Promise<import('../shared/workspaceStateTypes').WorkspaceState | null>
+    saveLayout: (projectPath: string, layout: import('../shared/workspaceStateTypes').WorkspaceLayoutState) => Promise<void>
+    saveDocumentView: (projectPath: string, docId: string, viewState: import('../shared/workspaceStateTypes').DocumentViewState) => Promise<void>
+    removeDocumentView: (projectPath: string, docId: string) => Promise<void>
+  }
+  behaviorPolicy?: {
+    submitFeedback: (feedback: import('../shared/behaviorPolicyTypes').FeedbackSubmission) => Promise<{ updatedVector: import('../shared/behaviorPolicyTypes').BehaviorVector }>
+    getVector: (projectPath: string | null, context: import('../shared/behaviorPolicyTypes').InteractionContext) => Promise<import('../shared/behaviorPolicyTypes').BehaviorVector>
+    reset: (projectPath: string | null, level: 'global' | 'project' | 'session') => Promise<void>
+    getFeedbackSummary: (projectPath: string) => Promise<{ totalThumbsUp: number; totalThumbsDown: number; recentEntries: import('../shared/behaviorPolicyTypes').FeedbackEntry[] }>
   }
 }
 

@@ -114,6 +114,8 @@ export interface AIWritingRequest {
   sceneContext?: SceneContext
   /** User's freeform question for the 'ask' command */
   userQuestion?: string
+  /** Custom system prompt instruction override (replaces default instruction for this command) */
+  customSystemPromptInstruction?: string
 }
 
 /**

@@ -22,6 +22,7 @@ import {
   SaveArrowRightFilled
 } from '@fluentui/react-icons'
 import { getPropIconComponent } from '../PropsPanel'
+import { DEFAULT_STICKERS } from '../StickersPanel'
 import { SaveVersionButton } from '../../workspaces/shared/components'
 import { SETTINGS_SECTIONS } from '../ProjectSettingsPanel'
 
@@ -109,8 +110,8 @@ function formatRelativeTime(dateString: string): string {
 }
 
 export function ProjectExplorer() {
-  const { 
-    currentProject, 
+  const {
+    currentProject,
     activeDocumentId,
     documents,
     setActiveDocument,
@@ -124,7 +125,11 @@ export function ProjectExplorer() {
     characterReferences,
     propReferences,
     ui,
-    toggleSettingsPanel
+    toggleSettingsPanel,
+    getStickersForDocument,
+    expandedFolders,
+    toggleFolder,
+    setExpandedFolders
   } = useProjectStore()
   
   const [isExporting, setIsExporting] = useState(false)
@@ -148,15 +153,6 @@ export function ProjectExplorer() {
   const [editingTitle, setEditingTitle] = useState('')
   const [editingProjectName, setEditingProjectName] = useState(false)
   const [projectNameInput, setProjectNameInput] = useState('')
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
-    // Start with all parent documents expanded by default
-    if (!currentProject) return new Set<string>()
-    const parentIds = new Set<string>()
-    for (const doc of currentProject.documents) {
-      if (doc.parentId) parentIds.add(doc.parentId)
-    }
-    return parentIds
-  })
   const [showAddMenu, setShowAddMenu] = useState(false)
   const addMenuRef = useRef<HTMLDivElement>(null)
   const addButtonRef = useRef<HTMLButtonElement>(null)
@@ -409,18 +405,6 @@ export function ProjectExplorer() {
     }
   }
 
-  const toggleFolder = (folderId: string) => {
-    setExpandedFolders(prev => {
-      const next = new Set(prev)
-      if (next.has(folderId)) {
-        next.delete(folderId)
-      } else {
-        next.add(folderId)
-      }
-      return next
-    })
-  }
-
   // Helper to check if a document is a descendant of another (prevents circular references)
   const isDescendantOf = (docId: string, potentialAncestorId: string): boolean => {
     let current = regularDocs.find(d => d.id === docId)
@@ -526,11 +510,9 @@ export function ProjectExplorer() {
     if (dropPosition === 'inside') {
       await moveDocument(draggedId, targetDoc.id)
       // Auto-expand the target folder to show the dropped item
-      setExpandedFolders(prev => {
-        const next = new Set(prev)
-        next.add(targetDoc.id)
-        return next
-      })
+      const next = new Set(expandedFolders)
+      next.add(targetDoc.id)
+      setExpandedFolders(next)
       return
     }
 
@@ -725,13 +707,59 @@ export function ProjectExplorer() {
             </div>
           )}
 
+          {/* Sticker previews — tiny sticker thumbnails at the end of the nav item */}
+          {(() => {
+            const docStickers = getStickersForDocument(doc.id)
+            if (docStickers.length === 0) return null
+            // Show up to 3 sticker previews, stacked/overlapping slightly
+            const previewStickers = docStickers.slice(0, 3)
+            return (
+              <div className="flex items-center shrink-0 ml-auto pl-1" style={{ marginRight: -2 }}>
+                {previewStickers.map((sticker, i) => {
+                  const isDefault = sticker.assetId.startsWith('default:')
+                  let src: string | null = null
+                  let name = 'sticker'
+                  if (isDefault) {
+                    const def = DEFAULT_STICKERS.find(s => s.id === sticker.assetId)
+                    if (def) { src = def.src; name = def.name }
+                  } else {
+                    const asset = currentProject?.assets.find(a => a.id === sticker.assetId)
+                    if (asset && currentProject) {
+                      src = window.api.utils.getAssetUrl(currentProject.path, asset.path)
+                      name = asset.name
+                    }
+                  }
+                  if (!src) return null
+                  return (
+                    <img
+                      key={sticker.id}
+                      src={src}
+                      alt={name}
+                      title={name}
+                      className="w-4 h-4 object-contain select-none pointer-events-none"
+                      style={{
+                        marginLeft: i > 0 ? -4 : 0,
+                        filter: 'drop-shadow(1px 1px 0px rgba(0,0,0,0.4))',
+                        transform: sticker.rotation ? `rotate(${sticker.rotation}deg)` : undefined,
+                      }}
+                      draggable={false}
+                    />
+                  )
+                })}
+                {docStickers.length > 3 && (
+                  <span className="text-[9px] text-theme-muted ml-0.5">+{docStickers.length - 3}</span>
+                )}
+              </div>
+            )
+          })()}
+
           {/* Actions */}
           <button
             onClick={(e) => {
               e.stopPropagation()
               handleContextMenu(e, doc.id)
             }}
-            className="opacity-0 group-hover:opacity-100 btn-icon-modern p-0.5 transition-opacity"
+            className="btn-icon-modern p-0.5 text-theme-muted"
           >
             <MoreVerticalRegular className="w-3 h-3" />
           </button>

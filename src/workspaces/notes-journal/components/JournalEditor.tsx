@@ -12,7 +12,7 @@ import { Placeholder } from '@tiptap/extension-placeholder'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { DragHandle } from '@tiptap/extension-drag-handle'
-import { CheckmarkRegular, DismissRegular } from '@fluentui/react-icons'
+import { CheckmarkRegular, DismissRegular, BotSparkleFilled } from '@fluentui/react-icons'
 import type { JSONContent } from '@tiptap/core'
 
 import { useProjectStore, getDocumentHierarchyType, getPageNumber, getParentDocument } from '../../../stores/projectStore'
@@ -145,6 +145,11 @@ export function JournalEditor() {
     versionHistoryMode,
     documentVersions,
     setVersionHistoryMode,
+    thoughtPartner,
+    clearThoughtPartnerEditorInsertion,
+    toggleThoughtPartnerAgentMode,
+    setThoughtPartnerSelectionContext,
+    clearThoughtPartnerSelectionContext,
   } = useProjectStore()
 
   const { hasOverrides, style: overrideStyle, maxWidth: overrideMaxWidth } = useProjectEditorStyles()
@@ -265,7 +270,8 @@ export function JournalEditor() {
   // TipTap extensions for journal
   const extensions = useMemo(() => [
     StarterKit.configure({
-      heading: { levels: [1, 2, 3] }
+      heading: { levels: [1, 2, 3] },
+      underline: false,
     }),
     Underline,
     Highlight.configure({ multicolor: true }),
@@ -445,6 +451,27 @@ export function JournalEditor() {
       saveTimeoutRef.current = setTimeout(() => {
         saveDocument(activeDocumentId)
       }, 1000)
+    },
+    onSelectionUpdate: ({ editor }) => {
+      if (!ui.thoughtPartnerPanelOpen || !activeDocumentId) return
+
+      const { from, to, empty } = editor.state.selection
+      if (empty) {
+        clearThoughtPartnerSelectionContext()
+        return
+      }
+
+      const selectedText = editor.state.doc.textBetween(from, to, '\n', '\n')
+      if (!selectedText.trim()) {
+        clearThoughtPartnerSelectionContext()
+        return
+      }
+
+      setThoughtPartnerSelectionContext({
+        text: selectedText,
+        documentId: activeDocumentId,
+        documentTitle: activeDoc?.title || 'Untitled'
+      })
     }
   })
 
@@ -455,10 +482,202 @@ export function JournalEditor() {
       const newContent = JSON.stringify(docState.content)
       
       if (currentContent !== newContent) {
-        editor.commands.setContent(docState.content)
+        // Check if there's an active AI preview — don't overwrite it
+        let hasPreview = false
+        editor.state.doc.descendants((node) => {
+          if (node.type.name === 'aiPreview') { hasPreview = true; return false }
+          return !hasPreview
+        })
+        if (!hasPreview) {
+          editor.commands.setContent(docState.content)
+        }
       }
     }
   }, [editor, docState?.content])
+
+  // Watch for Thought Partner editor insertions
+  const pendingInsertion = thoughtPartner.pendingEditorInsertion
+  useEffect(() => {
+    if (!pendingInsertion || !editor) return
+
+    const { text, mode, insertionPoint, afterHeading, targetHeading, targetText } = pendingInsertion
+    const generatedText = text || ''
+
+    if (mode === 'replace') {
+      // REPLACE MODE: find the target block(s) and replace them
+      const previewAttrs = {
+        previewId: `tp-${pendingInsertion.actionId}`,
+        generatedText,
+        commandName: 'Thought Partner',
+        isScreenplay: false
+      }
+      let replaceFrom = -1
+      let replaceTo = -1
+
+      // Strategy 1: targetText — find the block(s) matching the target text
+      if (targetText) {
+        const targetNorm = targetText.toLowerCase().trim()
+        const doc = editor.state.doc
+        const blocks: Array<{ text: string; pos: number; end: number }> = []
+        doc.forEach((node, offset) => {
+          blocks.push({
+            text: node.textContent.toLowerCase().trim(),
+            pos: offset,
+            end: offset + node.nodeSize
+          })
+        })
+
+        // a) Exact block text match
+        let blockIdx = blocks.findIndex(b => b.text === targetNorm)
+        // b) Prefix match
+        if (blockIdx === -1) {
+          const prefixLen = Math.min(80, targetNorm.length, ...blocks.map(b => b.text.length).filter(l => l > 0))
+          if (prefixLen > 10) {
+            blockIdx = blocks.findIndex(b =>
+              b.text.startsWith(targetNorm.slice(0, prefixLen)) ||
+              targetNorm.startsWith(b.text.slice(0, prefixLen))
+            )
+          }
+        }
+        // c) Contains — block contains target text
+        if (blockIdx === -1) {
+          blockIdx = blocks.findIndex(b => b.text.includes(targetNorm))
+        }
+        // d) Contains — target contains block text
+        if (blockIdx === -1) {
+          blockIdx = blocks.findIndex(b => b.text.length > 10 && targetNorm.includes(b.text))
+        }
+        // e) Fuzzy: first several words of target appear in a block
+        if (blockIdx === -1) {
+          const firstWords = targetNorm.split(/\s+/).slice(0, 8).join(' ')
+          if (firstWords.length > 15) {
+            blockIdx = blocks.findIndex(b => b.text.includes(firstWords))
+          }
+        }
+
+        if (blockIdx !== -1) {
+          replaceFrom = blocks[blockIdx].pos
+          replaceTo = blocks[blockIdx].end
+
+          const targetWords = targetNorm.split(/\s+/).length
+          const blockWords = blocks[blockIdx].text.split(/\s+/).length
+          if (targetWords > blockWords * 1.5 && blockIdx + 1 < blocks.length) {
+            let accumulated = blocks[blockIdx].text
+            for (let i = blockIdx + 1; i < blocks.length; i++) {
+              accumulated += ' ' + blocks[i].text
+              replaceTo = blocks[i].end
+              if (accumulated.length >= targetNorm.length * 0.8) break
+            }
+          }
+        }
+      }
+
+      // Strategy 2: targetHeading — heading-based section replacement (fallback)
+      if (replaceFrom === -1 && targetHeading) {
+        const target = targetHeading.toLowerCase().trim()
+        const headings: Array<{ text: string; level: number; pos: number; endPos: number }> = []
+        editor.state.doc.descendants((node, nodePos) => {
+          if (node.type.name === 'heading') {
+            headings.push({
+              text: node.textContent.toLowerCase().trim(),
+              level: node.attrs.level || 1,
+              pos: nodePos,
+              endPos: nodePos + node.nodeSize
+            })
+          }
+          return true
+        })
+
+        let matchIdx = headings.findIndex(h => h.text === target)
+        if (matchIdx === -1) {
+          matchIdx = headings.findIndex(h => h.text.includes(target) || target.includes(h.text))
+        }
+
+        if (matchIdx !== -1) {
+          const matched = headings[matchIdx]
+          replaceFrom = matched.endPos
+          const targetLevel = matched.level
+          for (let i = matchIdx + 1; i < headings.length; i++) {
+            if (targetLevel === 1 || headings[i].level <= targetLevel) {
+              replaceTo = headings[i].pos
+              break
+            }
+          }
+          if (replaceTo === -1) replaceTo = editor.state.doc.content.size - 1
+        }
+      }
+
+      if (replaceFrom !== -1 && replaceTo !== -1) {
+        try {
+          const { tr } = editor.state
+          if (replaceTo > replaceFrom) {
+            tr.delete(replaceFrom, replaceTo)
+          }
+          const previewNode = editor.state.schema.nodes.aiPreview?.create(previewAttrs)
+          if (previewNode) {
+            tr.insert(replaceFrom, previewNode)
+          }
+          editor.view.dispatch(tr)
+        } catch (err) {
+          console.error('[JournalEditor] Failed to replace Thought Partner content:', err)
+        }
+      } else {
+        try {
+          const pos = editor.state.doc.content.size - 1
+          editor.chain().focus().insertContentAt(Math.max(0, pos), {
+            type: 'aiPreview',
+            attrs: previewAttrs
+          }).run()
+        } catch (err) {
+          console.error('[JournalEditor] Failed to insert Thought Partner content (target not found):', err)
+        }
+      }
+    } else {
+      // INSERT MODE
+      let pos: number
+      if (insertionPoint === 'cursor') {
+        pos = editor.state.selection.from
+      } else if (insertionPoint === 'start') {
+        // Insert after the first heading (title) if present, otherwise at position 0
+        let afterTitle = 0
+        const firstNode = editor.state.doc.firstChild
+        if (firstNode && firstNode.type.name === 'heading') {
+          afterTitle = firstNode.nodeSize
+        }
+        pos = afterTitle
+      } else if (insertionPoint === 'after-heading' && afterHeading) {
+        let foundPos = -1
+        const target = afterHeading.toLowerCase().trim()
+        editor.state.doc.descendants((node, nodePos) => {
+          if (foundPos !== -1) return false
+          if (node.type.name === 'heading' && node.textContent.toLowerCase().trim() === target) {
+            foundPos = nodePos + node.nodeSize
+            return false
+          }
+          return true
+        })
+        pos = foundPos !== -1 ? foundPos : editor.state.doc.content.size - 1
+      } else {
+        pos = editor.state.doc.content.size - 1
+      }
+
+      try {
+        editor.chain().focus().insertContentAt(Math.max(0, pos), {
+          type: 'aiPreview',
+          attrs: {
+            previewId: `tp-${pendingInsertion.actionId}`,
+            generatedText,
+            commandName: 'Thought Partner',
+            isScreenplay: false
+          }
+        }).run()
+      } catch (err) {
+        console.error('[JournalEditor] Failed to insert Thought Partner content:', err)
+      }
+    }
+
+    clearThoughtPartnerEditorInsertion()
+  }, [pendingInsertion, editor, clearThoughtPartnerEditorInsertion])
 
   // Cleanup
   useEffect(() => {
@@ -894,7 +1113,28 @@ export function JournalEditor() {
       <div className="relative z-20 flex-shrink-0">
         <JournalToolbar editor={editor} />
       </div>
-      
+
+      {/* Agent Mode banner */}
+      {thoughtPartner.agentMode && (
+        <div className="flex items-center justify-between px-4 py-2 bg-blue-500/10 border-b border-blue-500/20 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <BotSparkleFilled className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-medium text-blue-400"
+                  style={{ fontFamily: 'Calibri, "Segoe UI", system-ui, -apple-system, sans-serif' }}>
+              Agent Mode Active
+            </span>
+          </div>
+          <button
+            onClick={toggleThoughtPartnerAgentMode}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors"
+            style={{ fontFamily: 'Calibri, "Segoe UI", system-ui, -apple-system, sans-serif' }}
+          >
+            <DismissRegular className="w-3.5 h-3.5" />
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className={`flex-1 min-h-0 flex ${versionHistoryMode.active ? 'flex-row' : 'flex-col'} overflow-hidden`}>
         <div
           ref={editorContainerRef}

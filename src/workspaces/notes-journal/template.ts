@@ -65,8 +65,9 @@ export const notesJournalConfig: WorkspaceConfig = {
     deriveTitlesFromContent: false,
     showPageNumbers: false,
     showTimestamps: true,
+    showThoughtPartner: true,
   },
-  
+
   editor: {
     fontFamily: 'Beth Ellen, cursive',
     useScreenplayExtension: false,

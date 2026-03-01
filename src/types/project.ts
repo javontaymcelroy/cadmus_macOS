@@ -392,6 +392,8 @@ export interface ProjectSettings {
   customImageInstructions?: string
   // Target runtime in minutes (screenplay only) - used for status bar display and AI prompt context
   targetRuntimeMinutes?: number
+  // Custom AI prompt instruction overrides per command (keyed by AIWritingCommand id)
+  customAIPrompts?: Partial<Record<string, string>>
 }
 
 export interface HeadingTypography {
@@ -658,6 +660,7 @@ interface AIWritingRequest {
   sceneContext?: { sceneHeading?: string; charactersInScene: string[]; precedingAction?: string }
   targetRuntimeMinutes?: number
   userQuestion?: string
+  customSystemPromptInstruction?: string
 }
 
 interface AIWritingResponse {
@@ -667,6 +670,82 @@ interface AIWritingResponse {
   isScreenplay?: boolean
   characterMap?: Record<string, CharacterInfo>
   propMap?: Record<string, PropInfo>
+}
+
+// Thought Partner types
+export interface ThoughtPartnerMessage {
+  id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  timestamp: string
+}
+
+export interface ContextDocument {
+  decisions: string[]
+  openQuestions: string[]
+  ideas: string[]
+  risks: string[]
+  considerations: string[]
+  lastUpdated: string
+}
+
+export interface SuggestionCard {
+  id: string
+  title: string
+  description: string
+  category: 'explore' | 'question' | 'risk' | 'idea'
+  prompt: string
+}
+
+export interface ConsciousContext {
+  title: string
+  content: string
+}
+
+export interface SubconsciousContext {
+  projectName: string
+  templateType: string
+  documents: { title: string; content: string; isActive: boolean }[]
+  characters?: { name: string; notes?: string }[]
+  props?: { name: string; notes?: string }[]
+  settings?: { synopsis?: string }
+}
+
+export interface ThoughtPartnerRequest {
+  message: string
+  conversationHistory: ThoughtPartnerMessage[]
+  consciousContext: ConsciousContext | null
+  subconsciousContext: SubconsciousContext
+  contextDocument: ContextDocument
+}
+
+export interface ThoughtPartnerResponse {
+  message: string
+  updatedContextDocument?: ContextDocument
+  error?: string
+}
+
+export interface ThoughtPartnerSuggestionsRequest {
+  subconsciousContext: SubconsciousContext
+}
+
+export interface ThoughtPartnerConversationData {
+  messages: ThoughtPartnerMessage[]
+  contextDocument: ContextDocument
+  lastUpdated: string
+}
+
+export interface ConversationMeta {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  messageCount: number
+}
+
+export interface ConversationIndex {
+  activeConversationId: string | null
+  conversations: ConversationMeta[]
 }
 
 // Electron API type declaration
@@ -764,9 +843,24 @@ declare global {
       aiWriting: {
         generate: (request: AIWritingRequest) => Promise<AIWritingResponse>
         hasApiKey: () => Promise<boolean>
+        getDefaultInstructions: () => Promise<{ prose: Record<string, string>; screenplay: Record<string, string> }>
       }
       gatedWriting: {
         generate: (request: AIWritingRequest, storyFacts?: any, forceOverride?: boolean) => Promise<any>
+      }
+      thoughtPartner: {
+        sendMessage: (request: ThoughtPartnerRequest) => Promise<ThoughtPartnerResponse>
+        stopStreaming: () => Promise<void>
+        getSuggestions: (request: ThoughtPartnerSuggestionsRequest) => Promise<SuggestionCard[]>
+        loadConversationIndex: (projectPath: string) => Promise<ConversationIndex>
+        saveConversationIndex: (projectPath: string, index: ConversationIndex) => Promise<void>
+        loadConversation: (projectPath: string, conversationId: string) => Promise<ThoughtPartnerConversationData | null>
+        saveConversation: (projectPath: string, conversationId: string, data: ThoughtPartnerConversationData) => Promise<void>
+        createConversation: (projectPath: string, title?: string) => Promise<ConversationMeta>
+        deleteConversation: (projectPath: string, conversationId: string) => Promise<ConversationIndex>
+        hasApiKey: () => Promise<boolean>
+        onChunk: (callback: (chunk: string) => void) => () => void
+        onDone: (callback: (response: ThoughtPartnerResponse) => void) => () => void
       }
     }
   }

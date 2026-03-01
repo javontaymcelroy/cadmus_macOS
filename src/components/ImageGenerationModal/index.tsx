@@ -314,13 +314,13 @@ export function ImageGenerationModal() {
       onKeyDown={handleKeyDown}
     >
       <div 
-        className="bg-ink-900 border border-white/[0.08] rounded-xl shadow-2xl w-[640px] max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-[var(--bg-elevated)] border border-white/[0.08] rounded-xl shadow-2xl w-[640px] max-h-[90vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
-            <ImageSparkleRegular className="w-5 h-5 text-gold-400" />
+            <ImageSparkleRegular className="w-5 h-5 text-theme-accent" />
             <h3 className="text-sm font-ui font-semibold text-white/90">Generate Storyboard Image</h3>
           </div>
           <button
@@ -375,7 +375,7 @@ export function ImageGenerationModal() {
                     type="checkbox"
                     checked={includeContext}
                     onChange={e => setIncludeContext(e.target.checked)}
-                    className="rounded border-white/20 bg-black/30 text-gold-400 focus:ring-gold-400/50"
+                    className="rounded border-white/20 bg-black/30 text-theme-accent focus:ring-gold-400/50"
                   />
                   Include in prompt
                 </label>
@@ -522,7 +522,7 @@ export function ImageGenerationModal() {
                         @{char.name}
                         <button
                           onClick={() => setAdditionalCharacterIds(prev => prev.filter(id => id !== charId))}
-                          className="hover:text-white ml-0.5"
+                          className="hover:text-theme-primary ml-0.5"
                           title="Remove"
                         >
                           ×
@@ -663,7 +663,7 @@ export function ImageGenerationModal() {
                       // Clear custom prompt from project settings (reset to code default)
                       await updateProjectSettings({ customImagePromptTemplate: undefined })
                     }}
-                    className="text-[10px] text-white/40 hover:text-gold-400 font-ui underline flex-shrink-0 ml-2"
+                    className="text-[10px] text-white/40 hover:text-theme-accent font-ui underline flex-shrink-0 ml-2"
                   >
                     Reset to Default
                   </button>

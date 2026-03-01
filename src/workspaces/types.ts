@@ -110,6 +110,11 @@ export interface FeatureFlags {
    * Show timestamps in sidebar list items
    */
   showTimestamps: boolean
+
+  /**
+   * Show the Thought Partner AI chat panel
+   */
+  showThoughtPartner: boolean
 }
 
 /**

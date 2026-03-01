@@ -7,11 +7,12 @@ import { Highlight } from '@tiptap/extension-highlight'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { PreserveMarks } from '../extensions/PreserveMarks'
+import { HorizontalRule } from '../extensions/HorizontalRule'
 import { Color } from '@tiptap/extension-color'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { DragHandle } from '@tiptap/extension-drag-handle'
 import { Link } from '@tiptap/extension-link'
-import { CheckmarkRegular, DismissRegular } from '@fluentui/react-icons'
+import { CheckmarkRegular, DismissRegular, BotSparkleFilled } from '@fluentui/react-icons'
 import type { JSONContent, Extension } from '@tiptap/core'
 
 import { useProjectStore, getDocumentHierarchyType, getPageNumber, getParentDocument } from '../../../stores/projectStore'
@@ -146,6 +147,12 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
     versionHistoryMode,
     documentVersions,
     setVersionHistoryMode,
+    thoughtPartner,
+    clearThoughtPartnerEditorInsertion,
+    toggleThoughtPartnerAgentMode,
+    setThoughtPartnerSelectionContext,
+    clearThoughtPartnerSelectionContext,
+    saveDocumentViewState,
   } = useProjectStore()
 
   const { hasOverrides, style: overrideStyle, maxWidth: overrideMaxWidth } = useProjectEditorStyles()
@@ -265,8 +272,11 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
   // TipTap extensions
   const extensions = useMemo(() => [
     StarterKit.configure({
-      heading: { levels: [1, 2, 3] }
+      heading: { levels: [1, 2, 3] },
+      horizontalRule: false,
+      underline: false,
     }),
+    HorizontalRule,
     Underline,
     Highlight.configure({ multicolor: true }),
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
@@ -427,25 +437,59 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
     },
     onUpdate: ({ editor }) => {
       if (!activeDocumentId) return
-      
+
       const content = editor.getJSON()
       updateDocumentContent(activeDocumentId, content)
       syncAssetReferences(activeDocumentId, content)
       syncDocumentTodos(activeDocumentId, content)
-      
+
       if (!titleSyncRef.current) {
         const h1Info = getFirstH1Info(content)
         if (h1Info.text && activeDoc && h1Info.text !== activeDoc.title) {
           renameDocument(activeDocumentId, h1Info.text)
         }
       }
-      
+
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
       }
       saveTimeoutRef.current = setTimeout(() => {
         saveDocument(activeDocumentId)
       }, 1000)
+    },
+    onSelectionUpdate: ({ editor }) => {
+      // Persist cursor/selection to workspace state (debounced)
+      if (activeDocumentId) {
+        const { from, to } = editor.state.selection
+        const scrollTop = editorContainerRef.current?.scrollTop ?? 0
+        saveDocumentViewState(activeDocumentId, {
+          cursorPosition: from,
+          selectionAnchor: from !== to ? from : null,
+          selectionHead: from !== to ? to : null,
+          scrollTop
+        })
+      }
+
+      // Thought partner selection context
+      if (!ui.thoughtPartnerPanelOpen || !activeDocumentId) return
+
+      const { from, to, empty } = editor.state.selection
+      if (empty) {
+        clearThoughtPartnerSelectionContext()
+        return
+      }
+
+      const selectedText = editor.state.doc.textBetween(from, to, '\n', '\n')
+      if (!selectedText.trim()) {
+        clearThoughtPartnerSelectionContext()
+        return
+      }
+
+      setThoughtPartnerSelectionContext({
+        text: selectedText,
+        documentId: activeDocumentId,
+        documentTitle: activeDoc?.title || 'Untitled'
+      })
     }
   })
 
@@ -456,10 +500,342 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
       const newContent = JSON.stringify(docState.content)
       
       if (currentContent !== newContent) {
-        editor.commands.setContent(docState.content)
+        // Check if there's an active AI preview — don't overwrite it
+        let hasPreview = false
+        editor.state.doc.descendants((node) => {
+          if (node.type.name === 'aiPreview') { hasPreview = true; return false }
+          return !hasPreview
+        })
+        if (!hasPreview) {
+          editor.commands.setContent(docState.content)
+        }
       }
     }
   }, [editor, docState?.content])
+
+  // Persist scroll position on scroll (debounced)
+  useEffect(() => {
+    const container = editorContainerRef.current
+    if (!container || !activeDocumentId || !editor) return
+
+    let scrollTimer: ReturnType<typeof setTimeout> | null = null
+    const handleScroll = () => {
+      if (scrollTimer) clearTimeout(scrollTimer)
+      scrollTimer = setTimeout(() => {
+        if (!editor || !activeDocumentId) return
+        const { from, to } = editor.state.selection
+        saveDocumentViewState(activeDocumentId, {
+          cursorPosition: from,
+          selectionAnchor: from !== to ? from : null,
+          selectionHead: from !== to ? to : null,
+          scrollTop: container.scrollTop
+        })
+      }, 500)
+    }
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (scrollTimer) clearTimeout(scrollTimer)
+    }
+  }, [editor, activeDocumentId, saveDocumentViewState])
+
+  // Restore cursor/selection/scroll from workspace state when switching documents
+  const lastRestoredDocRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!editor || !activeDocumentId || !currentProject?.path) return
+    if (!docState?.content) return
+    // Only restore once per document switch
+    if (lastRestoredDocRef.current === activeDocumentId) return
+    lastRestoredDocRef.current = activeDocumentId
+
+    const restoreViewState = async () => {
+      try {
+        const workspaceState = await window.api.workspace?.load(currentProject.path)
+        const viewState = workspaceState?.documentViews?.[activeDocumentId]
+        if (!viewState) return
+
+        const docSize = editor.state.doc.content.size
+        if (viewState.cursorPosition !== null && viewState.cursorPosition <= docSize) {
+          if (viewState.selectionAnchor !== null && viewState.selectionHead !== null
+              && viewState.selectionAnchor <= docSize && viewState.selectionHead <= docSize) {
+            editor.commands.setTextSelection({
+              from: viewState.selectionAnchor,
+              to: viewState.selectionHead
+            })
+          } else {
+            editor.commands.setTextSelection(viewState.cursorPosition)
+          }
+        }
+
+        // Restore scroll (requestAnimationFrame to ensure layout is done)
+        const container = editorContainerRef.current
+        if (container && viewState.scrollTop > 0) {
+          requestAnimationFrame(() => {
+            container.scrollTop = viewState.scrollTop
+          })
+        }
+      } catch (err) {
+        console.error('[BaseEditor] Failed to restore view state:', err)
+      }
+    }
+
+    restoreViewState()
+  }, [editor, activeDocumentId, currentProject?.path, docState?.content])
+
+  // Watch for Thought Partner editor insertions
+  const pendingInsertion = thoughtPartner.pendingEditorInsertion
+  useEffect(() => {
+    if (!pendingInsertion || !editor) return
+
+    const { text, mode, insertionPoint, afterHeading, targetHeading, targetText } = pendingInsertion
+    const generatedText = text || ''
+
+    if (mode === 'replace') {
+      // REPLACE MODE: find the target block(s) and replace them
+      const previewAttrs = {
+        previewId: `tp-${pendingInsertion.actionId}`,
+        generatedText,
+        commandName: 'Thought Partner',
+        isScreenplay: false
+      }
+      let replaceFrom = -1
+      let replaceTo = -1
+
+      // Strategy 1: targetText — find the block(s) matching the target text
+      if (targetText) {
+        const targetNorm = targetText.toLowerCase().trim()
+        const doc = editor.state.doc
+        const blocks: Array<{ text: string; pos: number; end: number }> = []
+        doc.forEach((node, offset) => {
+          blocks.push({
+            text: node.textContent.toLowerCase().trim(),
+            pos: offset,
+            end: offset + node.nodeSize
+          })
+        })
+
+        // a) Exact block text match
+        let blockIdx = blocks.findIndex(b => b.text === targetNorm)
+        // b) Prefix match — block starts with target or target starts with block
+        if (blockIdx === -1) {
+          const prefixLen = Math.min(80, targetNorm.length, ...blocks.map(b => b.text.length).filter(l => l > 0))
+          if (prefixLen > 10) {
+            blockIdx = blocks.findIndex(b =>
+              b.text.startsWith(targetNorm.slice(0, prefixLen)) ||
+              targetNorm.startsWith(b.text.slice(0, prefixLen))
+            )
+          }
+        }
+        // c) Contains — block contains target text (target is a substring/fragment within a block)
+        if (blockIdx === -1) {
+          blockIdx = blocks.findIndex(b => b.text.includes(targetNorm))
+        }
+        // d) Contains — target contains block text (target is larger than a single block)
+        if (blockIdx === -1) {
+          blockIdx = blocks.findIndex(b => b.text.length > 10 && targetNorm.includes(b.text))
+        }
+        // e) Fuzzy: first several words of target appear in a block
+        if (blockIdx === -1) {
+          const firstWords = targetNorm.split(/\s+/).slice(0, 8).join(' ')
+          if (firstWords.length > 15) {
+            blockIdx = blocks.findIndex(b => b.text.includes(firstWords))
+          }
+        }
+
+        if (blockIdx !== -1) {
+          replaceFrom = blocks[blockIdx].pos
+          replaceTo = blocks[blockIdx].end
+
+          // If targetText spans multiple blocks, extend replaceTo to cover them
+          const targetWords = targetNorm.split(/\s+/).length
+          const blockWords = blocks[blockIdx].text.split(/\s+/).length
+          if (targetWords > blockWords * 1.5 && blockIdx + 1 < blocks.length) {
+            let accumulated = blocks[blockIdx].text
+            for (let i = blockIdx + 1; i < blocks.length; i++) {
+              accumulated += ' ' + blocks[i].text
+              replaceTo = blocks[i].end
+              if (accumulated.length >= targetNorm.length * 0.8) break
+            }
+          }
+        }
+      }
+
+      // Strategy 2: targetHeading — heading-based section replacement (fallback)
+      if (replaceFrom === -1 && targetHeading) {
+        const target = targetHeading.toLowerCase().trim()
+        const headings: Array<{ text: string; level: number; pos: number; endPos: number }> = []
+        editor.state.doc.descendants((node, nodePos) => {
+          if (node.type.name === 'heading') {
+            headings.push({
+              text: node.textContent.toLowerCase().trim(),
+              level: node.attrs.level || 1,
+              pos: nodePos,
+              endPos: nodePos + node.nodeSize
+            })
+          }
+          return true
+        })
+
+        let matchIdx = headings.findIndex(h => h.text === target)
+        if (matchIdx === -1) {
+          matchIdx = headings.findIndex(h => h.text.includes(target) || target.includes(h.text))
+        }
+
+        if (matchIdx !== -1) {
+          const matched = headings[matchIdx]
+          replaceFrom = matched.endPos
+          const targetLevel = matched.level
+
+          // Find section end
+          for (let i = matchIdx + 1; i < headings.length; i++) {
+            if (targetLevel === 1 || headings[i].level <= targetLevel) {
+              replaceTo = headings[i].pos
+              break
+            }
+          }
+          if (replaceTo === -1) replaceTo = editor.state.doc.content.size - 1
+        }
+      }
+
+      // Strategy 3: anchorBlockId — direct block lookup via blockId attribute
+      if (replaceFrom === -1 && pendingInsertion.anchorBlockId) {
+        editor.state.doc.descendants((node, pos) => {
+          if (node.attrs?.blockId === pendingInsertion.anchorBlockId) {
+            replaceFrom = pos
+            replaceTo = pos + node.nodeSize
+            return false
+          }
+          return true
+        })
+      }
+
+      if (replaceFrom !== -1 && replaceTo !== -1) {
+        // Found the target — delete old content and insert aiPreview
+        try {
+          const { tr } = editor.state
+          if (replaceTo > replaceFrom) {
+            tr.delete(replaceFrom, replaceTo)
+          }
+          const previewNode = editor.state.schema.nodes.aiPreview?.create(previewAttrs)
+          if (previewNode) {
+            tr.insert(replaceFrom, previewNode)
+          }
+          editor.view.dispatch(tr)
+        } catch (err) {
+          console.error('[BaseEditor] Failed to replace Thought Partner content:', err)
+        }
+      } else {
+        // Nothing matched — fall back to appending at end
+        try {
+          const pos = editor.state.doc.content.size - 1
+          editor.chain().focus().insertContentAt(Math.max(0, pos), {
+            type: 'aiPreview',
+            attrs: previewAttrs
+          }).run()
+        } catch (err) {
+          console.error('[BaseEditor] Failed to insert Thought Partner content (target not found):', err)
+        }
+      }
+    } else {
+      // INSERT MODE: standard insertion at target position
+      let pos: number
+      if (insertionPoint === 'cursor') {
+        pos = editor.state.selection.from
+      } else if (insertionPoint === 'start') {
+        // Insert after the first heading (title) if present, otherwise at position 0
+        let afterTitle = 0
+        const firstNode = editor.state.doc.firstChild
+        if (firstNode && firstNode.type.name === 'heading') {
+          afterTitle = firstNode.nodeSize
+        }
+        pos = afterTitle
+      } else if (insertionPoint === 'after-heading' && afterHeading) {
+        let foundPos = -1
+        const target = afterHeading.toLowerCase().trim()
+        editor.state.doc.descendants((node, nodePos) => {
+          if (foundPos !== -1) return false
+          if (node.type.name === 'heading' && node.textContent.toLowerCase().trim() === target) {
+            foundPos = nodePos + node.nodeSize
+            return false
+          }
+          return true
+        })
+        pos = foundPos !== -1 ? foundPos : editor.state.doc.content.size - 1
+      } else {
+        pos = editor.state.doc.content.size - 1
+      }
+
+      try {
+        editor.chain().focus().insertContentAt(Math.max(0, pos), {
+          type: 'aiPreview',
+          attrs: {
+            previewId: `tp-${pendingInsertion.actionId}`,
+            generatedText,
+            commandName: 'Thought Partner',
+            isScreenplay: false
+          }
+        }).run()
+      } catch (err) {
+        console.error('[BaseEditor] Failed to insert Thought Partner content:', err)
+      }
+    }
+
+    clearThoughtPartnerEditorInsertion()
+  }, [pendingInsertion, editor, clearThoughtPartnerEditorInsertion])
+
+  // Collect block context for the pipeline when Thought Partner panel is open
+  const updateDocumentBlockContext = useProjectStore(s => s.updateDocumentBlockContext)
+  const usePipeline = thoughtPartner.usePipeline
+  useEffect(() => {
+    if (!editor || !ui.thoughtPartnerPanelOpen || !usePipeline || !activeDocumentId) return
+
+    const collectBlockContext = () => {
+      const json = editor.getJSON()
+      if (!json.content) return
+
+      const blocks: Array<{ blockId: string; type: string; text: string; textHash: string; attrs?: Record<string, unknown> }> = []
+
+      for (const node of json.content) {
+        const blockId = node.attrs?.blockId as string
+        if (!blockId) continue
+
+        // Extract text from this block
+        let text = ''
+        const extractText = (n: any): void => {
+          if (n.type === 'text' && n.text) { text += n.text; return }
+          if (n.content) n.content.forEach(extractText)
+        }
+        extractText(node)
+
+        // Simple djb2 hash
+        let hash = 5381
+        for (let i = 0; i < text.length; i++) {
+          hash = ((hash << 5) + hash) + text.charCodeAt(i)
+          hash = hash & hash
+        }
+        const textHash = (hash >>> 0).toString(16)
+
+        blocks.push({
+          blockId,
+          type: node.type || 'paragraph',
+          text,
+          textHash,
+          attrs: node.attrs ? { ...node.attrs } : undefined,
+        })
+      }
+
+      updateDocumentBlockContext({ documentId: activeDocumentId, blocks })
+    }
+
+    // Collect on mount and when content changes
+    collectBlockContext()
+
+    // Re-collect when the editor updates content
+    const handler = () => collectBlockContext()
+    editor.on('update', handler)
+    return () => { editor.off('update', handler) }
+  }, [editor, ui.thoughtPartnerPanelOpen, usePipeline, activeDocumentId, updateDocumentBlockContext])
 
   // Toggle editor editable state based on reader mode
   useEffect(() => {
@@ -902,7 +1278,28 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
       <div className="relative z-20 flex-shrink-0">
         {toolbar(editor)}
       </div>
-      
+
+      {/* Agent Mode banner */}
+      {thoughtPartner.agentMode && (
+        <div className="flex items-center justify-between px-4 py-2 bg-blue-500/10 border-b border-blue-500/20 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <BotSparkleFilled className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-medium text-blue-400"
+                  style={{ fontFamily: 'Calibri, "Segoe UI", system-ui, -apple-system, sans-serif' }}>
+              Agent Mode Active
+            </span>
+          </div>
+          <button
+            onClick={toggleThoughtPartnerAgentMode}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors"
+            style={{ fontFamily: 'Calibri, "Segoe UI", system-ui, -apple-system, sans-serif' }}
+          >
+            <DismissRegular className="w-3.5 h-3.5" />
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className={`flex-1 min-h-0 flex ${versionHistoryMode.active ? 'flex-row' : 'flex-col'} overflow-hidden`}>
         <div
           ref={editorContainerRef}

@@ -172,7 +172,7 @@ export function ScreenplayElementPicker({
   return (
     <div
       ref={menuRef}
-      className="fixed z-[100] bg-ink-900 border border-ink-600 rounded-lg shadow-2xl py-1.5 min-w-[240px] max-h-[400px] overflow-auto focus:outline-none"
+      className="fixed z-[100] bg-[var(--bg-elevated)] border border-theme-default rounded-lg shadow-2xl py-1.5 min-w-[240px] max-h-[400px] overflow-auto focus:outline-none"
       style={{
         left: position.x,
         top: position.y,
@@ -183,7 +183,7 @@ export function ScreenplayElementPicker({
       role="listbox"
       aria-label="Screenplay element types"
     >
-      <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-ink-400 uppercase tracking-wider border-b border-ink-700 mb-1">
+      <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-theme-muted uppercase tracking-wider border-b border-theme-default mb-1">
         Screenplay Element
       </div>
       
@@ -195,16 +195,16 @@ export function ScreenplayElementPicker({
           onMouseEnter={() => setSelectedIndex(index)}
           className={clsx(
             'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
-            index === selectedIndex 
-              ? 'bg-gold-400/20 text-gold-400' 
-              : 'text-white hover:bg-ink-800'
+            index === selectedIndex
+              ? 'bg-gold-400/20 text-theme-accent'
+              : 'text-theme-primary hover:bg-[var(--bg-hover)]'
           )}
           role="option"
           aria-selected={index === selectedIndex}
         >
           <span className={clsx(
             'flex-shrink-0',
-            index === selectedIndex ? 'text-gold-400' : 'text-ink-400'
+            index === selectedIndex ? 'text-theme-accent' : 'text-theme-muted'
           )}>
             {getElementIcon(element.type)}
           </span>
@@ -215,7 +215,7 @@ export function ScreenplayElementPicker({
             </div>
             <div className={clsx(
               'text-xs truncate',
-              index === selectedIndex ? 'text-gold-400/70' : 'text-ink-500'
+              index === selectedIndex ? 'text-gold-400/70' : 'text-theme-muted'
             )}>
               {element.description}
             </div>
@@ -223,9 +223,9 @@ export function ScreenplayElementPicker({
           
           <span className={clsx(
             'flex-shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded',
-            index === selectedIndex 
-              ? 'bg-gold-400/30 text-gold-400' 
-              : 'bg-ink-700 text-ink-400'
+            index === selectedIndex
+              ? 'bg-[var(--accent-gold-muted)] text-theme-accent'
+              : 'bg-[var(--bg-tertiary)] text-theme-muted'
           )}>
             {element.shortcut}
           </span>
@@ -233,7 +233,7 @@ export function ScreenplayElementPicker({
       ))}
 
       {/* Divider */}
-      <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-ink-400 uppercase tracking-wider border-t border-ink-700 mt-1 mb-1">
+      <div className="px-3 py-1.5 text-[10px] font-ui font-semibold text-theme-muted uppercase tracking-wider border-t border-theme-default mt-1 mb-1">
         Story Elements
       </div>
 
@@ -244,16 +244,16 @@ export function ScreenplayElementPicker({
         onMouseEnter={() => setSelectedIndex(PROP_INDEX)}
         className={clsx(
           'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
-          selectedIndex === PROP_INDEX 
-            ? 'bg-gold-400/20 text-gold-400' 
-            : 'text-white hover:bg-ink-800'
+          selectedIndex === PROP_INDEX
+            ? 'bg-gold-400/20 text-theme-accent'
+            : 'text-theme-primary hover:bg-[var(--bg-hover)]'
         )}
         role="option"
         aria-selected={selectedIndex === PROP_INDEX}
       >
         <span className={clsx(
           'flex-shrink-0',
-          selectedIndex === PROP_INDEX ? 'text-gold-400' : 'text-ink-400'
+          selectedIndex === PROP_INDEX ? 'text-theme-accent' : 'text-theme-muted'
         )}>
           <BoxRegular className="w-4 h-4" />
         </span>
@@ -264,7 +264,7 @@ export function ScreenplayElementPicker({
           </div>
           <div className={clsx(
             'text-xs truncate',
-            selectedIndex === PROP_INDEX ? 'text-gold-400/70' : 'text-ink-500'
+            selectedIndex === PROP_INDEX ? 'text-gold-400/70' : 'text-theme-muted'
           )}>
             Important item or object
           </div>
@@ -272,16 +272,16 @@ export function ScreenplayElementPicker({
         
         <span className={clsx(
           'flex-shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded',
-          selectedIndex === PROP_INDEX 
-            ? 'bg-gold-400/30 text-gold-400' 
-            : 'bg-ink-700 text-ink-400'
+          selectedIndex === PROP_INDEX
+            ? 'bg-[var(--accent-gold-muted)] text-theme-accent'
+            : 'bg-[var(--bg-tertiary)] text-theme-muted'
         )}>
           R
         </span>
       </button>
       
-      <div className="px-3 py-1.5 mt-1 border-t border-ink-700 text-[10px] text-ink-500 font-ui">
-        <span className="text-ink-400">↑↓</span> Navigate • <span className="text-ink-400">Enter</span> Select • <span className="text-ink-400">Esc</span> Close
+      <div className="px-3 py-1.5 mt-1 border-t border-theme-default text-[10px] text-theme-muted font-ui">
+        <span className="text-theme-muted">↑↓</span> Navigate • <span className="text-theme-muted">Enter</span> Select • <span className="text-theme-muted">Esc</span> Close
       </div>
     </div>
   )

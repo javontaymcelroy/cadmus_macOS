@@ -13,6 +13,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
 import { CheckmarkRegular, DismissRegular } from '@fluentui/react-icons'
 import { clsx } from 'clsx'
+import { useState, useEffect, useRef } from 'react'
 
 // Screenplay element types
 type ScreenplayElementType = 
@@ -59,6 +60,10 @@ export interface AIPreviewAttributes {
   // Replacement mode (for rework command)
   isReplacement?: boolean
   replacementRange?: string // JSON stringified { from: number; to: number }
+  // Pipeline attributes
+  patchOpId?: string
+  originalText?: string
+  opWhy?: string
 }
 
 declare module '@tiptap/core' {
@@ -83,7 +88,7 @@ declare module '@tiptap/core' {
 // Element type display formatting
 const ELEMENT_DISPLAY: Record<ScreenplayElementType, { label: string; color: string }> = {
   'scene-heading': { label: 'Scene', color: 'text-blue-400' },
-  'action': { label: 'Action', color: 'text-ink-300' },
+  'action': { label: 'Action', color: 'text-theme-muted' },
   'character': { label: 'Char', color: 'text-purple-400' },
   'dialogue': { label: 'Dial', color: 'text-green-400' },
   'parenthetical': { label: 'Paren', color: 'text-yellow-400' },
@@ -384,16 +389,19 @@ interface AIPreviewComponentProps {
 }
 
 function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewComponentProps) {
-  const { 
-    previewId, 
-    generatedText, 
-    commandName, 
-    isScreenplay, 
-    screenplayElements, 
-    characterMap: characterMapStr, 
+  const {
+    previewId,
+    generatedText,
+    commandName,
+    isScreenplay,
+    screenplayElements,
+    characterMap: characterMapStr,
     propMap: propMapStr,
     isReplacement,
-    replacementRange: replacementRangeStr
+    replacementRange: replacementRangeStr,
+    patchOpId: _patchOpId,
+    originalText: _originalText,
+    opWhy,
   } = node.attrs
   const { onAccept, onReject } = extension.options
 
@@ -443,9 +451,88 @@ function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewCompon
     ext => ext.name === 'mention'
   )
 
+  // --- Typewriter animation ---
+  // Split prose into word tokens (preserving whitespace for natural rendering)
+  const wordTokens = generatedText ? generatedText.split(/(\s+)/) : []
+  const totalWordTokens = wordTokens.length
+  const totalElements = parsedElements?.length ?? 0
+  const isScreenplayContent = parsedElements && parsedElements.length > 0
+
+  // Check if this preview has already been animated (persists across re-renders within session)
+  const storageKey = `aipreview-animated-${previewId}`
+  const alreadyAnimated = useRef(
+    typeof sessionStorage !== 'undefined' && sessionStorage.getItem(storageKey) === '1'
+  )
+
+  const [isAnimating, setIsAnimating] = useState(!alreadyAnimated.current && (totalWordTokens > 0 || totalElements > 0))
+  const [revealedWords, setRevealedWords] = useState(alreadyAnimated.current ? totalWordTokens : 0)
+  const [revealedElements, setRevealedElements] = useState(alreadyAnimated.current ? totalElements : 0)
+  const animationRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (alreadyAnimated.current) return
+
+    if (isScreenplayContent) {
+      // Screenplay: reveal one element at a time
+      let count = 0
+      const timer = setInterval(() => {
+        count++
+        setRevealedElements(count)
+        if (count >= totalElements) {
+          clearInterval(timer)
+          setIsAnimating(false)
+          sessionStorage.setItem(storageKey, '1')
+        }
+      }, 120)
+      animationRef.current = timer
+    } else if (totalWordTokens > 0) {
+      // Prose: reveal ~3 word-tokens per tick (word + space counts as 2 tokens)
+      let count = 0
+      const tokensPerTick = 3
+      const timer = setInterval(() => {
+        count += tokensPerTick
+        if (count >= totalWordTokens) {
+          count = totalWordTokens
+          setRevealedWords(count)
+          clearInterval(timer)
+          setIsAnimating(false)
+          sessionStorage.setItem(storageKey, '1')
+        } else {
+          setRevealedWords(count)
+        }
+      }, 25)
+      animationRef.current = timer
+    } else {
+      setIsAnimating(false)
+    }
+
+    return () => {
+      if (animationRef.current) clearInterval(animationRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run on mount
+
+  const stopAnimation = () => {
+    if (animationRef.current) {
+      clearInterval(animationRef.current)
+      animationRef.current = null
+    }
+    setIsAnimating(false)
+    sessionStorage.setItem(storageKey, '1')
+  }
+
+  // Computed display values
+  const displayText = isAnimating
+    ? wordTokens.slice(0, revealedWords).join('')
+    : generatedText
+  const visibleElements = isAnimating
+    ? parsedElements?.slice(0, revealedElements) ?? []
+    : parsedElements
+
   const handleAccept = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    stopAnimation()
     
     const pos = getPos()
     const nodeSize = node.nodeSize
@@ -463,8 +550,16 @@ function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewCompon
             content: [{ type: 'text', text: element.text }]
           }))
     } else {
-      // Plain text for prose
-      content = generatedText
+      // Plain text for prose — split into separate paragraph blocks
+      const paragraphs = generatedText.split(/\n\n+/).filter((p: string) => p.trim())
+      if (paragraphs.length > 1) {
+        content = paragraphs.map((p: string) => ({
+          type: 'paragraph',
+          content: [{ type: 'text', text: p.trim() }]
+        }))
+      } else {
+        content = generatedText
+      }
     }
     
     // Handle replacement mode (for rework command)
@@ -492,18 +587,29 @@ function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewCompon
         .run()
     } else {
       // Standard mode - just replace the preview node with the content
-      if (parsedElements && parsedElements.length > 0 && hasScreenplayExtension) {
+      if (!generatedText && !Array.isArray(content)) {
+        // Empty content — just remove the preview node
+        editor.chain()
+          .focus()
+          .deleteRange({ from: pos, to: pos + nodeSize })
+          .run()
+      } else if (Array.isArray(content)) {
+        // Multi-block content (screenplay elements or multi-paragraph prose)
         editor.chain()
           .focus()
           .deleteRange({ from: pos, to: pos + nodeSize })
           .insertContentAt(pos, content)
           .run()
       } else {
-        // Plain text fallback - replace preview with text
-        editor.chain().focus().command(({ tr, state }) => {
-          tr.replaceWith(pos, pos + nodeSize, state.schema.text(generatedText))
-          return true
-        }).run()
+        // Single-block plain text — use insertContentAt with a paragraph wrapper
+        editor.chain()
+          .focus()
+          .deleteRange({ from: pos, to: pos + nodeSize })
+          .insertContentAt(pos, {
+            type: 'paragraph',
+            content: [{ type: 'text', text: generatedText }]
+          })
+          .run()
       }
     }
     
@@ -513,6 +619,7 @@ function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewCompon
   const handleReject = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    stopAnimation()
     
     // Remove the preview node entirely
     editor.chain().focus().command(({ tr }) => {
@@ -600,15 +707,18 @@ function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewCompon
   }
 
   return (
-    <NodeViewWrapper as="div" className="ai-preview-wrapper my-2">
-      <div className="ai-preview relative border-l-4 border-gold-400 bg-gold-400/5 rounded-r-lg overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-3 py-1.5 bg-gold-400/10 border-b border-gold-400/20">
-          <span className="text-xs font-ui font-medium text-gold-400 flex items-center gap-1.5">
-            <span className="text-gold-400">✨</span>
-            AI Generated: {commandName}
+    <NodeViewWrapper as="div" className="ai-preview-wrapper my-1">
+      <div className="ai-preview relative rounded-lg overflow-hidden">
+        {/* Compact toolbar */}
+        <div className="flex items-center justify-between px-2 py-1 bg-gold-400/8 border border-gold-400/15 rounded-t-lg">
+          <span className="text-[10px] font-ui font-medium text-theme-accent/70 flex items-center gap-1">
+            <span>✦</span>
+            {commandName}
+            {opWhy && (
+              <span className="ml-1 text-theme-secondary/60 font-normal">— {opWhy}</span>
+            )}
             {isScreenplay && (
-              <span className="ml-1 px-1.5 py-0.5 bg-gold-400/20 rounded text-[10px]">
+              <span className="ml-1 px-1 py-0.5 bg-gold-400/15 rounded text-[9px]">
                 Screenplay
               </span>
             )}
@@ -616,51 +726,52 @@ function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewCompon
           <div className="flex items-center gap-1">
             <button
               onClick={handleAccept}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-ui font-medium bg-green-500/20 text-green-400 hover:bg-green-500/30 hover:text-green-300 transition-colors"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-ui font-medium bg-green-500/15 text-green-400 hover:bg-green-500/25 hover:text-green-300 transition-colors"
               title="Accept (keep this text)"
               contentEditable={false}
             >
-              <CheckmarkRegular className="w-3 h-3" />
+              <CheckmarkRegular className="w-2.5 h-2.5" />
               Accept
             </button>
             <button
               onClick={handleReject}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-ui font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-colors"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-ui font-medium bg-red-500/15 text-red-400 hover:bg-red-500/25 hover:text-red-300 transition-colors"
               title="Reject (remove this text)"
               contentEditable={false}
             >
-              <DismissRegular className="w-3 h-3" />
+              <DismissRegular className="w-2.5 h-2.5" />
               Reject
             </button>
+            <span className="text-[9px] text-theme-muted/50 ml-1 hidden sm:inline">⌘↵ / Esc</span>
           </div>
         </div>
-        
-        {/* Generated content */}
-        <div className="px-3 py-2">
-          {parsedElements && parsedElements.length > 0 ? (
-            // Render screenplay elements with type indicators
+
+        {/* Generated content — yellow accent text with typewriter animation */}
+        <div className="px-1 py-1.5">
+          {visibleElements && visibleElements.length > 0 ? (
+            // Render screenplay elements with type indicators (revealed progressively)
             <div className="space-y-1.5">
-              {parsedElements.map((element, idx) => {
+              {visibleElements.map((element, idx) => {
                 const display = ELEMENT_DISPLAY[element.type]
                 return (
                   <div key={idx} className="flex gap-2 items-start">
                     <span className={clsx(
-                      'flex-shrink-0 text-[9px] font-mono px-1 py-0.5 rounded bg-ink-800 uppercase tracking-wider',
+                      'flex-shrink-0 text-[9px] font-mono px-1 py-0.5 rounded bg-[var(--bg-tertiary)] uppercase tracking-wider',
                       display.color
                     )}>
                       {display.label}
                     </span>
                     <span className={clsx(
-                      'text-gold-100 flex-1',
+                      'text-theme-accent flex-1',
                       element.type === 'scene-heading' && 'uppercase font-bold',
                       element.type === 'action' && 'italic',
                       element.type === 'character' && 'uppercase text-center',
                       element.type === 'dialogue' && 'text-center px-8',
-                      element.type === 'parenthetical' && 'text-center italic text-ink-400 text-sm',
+                      element.type === 'parenthetical' && 'text-center italic opacity-80 text-sm',
                       element.type === 'transition' && 'uppercase text-right',
                       element.type === 'shot' && 'uppercase font-bold'
                     )}>
-                      {element.type === 'character' 
+                      {element.type === 'character'
                         ? renderCharacterElement(element.text)
                         : renderPreviewText(element.text)
                       }
@@ -668,19 +779,24 @@ function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewCompon
                   </div>
                 )
               })}
+              {isAnimating && (
+                <span className="inline-block w-[2px] h-[1em] bg-theme-accent animate-blink ml-1 align-text-bottom" />
+              )}
+            </div>
+          ) : displayText ? (
+            // Plain text — yellow accent color with typewriter reveal
+            <div className="text-theme-accent whitespace-pre-wrap">
+              {displayText}
+              {isAnimating && (
+                <span className="inline-block w-[2px] h-[1em] bg-theme-accent animate-blink ml-0.5 align-text-bottom" />
+              )}
             </div>
           ) : (
-            // Plain text
-            <div className="text-gold-100 whitespace-pre-wrap">
-              {generatedText}
+            // Empty content fallback
+            <div className="text-theme-muted/50 italic text-sm">
+              No content generated — try asking again
             </div>
           )}
-        </div>
-        
-        {/* Keyboard shortcut hints */}
-        <div className="px-3 py-1.5 border-t border-gold-400/10 text-[10px] text-ink-500 font-ui flex items-center gap-3">
-          <span><kbd className="px-1 py-0.5 bg-ink-800 rounded text-ink-400">⌘↵</kbd> Accept</span>
-          <span><kbd className="px-1 py-0.5 bg-ink-800 rounded text-ink-400">Esc</kbd> Reject</span>
         </div>
       </div>
     </NodeViewWrapper>
@@ -769,6 +885,27 @@ export const AIPreview = Node.create<AIPreviewOptions>({
         parseHTML: element => element.getAttribute('data-replacement-range'),
         renderHTML: attributes => ({
           'data-replacement-range': attributes.replacementRange,
+        }),
+      },
+      patchOpId: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-patch-op-id'),
+        renderHTML: attributes => ({
+          'data-patch-op-id': attributes.patchOpId,
+        }),
+      },
+      originalText: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-original-text'),
+        renderHTML: attributes => ({
+          'data-original-text': attributes.originalText,
+        }),
+      },
+      opWhy: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-op-why'),
+        renderHTML: attributes => ({
+          'data-op-why': attributes.opWhy,
         }),
       },
     }

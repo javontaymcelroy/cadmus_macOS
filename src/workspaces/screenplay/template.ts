@@ -66,8 +66,9 @@ export const screenplayConfig: WorkspaceConfig = {
     deriveTitlesFromContent: true,
     showPageNumbers: true,
     showTimestamps: false,
+    showThoughtPartner: true,
   },
-  
+
   editor: {
     fontFamily: 'Courier New, Courier, monospace',
     useScreenplayExtension: true,

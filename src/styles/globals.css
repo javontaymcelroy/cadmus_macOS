@@ -68,30 +68,57 @@
   --border-default: rgba(0, 0, 0, 0.15);
   --border-strong: rgba(0, 0, 0, 0.25);
   
-  /* Shadow tokens - no extra border outline in light mode */
-  --shadow-color: rgba(0, 0, 0, 0.06);
-  --shadow-panel: 0 1px 3px var(--shadow-color);
+  /* Shadow tokens - subtle two-layer elevation */
+  --shadow-color: rgba(0, 0, 0, 0.08);
+  --shadow-panel: 0 2px 12px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.05);
   
   /* Scrollbar tokens */
   --scrollbar-thumb: rgba(0, 0, 0, 0.2);
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
   
-  /* Accent adjustments for light mode - darker gold/amber for accessibility */
-  --accent-gold: #92400e;
-  --accent-gold-hover: #78350f;
-  --accent-gold-muted: rgba(146, 64, 14, 0.12);
-  --accent-gold-border: rgba(146, 64, 14, 0.3);
-  --accent-gold-glow: rgba(146, 64, 14, 0.1);
+  /* Accent adjustments for light mode - warm amber for accessibility (4.5:1 on white) */
+  --accent-gold: #b45309;
+  --accent-gold-hover: #92400e;
+  --accent-gold-muted: rgba(180, 83, 9, 0.10);
+  --accent-gold-border: rgba(180, 83, 9, 0.25);
+  --accent-gold-glow: rgba(180, 83, 9, 0.08);
 }
 
-/* Light mode panel overrides - clean 1px border only */
+/* Light mode panel overrides - subtle two-layer elevation */
 [data-theme="light"] .panel-floating,
 [data-theme="light"] .floating-editor-area {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07), 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 [data-theme="light"] .menu-modern {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10), 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* Theme-aware popover surfaces (replaces inline dark gradients) */
+.cadmus-popover {
+  background: linear-gradient(135deg, rgba(26, 26, 26, 0.98) 0%, rgba(18, 18, 18, 0.99) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .cadmus-popover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 249, 245, 0.99) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10), 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.cadmus-dialog {
+  background: linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(10, 10, 10, 0.99) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 40px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] .cadmus-dialog {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(252, 251, 247, 0.99) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
 /* ======================================
@@ -184,12 +211,15 @@
 .ProseMirror {
   outline: none;
   min-height: 100%;
-  padding: 2rem;
+  padding: 2rem 2rem 60vh 2rem;
   font-family: 'Carlito', 'Calibri', sans-serif;
   font-size: 16px;
   font-weight: 500;
   line-height: 1.75;
   color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   --ws-font-family: 'Carlito', 'Calibri', sans-serif;
   --ws-font-size: 16px;
   --ws-line-height: 1.75;
@@ -198,10 +228,12 @@
 /* Screenplay mode - use Courier New for entire editor */
 .screenplay-mode .ProseMirror {
   font-family: 'Courier New', Courier, monospace;
-  font-weight: 500;
-  font-size: 14pt;
+  font-weight: normal;
+  font-size: 12pt;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
   --ws-font-family: 'Courier New', Courier, monospace;
-  --ws-font-size: 14pt;
+  --ws-font-size: 12pt;
 }
 
 /* Note editor mode - Calibri 14pt for all notes across workspaces */
@@ -423,7 +455,7 @@
   top: 2px;
   width: 5px;
   height: 9px;
-  border: solid #000;
+  border: solid var(--text-inverted);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -465,6 +497,24 @@
 .ProseMirror ul.task-list ul.task-list {
   margin-top: 0.5rem;
   margin-left: 1.5rem;
+}
+
+/* Horizontal rule / divider */
+.ProseMirror hr {
+  border: none;
+  height: 1px;
+  background: var(--border-default);
+  margin: 2rem 0;
+  padding: 0;
+  cursor: grab;
+}
+
+/* Selected state for horizontal rule (node selection) */
+.ProseMirror hr.ProseMirror-selectednode {
+  background: var(--accent-gold, #d4a843);
+  outline: 2px solid var(--accent-gold, #d4a843);
+  outline-offset: 4px;
+  border-radius: 1px;
 }
 
 .ProseMirror mark {
@@ -814,6 +864,14 @@
   }
 }
 
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-blink {
+  animation: blink 0.8s step-end infinite;
+}
+
 /* AI loading placeholder text uses .ai-thinking-placeholder class for animation */
 
 /* Dialogue - Regular case, centered under character name (narrower than action) */
@@ -1049,6 +1107,7 @@
   box-shadow:
     0 0 0 1px var(--border-subtle),
     var(--shadow-panel);
+  -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
 }
 

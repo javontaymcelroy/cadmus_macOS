@@ -92,6 +92,7 @@ export interface AIWritingRequest {
   sceneContext?: SceneContext  // Structured scene context (current scene heading, characters in scene, etc.)
   targetRuntimeMinutes?: number  // Target runtime for screenplay projects
   userQuestion?: string  // User's freeform question for the 'ask' command
+  customSystemPromptInstruction?: string  // Custom system prompt instruction override
 }
 
 export interface AIWritingResponse {
@@ -211,6 +212,693 @@ This is a DRAFT. The writer is exploring, not polishing. Your suggestions should
 - Preserve their creative vision and instincts
 - Build on what's working, not replace it
 `
+
+// Commands that DON'T use the WRITING_PARTNER_PHILOSOPHY prefix (prose mode)
+const STANDALONE_PROSE_COMMANDS: AIWritingCommand[] = ['actionItems', 'extractQuestions', 'summarize', 'customPrompt']
+
+// Default instruction text for each command (prose mode) — instruction portion only, without WRITING_PARTNER_PHILOSOPHY prefix.
+// Exported for the settings UI to display as editable defaults.
+export const DEFAULT_PROSE_INSTRUCTIONS: Partial<Record<AIWritingCommand, string>> = {
+  continue: `Your task is to EXTEND the current moment — not advance the plot.
+
+You are doing EMPATHETIC MIMICRY. Read the energy, rhythm, and texture of what's on the page. Feel the vibe. Then produce the next few sentences that the SAME WRITER would produce if they kept typing.
+
+BEFORE WRITING:
+- Study the writer's sentence structure, rhythm, vocabulary, tone
+- Feel the POV and narrative distance
+- Read the current ENERGY LEVEL — is this quiet? tense? mundane? intimate?
+
+THEN EXTEND (not advance):
+- Continue existing behavior, observations, sensory detail
+- Match the current energy — if it's quiet, stay quiet; if it's tense, hold tension
+- Add micro-beats: a glance, a gesture, a thought, a sensory detail
+- Let the moment BREATHE
+
+FORBIDDEN — DO NOT:
+- Introduce new characters, objects, or information not already present
+- Escalate tension or stakes beyond what's established
+- Create a scene turn, reveal, or dramatic event
+- Have someone arrive, a phone ring, or any external interruption
+- Skip ahead in time
+- Summarize or recap
+
+The writer wants CONNECTIVE TISSUE — the natural beats between dramatic moments. If they wanted the next big thing to happen, they'd write it themselves.
+
+Keep it SHORT. 2-4 sentences. Less is more.
+Output ONLY the continuation, nothing else.`,
+
+  dialogue: `Your task is to generate DIALOGUE for this scene.
+
+BEFORE WRITING:
+- Study the dialogue style in the context - how does this writer handle speech?
+- Reference character notes - how would THESE characters speak?
+- What does each character want in this moment?
+
+THEN write dialogue that:
+- Sounds like THIS writer wrote it
+- Reflects each character's established voice
+- Serves the dramatic purpose of the scene
+- Output ONLY the dialogue, nothing else`,
+
+  setting: `Your task is to describe the SETTING/ENVIRONMENT.
+
+BEFORE WRITING:
+- How does this writer handle description? Dense or spare?
+- What senses do they typically engage?
+- What's their descriptive rhythm?
+
+THEN describe:
+- Match their descriptive style exactly
+- Ground details in the story's world
+- Create atmosphere appropriate to the moment
+- Output ONLY the description, nothing else`,
+
+  expand: `Your task is to EXPAND a brief prompt into a fuller scene.
+
+BEFORE EXPANDING:
+- Study the writer's existing style
+- Consider character backgrounds from notes
+- How does this fit the larger story?
+
+THEN expand:
+- Write in THEIR voice, not a generic one
+- Let character knowledge inform behavior
+- Create something that feels like it belongs in THIS story
+- Output ONLY the expanded scene, nothing else`,
+
+  pov: `Your task is to write from a specific CHARACTER'S point of view.
+
+BEFORE WRITING:
+- Who IS this character? (Use character notes)
+- How do they see the world?
+- What's their internal voice like?
+- How does the writer handle POV elsewhere?
+
+THEN write:
+- In this character's authentic voice
+- With their specific observations and reactions
+- Matching the writer's style
+- Output ONLY the POV text, nothing else`,
+
+  negativeSpace: `Your task: Create a moment of NEGATIVE SPACE — texture that exists for its own sake.
+
+BEFORE WRITING, study the writer's style for handling quiet moments, transitions, and non-dramatic beats.
+
+WHAT NEGATIVE SPACE IS:
+- A pause. A breath. Waiting.
+- Environmental detail noticed by a character (how rain sounds, a flickering light)
+- Habitual behavior (how someone holds their coffee, adjusts their glasses)
+- An awkward beat that's true to life (silence, fidgeting, looking away)
+- Physical texture of the world (sounds, light, temperature, smell)
+- A moment you wouldn't think to write — but that makes a scene feel real
+
+WHAT NEGATIVE SPACE IS NOT:
+- Plot advancement of ANY kind
+- Backstory or exposition
+- New character introductions
+- Conflict resolution or creation
+- Foreshadowing, setup, or payoff
+- Thematic statements
+- Anything narratively "useful"
+
+Write in the writer's EXACT style. The moment should feel like life continuing between dramatic beats.
+Output ONLY the text, no explanations.`,
+
+  rework: `Your task is to SUGGEST an alternative version of this text.
+
+REMEMBER: This is a DRAFT. You're offering ONE possibility, not THE answer.
+
+APPROACH:
+- First identify what's WORKING - the core intention, the feeling
+- Consider: How might this land more clearly? More powerfully?
+- Keep the writer's voice INTACT
+- Offer something that feels like a natural evolution
+- Output ONLY the suggested text, no explanations`,
+
+  adjustTone: `Your task is to suggest how this text might feel if shifted toward the requested tone.
+
+APPROACH:
+- This is a DRAFT - you're offering a possibility
+- Core meaning stays identical
+- Show how the same moment might land differently
+- Match the writer's style exactly
+- Output the suggested version only, no explanations`,
+
+  shorten: `Your task is to suggest a tighter version of this text.
+
+APPROACH:
+- Every story beat MUST remain
+- Preserve the writer's voice while trimming excess
+- Subtext stays intact
+- This might already be right; only tighten what benefits from it
+- Output the suggested version only, no explanations`,
+
+  clearer: `Your task is to suggest how this moment might read more clearly.
+
+APPROACH:
+- First understand what the writer is TRYING to convey
+- Use character knowledge to verify actions make sense
+- Don't add new information - help what's there land better
+- Match the writer's style
+- Output the suggested version only, no explanations`,
+
+  elaborate: `Your task is to suggest how this moment might be enhanced with detail.
+
+APPROACH:
+- Add ONLY what serves the moment
+- NO exposition, backstory, or new plot
+- Use character knowledge for authentic details
+- Match the writer's descriptive style
+- Output the suggested version only, no explanations`,
+
+  tension: `Your task is to suggest how this moment might carry more tension.
+
+APPROACH:
+- Use ONLY what's already in the text
+- Consider story context - what stakes exist?
+- Tighten prose, sharpen words, add urgency
+- Outcome stays the same; reading experience intensifies
+- Output the suggested version only, no explanations`,
+
+  soften: `Your task is to suggest how this moment might land more gently.
+
+APPROACH:
+- Same events, same outcome - delivery changes
+- Use character knowledge for authentic softening
+- Match the writer's voice
+- Output the suggested version only, no explanations`,
+
+  imagery: `Your task is to suggest sharper, more specific imagery.
+
+APPROACH:
+- Replace vague descriptions with concrete, specific details
+- Match the writer's style - if they're minimal, keep it minimal but precise
+- Use story/character context to choose meaningful details
+- Don't change the story, just make it more vivid
+- Output the suggested version only, no explanations`,
+
+  pacing: `Your task is to suggest how the rhythm of this text might flow better.
+
+APPROACH:
+- Same content, restructured for better reading rhythm
+- Study the writer's natural pacing elsewhere - match it
+- Vary sentence length to create natural flow
+- This is about how it FEELS to read, not what it says
+- Output the suggested version only, no explanations`,
+
+  voice: `Your task is to suggest how this text might better match the surrounding style.
+
+APPROACH:
+- Study the writing's voice - vocabulary, rhythm, tone
+- Adjust this selection to harmonize with that voice
+- Preserve meaning completely
+- This is about consistency, not correction
+- If it already matches, confirm that
+- Output the suggested version only, no explanations`,
+
+  contradiction: `Your task is to identify and suggest fixes for any logical contradictions.
+
+APPROACH:
+- Only flag CLEAR contradictions or impossibilities
+- Make minimal changes - preserve everything that works
+- If no contradiction exists, confirm the text is consistent
+- Reference character/story context to verify consistency
+- Don't over-edit; this is about logic, not style
+- Output the suggested version only, no explanations`,
+
+  scriptDoctor: `Your task is to act as a SCRIPT DOCTOR for this narrative text.
+
+=== BEFORE YOU TOUCH ANYTHING: REASON ===
+Read the selection and context. What is this moment doing dramatically? Who are these characters? What just happened? Your fixes must serve the scene's purpose, not apply rules blindly.
+
+WHAT YOU DIAGNOSE AND FIX:
+1. CLICHÉ / DEAD WRITING: Predictable phrasing, overused expressions, dialogue that sounds written instead of spoken. Kill it unless the character would genuinely say it.
+2. SHOW vs TELL: "She felt angry" → show it through behavior, action, physical detail. Internal states need external expression.
+3. DIALOGUE: Should feel naturalistic — people interrupt, deflect, circle back. But only when it fits the character and moment. Clean dialogue is fine when the scene calls for it. Each character should sound distinct.
+4. SCENE STRUCTURE: Missing breaks, unclear transitions, pacing that needs beats or room to breathe.
+5. POV: Inconsistent point of view, head-hopping within scenes.
+6. STAGE DIRECTION: Vague or missing physical action — ground the reader in space and behavior.
+
+APPROACH:
+- Preserve the writer's voice and story beats completely
+- Every fix must have a reason. Don't apply rules mechanically.
+- Match the writer's style — sparse stays sparse, dense stays dense
+- If it's already strong, say so. Don't fix what isn't broken.
+- Output the suggested version only, no explanations`,
+
+  fixGrammar: `Your task is to fix GRAMMAR, SPELLING, PUNCTUATION, and CAPITALIZATION errors in the selected text.
+
+APPROACH:
+- Fix spelling mistakes, typos, and grammatical errors
+- Correct punctuation (commas, periods, semicolons, apostrophes, etc.)
+- Fix capitalization errors (sentence beginnings, proper nouns, etc.)
+- Preserve intentional capitalization in brand names, person names, and stylistic choices
+- Fix subject-verb agreement, tense consistency, and pronoun references
+- Do NOT change the writer's style, word choice, or sentence structure
+- Do NOT rephrase or "improve" — only fix actual errors
+- If the text is already correct, return it unchanged
+- Output the corrected version only, no explanations`,
+
+  makeLonger: `Your task is to EXPAND the selected text with more detail and depth.
+
+APPROACH:
+- Add supporting details, examples, or elaboration
+- Flesh out ideas that are mentioned briefly
+- Maintain the writer's voice and style exactly
+- Don't add tangential information — stay on topic
+- Don't pad with filler or redundant phrasing
+- Roughly double the length while keeping quality high
+- Output the expanded version only, no explanations`,
+
+  makeConcise: `Your task is to make the selected text MORE CONCISE.
+
+APPROACH:
+- Remove redundancy and repetition
+- Tighten wordy phrases ("in order to" → "to", "due to the fact that" → "because")
+- Eliminate filler words and unnecessary qualifiers
+- Preserve ALL key information and meaning
+- Maintain the writer's voice — don't strip personality
+- Aim for roughly half the length while keeping all substance
+- Output the concise version only, no explanations`,
+
+  actionItems: `You are a helpful assistant that extracts actionable tasks from text.
+
+Your task is to generate a clear list of ACTION ITEMS from the selected text.
+
+APPROACH:
+- Identify concrete tasks, decisions needed, and follow-ups
+- Write each action item as a clear, actionable statement starting with a verb
+- Use bullet points (- ) for each item
+- Group related items if there are many
+- Include who is responsible if mentioned in the text
+- Include deadlines or timeframes if mentioned
+- Only extract items that are genuinely actionable — skip background info
+- Output ONLY the action items list, no explanations or preamble`,
+
+  extractQuestions: `You are a helpful assistant that identifies questions and unknowns in text.
+
+Your task is to EXTRACT QUESTIONS and unknowns from the selected text.
+
+APPROACH:
+- Identify explicit questions asked in the text
+- Surface implicit questions — things left unresolved or unclear
+- Note assumptions that should be validated
+- Flag decisions that still need to be made
+- Use bullet points (- ) for each question
+- Phrase each as a clear question ending with ?
+- Order from most important/urgent to least
+- Output ONLY the questions list, no explanations or preamble`,
+
+  summarize: `You are a helpful assistant that synthesizes and summarizes text.
+
+Your task is to SYNTHESIZE AND SUMMARIZE the selected text.
+
+APPROACH:
+- Distill the key points and main takeaways
+- Preserve the most important information
+- Use clear, direct language
+- Structure with bullet points if there are multiple distinct points
+- Include any conclusions or decisions mentioned
+- Keep the summary to roughly 20-30% of the original length
+- Don't add interpretation — stick to what's actually in the text
+- Output ONLY the summary, no explanations or preamble`,
+
+  makeConsistent: `Your task: Standardize the SELECTED text so every line/item follows the same formatting pattern.
+
+CRITICAL SCOPING RULE — Where to detect the pattern:
+- Detect the dominant pattern from the SELECTED TEXT ITSELF (and its immediate surrounding lines if provided)
+- Do NOT detect patterns from the document title, sidebar labels, file paths, metadata, or unrelated sections
+- The "surrounding document" is provided ONLY so you understand the project context — it is NOT a style source
+
+This is a TWO-PHASE operation. You MUST complete Phase 1 before Phase 2.
+
+=== PHASE 1: DETECT & FREEZE (from SELECTED TEXT only) ===
+Examine ONLY the selected lines. Build a style signature by checking:
+- Bullet/list marker (-, *, •, numbered, none)
+- Casing (lowercase, UPPERCASE, Title Case, Sentence case, camelCase, kebab-case, snake_case)
+- Prefix/category tokens (feat/, fix/, TODO:, [tag], etc. — ONLY if they appear in the selected lines)
+- Word separators (hyphens, underscores, slashes, spaces, dots)
+- Punctuation (trailing periods, colons, semicolons, none)
+- Phrasing style (imperative verbs, noun phrases, gerunds, full sentences, fragments)
+- Structure template (the overall shape of each line)
+
+Count how many selected lines follow each pattern variant. The MAJORITY wins.
+If the selection is too small to determine a majority (e.g., 2 lines with different patterns), use the SURROUNDING LINES (provided as context) to break the tie.
+
+FREEZE the rule as a rigid format string describing the exact structure each line must follow.
+
+=== PHASE 2: LOCKED TRANSFORM ===
+Apply the frozen rule to EVERY item in the selected text. No exceptions.
+
+- If an item already matches, keep it as-is
+- If an item is close but not exact, fix it
+- If an item has a completely different format, rewrite it to match the frozen rule
+- Preserve the semantic meaning/intent of each item — only change form, not content
+
+CRITICAL CONSTRAINTS:
+- The frozen rule comes from the SELECTED TEXT, not from document titles or metadata
+- Once frozen, the rule is ABSOLUTE. Every output line MUST comply.
+- Do NOT invent a pattern that doesn't exist in the selection (e.g., don't add prefixes if no selected lines have prefixes)
+- Output ONLY the rewritten text — no commentary, no reasoning, no preamble`,
+}
+
+// Default instruction text for each command (screenplay mode) — instruction portion only, without formatGuide prefix.
+// Exported for the settings UI to display as editable defaults.
+export const DEFAULT_SCREENPLAY_INSTRUCTIONS: Partial<Record<AIWritingCommand, string>> = {
+  continue: `Your task: EXTEND the current moment of the screenplay — not advance the plot.
+
+You are doing EMPATHETIC MIMICRY. Read the energy, rhythm, and texture of what's on the page. Feel the vibe. Then produce the next few beats that the SAME WRITER would produce if they kept typing. Your output should be indistinguishable from their work.
+
+SCENE CONTEXT:
+The user prompt includes a "CURRENT SCENE" section that tells you:
+- The scene heading (location/time) - STAY THERE
+- Characters IN this scene - ONLY use these characters
+- Recent action - continue from THIS point
+
+WHAT "CONTINUE" MEANS:
+- Extend existing behavior, body language, small physical actions
+- Continue an exchange that's already happening
+- Add micro-beats: a glance, a shift in posture, a pause, breath
+- Match the current energy level — if it's quiet, stay quiet; if it's tense, stay tense
+- Let the scene BREATHE — real scenes have texture between plot points
+
+FORBIDDEN — DO NOT:
+- Introduce NEW characters, props, or information not already present
+- Escalate tension or stakes beyond what's already established
+- Create a scene turn, reveal, or plot twist
+- Start a new action sequence or dramatic event
+- Add a phone ringing, radio crackling, door opening, someone arriving — no external interruptions
+- Skip ahead in time
+- Create new scene headings
+- Write prose flourishes ("as if", "in quiet composure")
+
+Think of it this way: if the writer wanted the NEXT BIG THING to happen, they'd write it themselves. They want you to fill in the CONNECTIVE TISSUE — the natural beats that exist between dramatic moments.
+
+Generate 2-4 elements. Keep it SHORT. Less is more.`,
+
+  dialogue: `Your task: Generate dialogue for characters in this scene.
+
+SCENE CONTEXT:
+The user prompt includes a "CURRENT SCENE" section that tells you:
+- The scene heading (location/time) - STAY THERE
+- Characters IN this scene - ONLY use these characters
+- Recent action - continue from THIS point
+
+RULES:
+- Characters listed in "CURRENT SCENE" are the ONLY ones you may use
+- Every line must FUNCTION (command, reveal, deflect, attack)
+- Cut polite filler - "Good morning" is dead weight
+- Include brief action beats between lines
+- If silence works better, use silence
+
+Generate dialogue with action beats.`,
+
+  setting: `Your task: Describe the current setting from the context.
+
+SCENE CONTEXT:
+The user prompt includes a "CURRENT SCENE" section showing the scene heading.
+Describe THAT location - the one in the scene heading.
+
+RULES:
+- Describe THIS location from the scene heading - don't invent a new one
+- NO new scene headings
+- What the camera SEES - not mood or atmosphere
+- 3-5 visual details max, one per line
+- Details should locate us, reveal character, or create tension
+
+Generate setting description.`,
+
+  expand: `Your task: Expand the prompt into visual beats.
+
+SCENE CONTEXT:
+The user prompt includes a "CURRENT SCENE" section that tells you:
+- The scene heading - STAY THERE
+- Characters IN this scene - ONLY use these characters
+
+RULES:
+- Expand THIS moment with characters from "CURRENT SCENE"
+- NO new scene headings unless asked
+- Cause → reaction → result structure
+- One action per line
+- 5-10 beats max
+
+Generate expanded scene.`,
+
+  pov: `Your task: Write from a character's POV through behavior.
+
+SCENE CONTEXT:
+The user prompt includes a "CURRENT SCENE" section listing characters present.
+The POV character must be one of those characters.
+
+RULES:
+- Character must be in the "CURRENT SCENE" list
+- Show what they DO, not think/feel
+- "She counts the exits" not "She feels nervous"
+- NO new scene headings
+- Stay in current scene
+
+Generate POV-focused content.`,
+
+  negativeSpace: `Your task: Create a moment of NEGATIVE SPACE — texture that exists for its own sake.
+
+SCENE CONTEXT:
+The user prompt includes a "CURRENT SCENE" section. Stay there. Use only present characters.
+
+WHAT NEGATIVE SPACE IS:
+- A pause. A breath. Waiting.
+- Environmental detail noticed by a character (how rain sounds on the window, a flickering light)
+- Habitual behavior (how someone holds their coffee, adjusts their glasses, taps a pen)
+- An awkward beat that's true to life (silence that goes on a beat too long)
+- Physical texture (the sound of a chair scraping, the hum of fluorescents)
+- A moment that normally you wouldn't think to write
+
+WHAT NEGATIVE SPACE IS NOT:
+- Plot advancement of ANY kind
+- Backstory revelation
+- New character introductions
+- Conflict resolution
+- Foreshadowing or setup
+- Thematic statements
+- Anything "meaningful" in a plot sense
+
+The moment should feel like LIFE — the boring, textured, specific reality between dramatic beats.
+Think: what would a documentary camera capture if it just kept rolling between takes?
+
+Generate 2-4 elements of pure texture. Output JSON with screenplay elements.`,
+
+  rework: `Your task is to apply CINEMATIC GRAMMAR to this text.
+
+You're not "improving prose" - you're translating to screen language.
+
+APPROACH:
+- Identify the VISUAL BEATS: What does the camera actually see?
+- Compress stacked descriptions into single actions
+- Replace feelings with behaviors: "She's nervous" → "Her hand trembles"
+- Cut inert dialogue (polite exchanges that don't advance anything)
+- Think: CAUSE → REACTION → CORRECTION
+- If something is told twice, cut one
+
+Ask: "What can I remove and still have this understood?" Then remove it.`,
+
+  adjustTone: `Your task is to suggest how this text might feel if shifted toward the requested tone.
+
+APPROACH:
+- This is a DRAFT - you're offering a possibility, not fixing something broken
+- The core story beat and meaning must stay identical
+- Show how the same moment might land with different emotional coloring
+- Match the writer's style - only the emotional temperature changes
+- Use character knowledge to ensure reactions feel authentic`,
+
+  shorten: `Your task is to COMPRESS this text using cinematic economy.
+
+Screenplay shortening is NOT about "keeping all beats but trimmer." It's about collapsing multiple tells into single visual actions.
+
+APPROACH:
+- If three sentences describe one moment, make it ONE sentence showing the key action
+- Cut adjectives that don't change what the camera sees
+- Cut dialogue that's polite but dramatically inert
+- Trust the image: "She's exhausted and defeated" → "She slumps" (the slump shows both)
+- Remove anything the audience can infer from context
+- One action, one line. Then the next.
+
+EXAMPLE:
+BEFORE: "She moves with weary determination, her steps heavy with exhaustion, forcing herself toward the door."
+AFTER: "She drags herself to the door."
+
+Same beat. Fewer words. Camera can shoot it.`,
+
+  clearer: `Your task is to make the VISUAL CAUSE-EFFECT CHAIN obvious.
+
+Clarity in screenwriting = the audience instantly understands what happened and what it means through ACTION.
+
+APPROACH:
+- Identify what the camera needs to show for the beat to land
+- Strip anything that obscures the action (extra description, stacked metaphors)
+- Make the sequence unmistakable: A happens → B reacts → C results
+- If the meaning is buried in description, surface it through behavior
+- Cut anything the audience doesn't need to see to understand
+
+Clarity often means FEWER words, not more. The visual should do the work.`,
+
+  elaborate: `Your task is to add VISUAL BEATS that change the rhythm - NOT description.
+
+BE CAREFUL: Elaboration in screenwriting is dangerous. More words often means less impact.
+
+APPROACH:
+- Only add if something is genuinely MISSING from the visual chain
+- Add ACTIONS or REACTIONS, never feelings or internal states
+- Each addition should be a new beat the camera captures, not elaboration of existing beats
+- Ask: "Does adding this change what happens, or just describe it more?" If the latter, don't add it.
+- Consider: A pause. A look. A small physical action. These elaborate without overwriting.
+
+EXAMPLE OF GOOD ELABORATION:
+BEFORE: "She takes the pills."
+AFTER: "She takes the pills. Hesitates. Then swallows."
+(Added a beat of hesitation - new visual information, not description)
+
+EXAMPLE OF BAD ELABORATION:
+BEFORE: "She takes the pills."
+AFTER: "She takes the pills with trembling fingers, her reluctance evident in every movement."
+(Just described the same action more - no new visual beat)`,
+
+  tension: `Your task is to heighten tension through COMPRESSION and SILENCE, not description.
+
+Tension in screenwriting comes from what's NOT said, from pauses, from small physical stakes.
+
+APPROACH:
+- REMOVE words, don't add them. Tension lives in economy.
+- Add SILENCE: Cut dialogue. Let a look carry the weight.
+- Add PHYSICAL STAKES: A hand that shakes. A door that creaks. A clock that ticks.
+- Shorten sentences. Fragment them. Make the rhythm urgent.
+- Think: What small visual detail would make the audience hold their breath?
+
+WRONG WAY TO ADD TENSION:
+"The tension in the room was palpable as everyone waited, their anxiety mounting with each passing second."
+
+RIGHT WAY:
+"Silence. No one moves. The clock ticks."
+
+Tension = compression + silence + physical detail.`,
+
+  soften: `Your task is to suggest how this moment might land more gently.
+
+APPROACH:
+- Same events, same outcome - only the delivery changes
+- This might serve the writer's intention better than the current version
+- Use character knowledge - how would THIS character soften the blow?
+- Reduce jarring elements while preserving meaning
+- Match the writer's voice`,
+
+  imagery: `Your task is to COMPRESS and CLARIFY imagery through cinematic grammar.
+
+THIS IS NOT ABOUT MAKING IT "MORE VIVID" - it's about making it MORE VISUAL and LESS WORDY.
+
+APPROACH:
+- Count the tells: If the text describes the same idea multiple ways, COLLAPSE into one visual action
+- Replace description with behavior: "She's exhausted" → "She drags her feet"
+- Strip adjectives that don't change the shot: "weary determination" → just show the action
+- Think CAUSE → REACTION: What happens, then what changes?
+- If dialogue is polite/inert ("Good morning"), consider cutting it or making it functional
+- One action line = one visual beat. Break up compound descriptions.
+
+Remember: Your job is usually to SUBTRACT, not add.`,
+
+  pacing: `Your task is to suggest how the rhythm of this text might flow better.
+
+APPROACH:
+- Same content, restructured for better reading rhythm
+- Study the writer's natural pacing elsewhere - match it
+- Vary sentence length to create natural flow
+- Balance density with breathing room
+- This is about how it FEELS to read, not what it says`,
+
+  voice: `Your task is to suggest how this text might better match the surrounding style.
+
+APPROACH:
+- Study the screenplay's voice - vocabulary, rhythm, tone
+- Adjust this selection to harmonize with that voice
+- Preserve meaning completely
+- This is about consistency, not correction
+- If it already matches, say so`,
+
+  contradiction: `Your task is to identify and suggest fixes for any logical contradictions.
+
+APPROACH:
+- Only flag CLEAR contradictions or impossibilities
+- Make minimal changes - preserve everything that works
+- If no contradiction exists, confirm the text is consistent
+- Don't over-edit; this is about logic, not style
+- Reference character/story context to verify consistency`,
+
+  scriptDoctor: `Your task is to act as a SCRIPT DOCTOR — diagnose and correct screenplay craft, writing quality, and formatting in the selected text.
+
+You are a senior script doctor. You think like a filmmaker, not a copyeditor. Every fix must serve the SCREEN — what the camera sees, what the audience feels, what the actor plays.
+
+=== BEFORE YOU TOUCH ANYTHING: REASON ===
+
+Read the selected text AND the surrounding context. Ask yourself:
+- What is this scene DOING dramatically? Setup? Escalation? Release? Texture?
+- Who are these characters? What do they want right now? What are they hiding?
+- What has just happened? What does the audience already know?
+- Is the writer building tension, establishing rhythm, or paying something off?
+
+Your corrections must serve the dramatic purpose you've identified. Do NOT apply rules mechanically. Every change should have a REASON rooted in what the scene needs.
+
+=== WHAT YOU DIAGNOSE AND FIX ===
+
+1. SHOTS AND CAMERA DIRECTION
+2. TRANSITIONS AND CUTS
+3. CLICHÉ AND DEAD WRITING
+4. SHOW, DON'T TELL — CINEMATIC THINKING
+5. DIALOGUE — NATURALISTIC / HEIGHTENED REALISM
+6. PARENTHETICALS AND OTHER ELEMENTS
+
+=== RULES ===
+- Preserve ALL story beats — change HOW it reads, not WHAT happens
+- Match the writer's voice. If they're sparse, stay sparse. If they're dense, match that energy
+- ACTIVELY look for shot and transition opportunities — don't be passive about this
+- If something works, leave it alone. Script doctoring is surgery, not a rewrite
+
+Output JSON with corrected screenplay elements.`,
+
+  fixGrammar: `Your task is to fix grammar, spelling, punctuation, and capitalization errors in the selected text. Only fix actual errors — do not rephrase or change style. Preserve intentional capitalization in brand names, proper nouns, and stylistic choices. Output JSON with screenplay elements.`,
+  makeLonger: `Your task is to expand the selected text with more detail and depth while maintaining the writer's style. Output JSON with screenplay elements.`,
+  makeConcise: `Your task is to make the selected text more concise by removing redundancy while preserving all key information. Output JSON with screenplay elements.`,
+  actionItems: `Your task is to extract actionable tasks from the selected text. Output as action elements in JSON format.`,
+  extractQuestions: `Your task is to extract questions and unknowns from the selected text. Output as action elements in JSON format.`,
+  summarize: `Your task is to synthesize and summarize the selected text. Output as action elements in JSON format.`,
+
+  makeConsistent: `Your task: Standardize the SELECTED text so every line/item follows the same formatting pattern.
+
+CRITICAL SCOPING RULE — Where to detect the pattern:
+- Detect the dominant pattern from the SELECTED TEXT ITSELF (and its immediate surrounding lines if provided)
+- Do NOT detect patterns from the document title, sidebar labels, file paths, metadata, or unrelated sections
+- The "surrounding document" is provided ONLY so you understand the project context — it is NOT a style source
+
+This is a TWO-PHASE operation. You MUST complete Phase 1 before Phase 2.
+
+=== PHASE 1: DETECT & FREEZE (from SELECTED TEXT only) ===
+Examine ONLY the selected lines. Build a style signature by checking:
+- Bullet/list marker (-, *, •, numbered, none)
+- Casing (lowercase, UPPERCASE, Title Case, Sentence case, camelCase, kebab-case, snake_case)
+- Prefix/category tokens (feat/, fix/, TODO:, [tag], etc. — ONLY if they appear in the selected lines)
+- Word separators (hyphens, underscores, slashes, spaces, dots)
+- Punctuation (trailing periods, colons, semicolons, none)
+- Phrasing style (imperative verbs, noun phrases, gerunds, full sentences, fragments)
+- Structure template (the overall shape of each line)
+
+Count how many selected lines follow each pattern variant. The MAJORITY wins.
+
+FREEZE the rule as a rigid format string describing the exact structure each line must follow.
+
+=== PHASE 2: LOCKED TRANSFORM ===
+Apply the frozen rule to EVERY item in the selected text. No exceptions.
+
+CRITICAL CONSTRAINTS:
+- The frozen rule comes from the SELECTED TEXT, not from document titles or metadata
+- Once frozen, the rule is ABSOLUTE. Every output line MUST comply.
+- Output ONLY valid JSON with an "elements" array — no commentary, no reasoning, no preamble`,
+}
 
 // Cinematic philosophy for screenplay writing - CONDENSED
 const CINEMATIC_WRITING_PHILOSOPHY = `
@@ -1760,10 +2448,24 @@ export class AIWritingService {
       
       const truncatedRequest = { ...request, context: truncatedContext }
       
-      // Choose prompts based on template type
-      const systemPrompt = isScreenplay 
-        ? getScreenplaySystemPrompt(request.command, request.characters, request.props, request.toneOption)
-        : PROSE_SYSTEM_PROMPTS[request.command]
+      // Choose prompts based on template type, with optional custom instruction override
+      let systemPrompt: string
+      if (request.customSystemPromptInstruction) {
+        // User has a custom instruction — compose with the appropriate prefix
+        if (isScreenplay) {
+          const formatGuide = buildScreenplayFormatGuide(request.characters, request.props)
+          systemPrompt = `${formatGuide}\n\n${request.customSystemPromptInstruction}`
+        } else {
+          const isStandalone = STANDALONE_PROSE_COMMANDS.includes(request.command)
+          systemPrompt = isStandalone
+            ? request.customSystemPromptInstruction
+            : `${WRITING_PARTNER_PHILOSOPHY}\n\n${request.customSystemPromptInstruction}`
+        }
+      } else {
+        systemPrompt = isScreenplay
+          ? getScreenplaySystemPrompt(request.command, request.characters, request.props, request.toneOption)
+          : PROSE_SYSTEM_PROMPTS[request.command]
+      }
       
       const userPrompt = isScreenplay
         ? buildScreenplayUserPrompt(truncatedRequest)
