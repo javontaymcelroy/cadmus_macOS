@@ -152,6 +152,7 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
     toggleThoughtPartnerAgentMode,
     setThoughtPartnerSelectionContext,
     clearThoughtPartnerSelectionContext,
+    updateCursorContext,
     saveDocumentViewState,
   } = useProjectStore()
 
@@ -836,6 +837,184 @@ export function BaseEditor({ toolbar, placeholder = 'Start writing...', addition
     editor.on('update', handler)
     return () => { editor.off('update', handler) }
   }, [editor, ui.thoughtPartnerPanelOpen, usePipeline, activeDocumentId, updateDocumentBlockContext])
+
+  // Compute cursor context for Thought Partner when Focus toggle is on
+  const useCursorContext = thoughtPartner.useCursorContext
+  const cursorContextRadius = thoughtPartner.cursorContextRadius
+  const cursorContextTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    if (!editor || !ui.thoughtPartnerPanelOpen || !useCursorContext || !activeDocumentId) {
+      return
+    }
+
+    const computeCursorContext = () => {
+      const json = editor.getJSON()
+      if (!json.content) return
+
+      const { from, to } = editor.state.selection
+      const cursorBlockId = getBlockIdAtPos(editor.state.doc, from) || ''
+      if (!cursorBlockId) return
+
+      // Build flat list of blocks with text
+      type BlockInfo = { blockId: string; type: string; text: string; nodeIndex: number }
+      const blocks: BlockInfo[] = []
+      const headingBlocks: Array<{ text: string; nodeIndex: number }> = []
+      const outline: string[] = []
+
+      for (let i = 0; i < json.content.length; i++) {
+        const node = json.content[i]
+        const bid = node.attrs?.blockId as string
+        if (!bid) continue
+
+        let text = ''
+        const extractText = (n: any): void => {
+          if (n.type === 'text' && n.text) { text += n.text; return }
+          if (n.content) n.content.forEach(extractText)
+        }
+        extractText(node)
+
+        const nodeType = node.type || 'paragraph'
+        blocks.push({ blockId: bid, type: nodeType, text, nodeIndex: i })
+
+        // Track headings for heading path and outline
+        const isHeading = nodeType === 'heading' || nodeType === 'sceneHeading' || nodeType === 'scene-heading'
+        if (isHeading && text.trim()) {
+          headingBlocks.push({ text: text.trim(), nodeIndex: i })
+          outline.push(text.trim())
+        }
+      }
+
+      // Find cursor block index
+      const cursorBlockIdx = blocks.findIndex(b => b.blockId === cursorBlockId)
+      if (cursorBlockIdx === -1) return
+
+      const cursorBlock = blocks[cursorBlockIdx]
+
+      // Compute offset within the cursor block
+      // Walk ProseMirror doc to find cursor block start position
+      let cursorOffsetInBlock = 0
+      let blockStartPos = 0
+      editor.state.doc.descendants((node, pos) => {
+        if (node.attrs?.blockId === cursorBlockId) {
+          blockStartPos = pos + 1 // +1 to skip the node open token
+          cursorOffsetInBlock = Math.max(0, from - blockStartPos)
+          return false
+        }
+      })
+
+      // Build anchor snippet (20-40 chars around cursor within the block)
+      const blockText = cursorBlock.text
+      const snippetStart = Math.max(0, cursorOffsetInBlock - 20)
+      const snippetEnd = Math.min(blockText.length, cursorOffsetInBlock + 20)
+      const anchorSnippet = blockText.slice(snippetStart, snippetEnd)
+
+      // Build heading path: walk backward to find enclosing headings
+      const headingPath: string[] = []
+      for (let i = headingBlocks.length - 1; i >= 0; i--) {
+        if (headingBlocks[i].nodeIndex < cursorBlock.nodeIndex) {
+          headingPath.unshift(headingBlocks[i].text)
+          // Only include headings of decreasing level for breadcrumb
+          // Simple: keep adding until we've collected up to 4
+          if (headingPath.length >= 4) break
+        }
+      }
+
+      // Expand before/after text by whole blocks, up to radius
+      let beforeText = ''
+      let afterText = ''
+
+      // Before: expand backwards from cursor block
+      for (let i = cursorBlockIdx; i >= 0; i--) {
+        const candidate = blocks[i].text
+        if (i === cursorBlockIdx) {
+          // Include text before cursor within this block
+          const textBefore = candidate.slice(0, cursorOffsetInBlock)
+          if (beforeText.length + textBefore.length > cursorContextRadius) break
+          beforeText = textBefore + (beforeText ? '\n' + beforeText : '')
+        } else {
+          if (beforeText.length + candidate.length + 1 > cursorContextRadius) {
+            // If this is a heading, include it (for context) then stop
+            const isH = blocks[i].type === 'heading' || blocks[i].type === 'sceneHeading' || blocks[i].type === 'scene-heading'
+            if (isH && candidate.length < 200) {
+              beforeText = candidate + '\n' + beforeText
+            }
+            break
+          }
+          beforeText = candidate + '\n' + beforeText
+        }
+      }
+
+      // After: expand forwards from cursor block
+      for (let i = cursorBlockIdx; i < blocks.length; i++) {
+        const candidate = blocks[i].text
+        if (i === cursorBlockIdx) {
+          // Include text after cursor within this block
+          const textAfter = candidate.slice(cursorOffsetInBlock)
+          if (afterText.length + textAfter.length > cursorContextRadius) break
+          afterText = (afterText ? afterText + '\n' : '') + textAfter
+        } else {
+          if (afterText.length + candidate.length + 1 > cursorContextRadius) {
+            // If this is a heading, include it then stop
+            const isH = blocks[i].type === 'heading' || blocks[i].type === 'sceneHeading' || blocks[i].type === 'scene-heading'
+            if (isH && candidate.length < 200) {
+              afterText = afterText + '\n' + candidate
+            }
+            break
+          }
+          afterText = afterText + '\n' + candidate
+        }
+      }
+
+      // Document version hash (djb2 of full text, same as block context)
+      const fullText = blocks.map(b => b.text).join('\n')
+      let hash = 5381
+      for (let i = 0; i < fullText.length; i++) {
+        hash = ((hash << 5) + hash) + fullText.charCodeAt(i)
+        hash = hash & hash
+      }
+      const documentVersion = (hash >>> 0).toString(16)
+
+      updateCursorContext({
+        documentId: activeDocumentId,
+        documentTitle: activeDoc?.title || 'Untitled',
+        documentVersion,
+        cursorBlockId,
+        cursorOffsetInBlock,
+        anchorSnippet,
+        cursorOffset: from,
+        selectionRange: from !== to ? { from, to } : undefined,
+        headingPath,
+        beforeText: beforeText.trim(),
+        afterText: afterText.trim(),
+        contextRadius: cursorContextRadius,
+        outline,
+      })
+    }
+
+    // Debounced computation on selection/cursor changes
+    const onSelectionChange = () => {
+      if (cursorContextTimerRef.current) clearTimeout(cursorContextTimerRef.current)
+      cursorContextTimerRef.current = setTimeout(computeCursorContext, 300)
+    }
+
+    // Also recompute on content changes (blocks may shift)
+    const onContentChange = () => {
+      if (cursorContextTimerRef.current) clearTimeout(cursorContextTimerRef.current)
+      cursorContextTimerRef.current = setTimeout(computeCursorContext, 500)
+    }
+
+    // Initial computation
+    computeCursorContext()
+
+    editor.on('selectionUpdate', onSelectionChange)
+    editor.on('update', onContentChange)
+    return () => {
+      editor.off('selectionUpdate', onSelectionChange)
+      editor.off('update', onContentChange)
+      if (cursorContextTimerRef.current) clearTimeout(cursorContextTimerRef.current)
+    }
+  }, [editor, ui.thoughtPartnerPanelOpen, useCursorContext, cursorContextRadius, activeDocumentId, activeDoc?.title, updateCursorContext])
 
   // Toggle editor editable state based on reader mode
   useEffect(() => {

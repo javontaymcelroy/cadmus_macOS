@@ -16,6 +16,7 @@
 import Store from 'electron-store'
 import * as fs from 'fs'
 import * as path from 'path'
+import { FeedbackLogger } from './feedbackLogger'
 import type {
   ThoughtPartnerRequest,
   ThoughtPartnerResponse,
@@ -151,6 +152,7 @@ Your thinking approach:
 Context Model:
 - You receive a "CONSCIOUS CONTEXT" section — this is the document the writer is currently looking at. Prioritize this in your responses.
 - You may receive a "SELECTION CONTEXT" section — this is text the writer has highlighted in their document. When present, this is their highest-priority focus area. Scope your edits and suggestions to this highlighted text. If you believe changes are also needed OUTSIDE the selection (for consistency, flow, or continuity), do NOT silently edit those areas. Instead, use ask_question to explain the issue and ask whether the writer wants you to also update those areas. Treat the selection as a "zoom in" on the conscious context — use the full document for understanding, but constrain your edits to the selection unless told otherwise.
+- You may receive "REFERENCED DOCUMENTS" — these are documents the writer has explicitly pinned for you to consider. Use them as background context alongside the conscious context.
 - You receive a "SUBCONSCIOUS CONTEXT" section — this is the full project. Reference it when relevant, but don't overwhelm the conversation with it.
 - You receive a "CONTEXT DOCUMENT" — this is a running log of decisions, questions, ideas, and risks from the conversation so far. Build on it.
 
@@ -398,6 +400,7 @@ Your thinking approach:
 Context Model:
 - You receive a "CONSCIOUS CONTEXT" section — this is the document the writer is currently looking at. Prioritize this. Each block has a [block:ID] prefix you can use in plan_edit tool calls.
 - You may receive a "SELECTION CONTEXT" section — this is text the writer has highlighted. Scope your edits to this highlighted text. If you believe changes are also needed OUTSIDE the selection, use ask_question to explain & get permission.
+- You may receive "REFERENCED DOCUMENTS" — these are documents the writer has explicitly pinned for you to consider. Use them as background context alongside the conscious context.
 - You receive a "SUBCONSCIOUS CONTEXT" section — this is the full project. Reference it when relevant.
 - You receive a "MEMORY" section — this is a structured log of decisions, glossary, constraints, questions, and risks. Build on it.
 
@@ -604,6 +607,53 @@ function buildPipelineConversationMessages(
     contextBlock += `\nScope your edits to this highlighted text unless asked otherwise.\n\n`
   }
 
+  // Cursor context (authoritative focus window around cursor)
+  if (request.cursorContext) {
+    const cc = request.cursorContext
+    const totalChars = (cc.beforeText?.length || 0) + (cc.afterText?.length || 0)
+    // Cap at MAX_CURSOR_CONTEXT_CHARS (4000)
+    const maxChars = 4000
+    let beforeText = cc.beforeText || ''
+    let afterText = cc.afterText || ''
+    if (totalChars > maxChars) {
+      const halfMax = Math.floor(maxChars / 2)
+      if (beforeText.length > halfMax) beforeText = beforeText.slice(-halfMax)
+      if (afterText.length > halfMax) afterText = afterText.slice(0, halfMax)
+    }
+
+    contextBlock += `=== CURSOR CONTEXT (Authoritative — Writer's Current Position) ===\n`
+    contextBlock += `Document: "${cc.documentTitle}"\n`
+    if (cc.headingPath.length > 0) {
+      contextBlock += `Location: ${cc.headingPath.join(' > ')}\n`
+    }
+    contextBlock += `Document version: ${cc.documentVersion}\n\n`
+    if (beforeText) {
+      contextBlock += `--- Before cursor ---\n${beforeText}\n\n`
+    }
+    contextBlock += `--- [CURSOR IS HERE] ---\n\n`
+    if (afterText) {
+      contextBlock += `--- After cursor ---\n${afterText}\n\n`
+    }
+    if (cc.outline.length > 0) {
+      contextBlock += `Document outline:\n`
+      cc.outline.forEach((h, i) => { contextBlock += `${i + 1}. ${h}\n` })
+      contextBlock += '\n'
+    }
+    contextBlock += `IMPORTANT: This is the writer's current working position. When proposing document edits, scope them within this context window unless the writer explicitly asks otherwise. If the writer's message is conversational (asking questions, brainstorming, giving feedback), reply in chat and do NOT propose document edits.\n\n`
+  }
+
+  // Referenced documents (explicitly pinned by the writer)
+  if (request.referencedDocuments && request.referencedDocuments.length > 0) {
+    contextBlock += `=== REFERENCED DOCUMENTS ===\n`
+    contextBlock += `The writer has pinned the following documents as additional context:\n\n`
+    for (const doc of request.referencedDocuments) {
+      const content = doc.content.slice(0, 8000)
+      contextBlock += `--- Document: "${doc.title}" ---\n${content}\n`
+      if (doc.content.length > 8000) contextBlock += '[...truncated]\n'
+      contextBlock += '\n'
+    }
+  }
+
   // Subconscious context (same as legacy)
   const sub = request.subconsciousContext
   contextBlock += `=== SUBCONSCIOUS CONTEXT (Full Project) ===\n`
@@ -793,6 +843,52 @@ function buildConversationMessages(request: ThoughtPartnerRequest): Array<{ role
       contextBlock += '[...truncated]\n'
     }
     contextBlock += `\nIMPORTANT: The writer's selection indicates this specific passage is their focus. When proposing edits or content, prioritize changes within or directly related to this highlighted text.\n\n`
+  }
+
+  // Cursor context (authoritative focus window around cursor)
+  if (request.cursorContext) {
+    const cc = request.cursorContext
+    const maxChars = 4000
+    let beforeText = cc.beforeText || ''
+    let afterText = cc.afterText || ''
+    const totalChars = beforeText.length + afterText.length
+    if (totalChars > maxChars) {
+      const halfMax = Math.floor(maxChars / 2)
+      if (beforeText.length > halfMax) beforeText = beforeText.slice(-halfMax)
+      if (afterText.length > halfMax) afterText = afterText.slice(0, halfMax)
+    }
+
+    contextBlock += `=== CURSOR CONTEXT (Authoritative — Writer's Current Position) ===\n`
+    contextBlock += `Document: "${cc.documentTitle}"\n`
+    if (cc.headingPath.length > 0) {
+      contextBlock += `Location: ${cc.headingPath.join(' > ')}\n`
+    }
+    contextBlock += `Document version: ${cc.documentVersion}\n\n`
+    if (beforeText) {
+      contextBlock += `--- Before cursor ---\n${beforeText}\n\n`
+    }
+    contextBlock += `--- [CURSOR IS HERE] ---\n\n`
+    if (afterText) {
+      contextBlock += `--- After cursor ---\n${afterText}\n\n`
+    }
+    if (cc.outline.length > 0) {
+      contextBlock += `Document outline:\n`
+      cc.outline.forEach((h, i) => { contextBlock += `${i + 1}. ${h}\n` })
+      contextBlock += '\n'
+    }
+    contextBlock += `IMPORTANT: This is the writer's current working position. When proposing document edits, scope them within this context window unless the writer explicitly asks otherwise. If the writer's message is conversational (asking questions, brainstorming, giving feedback), reply in chat and do NOT propose document edits.\n\n`
+  }
+
+  // Referenced documents (explicitly pinned by the writer)
+  if (request.referencedDocuments && request.referencedDocuments.length > 0) {
+    contextBlock += `=== REFERENCED DOCUMENTS ===\n`
+    contextBlock += `The writer has pinned the following documents as additional context:\n\n`
+    for (const doc of request.referencedDocuments) {
+      const content = doc.content.slice(0, 8000)
+      contextBlock += `--- Document: "${doc.title}" ---\n${content}\n`
+      if (doc.content.length > 8000) contextBlock += '[...truncated]\n'
+      contextBlock += '\n'
+    }
   }
 
   // Subconscious context (full project — background)
@@ -1134,6 +1230,7 @@ class ThoughtPartnerService {
       selectionContext?: { text: string } | null
       lastPipelineActions: PipelineAction[]
       consecutiveChatTurns: number
+      conversationHistory?: Array<{ role: string; content: string; questions?: any[] }>
     }
   ): IntentClassification {
     const msg = message.toLowerCase().trim()
@@ -1146,6 +1243,7 @@ class ThoughtPartnerService {
       new RegExp(`(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?(?:${editVerbs})\\b`),   // Polite: "Can you rewrite this?"
       new RegExp(`let(?:'s|\\s+us)\\s+(?:${editVerbs})\\b`),                                 // Collaborative: "Let's rewrite this"
       /(?:apply|send|push)\s+(?:that|this|it)\s+(?:to|into)/,                                // Apply: "Apply that to the doc"
+      new RegExp(`(?:we|i)\\s+(?:need|want|should|have)\\s+to\\s+(?:${editVerbs})\\b`),      // Intentional: "We need to add..."
     ]
     const hasDirective = directivePatterns.some(p => p.test(msg))
     if (hasDirective) signals.push('directive')
@@ -1160,15 +1258,35 @@ class ThoughtPartnerService {
     const hasPending = context.lastPipelineActions.some(
       a => (a.type === 'plan' || a.type === 'reflection') && a.status === 'pending'
     )
+
+    // Also detect implicit edit intent from the assistant's last message.
+    // When the model expresses a plan in plain text (because it lacked plan tools),
+    // the user's confirmation should still be recognized.
+    const recentAssistant = (context.conversationHistory || [])
+      .filter(m => m.role === 'assistant')
+      .slice(-1)[0]
+    const implicitPlanPattern = /\b(?:i(?:'m going to|'ll|will|shall| am going to| will now)\s+(?:add|insert|write|create|draft|produce|remove|delete|replace|change|update|fix|edit|rewrite|revise|put|place|include))\b/i
+    const hasImplicitPlan = recentAssistant?.content ? implicitPlanPattern.test(recentAssistant.content) : false
+    if (hasImplicitPlan) signals.push('implicit_plan')
+
     const confirmPattern = /^(?:go ahead|do it|proceed|approved?|yes|yep|yeah|yup|ok|sure|apply|execute|try that|let'?s do it|sounds good|make it happen|confirm)\b/
-    const isConfirmation = hasPending && confirmPattern.test(msg)
+    const isConfirmation = (hasPending || hasImplicitPlan) && confirmPattern.test(msg)
     if (isConfirmation) signals.push('confirmation')
 
-    // === 4. Mode latch: conversational streak ===
+    // === 4. Detect post-clarification phase ===
+    // If the model recently asked questions via ask_question, it was gathering info
+    // to build toward an action. Escalate to reflect-first so it can formalize a plan.
+    const recentAssistantMsgs = (context.conversationHistory || [])
+      .filter(m => m.role === 'assistant')
+      .slice(-3)
+    const hasRecentQuestions = recentAssistantMsgs.some(m => m.questions && m.questions.length > 0)
+    if (hasRecentQuestions) signals.push('post_clarification')
+
+    // === 5. Mode latch: conversational streak ===
     const inStreak = context.consecutiveChatTurns >= 3
     if (inStreak) signals.push(`streak:${context.consecutiveChatTurns}`)
 
-    // === 5. Policy decision tree (default: chat-only) ===
+    // === 6. Policy decision tree (default: chat-only) ===
     let policy: ToolPolicy
     if (isConfirmation) {
       policy = 'full'
@@ -1179,6 +1297,10 @@ class ThoughtPartnerService {
     } else if ((hasDirective || hasSelectionTransform) && inStreak) {
       policy = 'reflect-first'
       signals.push('rule:directive_in_streak')
+    } else if (hasRecentQuestions) {
+      // Post-clarification: model asked questions recently, let it formalize a plan
+      policy = 'reflect-first'
+      signals.push('rule:post_clarification')
     } else {
       policy = 'chat-only'
       signals.push('rule:default_chat')
@@ -1295,6 +1417,7 @@ class ThoughtPartnerService {
         selectionContext: request.selectionContext || null,
         lastPipelineActions: request.currentPipelineActions || [],
         consecutiveChatTurns: request.consecutiveChatTurns || 0,
+        conversationHistory: request.conversationHistory || [],
       })
     }
 
@@ -1705,7 +1828,6 @@ class ThoughtPartnerService {
       // Analyze response dimensions for the behavior feedback loop
       let expressedDimensions: Partial<Record<string, number>> | undefined
       try {
-        const { FeedbackLogger } = require('./feedbackLogger')
         const interactionCtx = {
           intentPolicy: classification.policy,
           hasSelection: !!request.selectionContext?.text,

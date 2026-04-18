@@ -13,11 +13,15 @@ import {
   FlashCheckmarkRegular,
   DismissRegular,
   EditRegular,
+  CursorClickRegular,
+  CursorClickFilled,
 } from '@fluentui/react-icons'
 import { MessageBubble } from './MessageBubble'
 import { SuggestionCard } from './SuggestionCard'
 import { ContextChip } from './ContextChip'
 import { SelectionContextChip } from './SelectionContextChip'
+import { ReferenceDocumentChip } from './ReferenceDocumentChip'
+import { CursorContextChip } from './CursorContextChip'
 import { ContextDocumentView } from './ContextDocumentView'
 import { ConversationSelector } from './ConversationSelector'
 import { ActionCard } from './ActionCard'
@@ -45,6 +49,8 @@ export function ThoughtPartnerPanel() {
     answerThoughtPartnerQuestion,
     skipThoughtPartnerQuestion,
     clearThoughtPartnerSelectionContext,
+    addThoughtPartnerReference,
+    removeThoughtPartnerReference,
     setPipelineState,
     acceptPipelineAction,
     rejectPipelineAction,
@@ -60,12 +66,17 @@ export function ThoughtPartnerPanel() {
     mergeIdeas,
     discardIdea,
     submitMessageFeedback,
+    toggleUseCursorContext,
+    setCursorContextRadius,
   } = useProjectStore()
 
   const [inputText, setInputText] = useState('')
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [excludeConscious, setExcludeConscious] = useState(false)
   const [showTextSizeControl, setShowTextSizeControl] = useState(false)
+  const [isDraggingOver, setIsDraggingOver] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -97,14 +108,51 @@ export function ThoughtPartnerPanel() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [thoughtPartner.messages, thoughtPartner.streamingContent])
 
+  // All project documents for @mention popover
+  const allDocuments = currentProject?.documents.filter(d => d.type === 'document') ?? []
+  const mentionResults = mentionQuery !== null
+    ? allDocuments.filter(d =>
+        d.id !== activeDocumentId &&
+        !thoughtPartner.referencedDocuments.some(r => r.id === d.id) &&
+        d.title.toLowerCase().includes(mentionQuery.toLowerCase())
+      ).slice(0, 6)
+    : []
+
   const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInputText(e.target.value)
+    const value = e.target.value
+    setInputText(value)
+
+    // Detect @mention: look for @ followed by non-space text at cursor
+    const cursorPos = e.target.selectionStart
+    const textBeforeCursor = value.slice(0, cursorPos)
+    const atMatch = textBeforeCursor.match(/@([^\s@]*)$/)
+    if (atMatch) {
+      setMentionQuery(atMatch[1])
+      setMentionIndex(0)
+    } else {
+      setMentionQuery(null)
+    }
   }, [])
+
+  const selectMention = useCallback((doc: { id: string; title: string }) => {
+    // Replace @query with empty string and add as reference
+    const cursorPos = textareaRef.current?.selectionStart ?? inputText.length
+    const textBeforeCursor = inputText.slice(0, cursorPos)
+    const atIdx = textBeforeCursor.lastIndexOf('@')
+    if (atIdx >= 0) {
+      const newText = inputText.slice(0, atIdx) + inputText.slice(cursorPos)
+      setInputText(newText)
+    }
+    addThoughtPartnerReference({ id: doc.id, title: doc.title })
+    setMentionQuery(null)
+    textareaRef.current?.focus()
+  }, [inputText, addThoughtPartnerReference])
 
   const handleSend = useCallback(() => {
     const text = inputText.trim()
     if (!text || thoughtPartner.isStreaming) return
     setInputText('')
+    setMentionQuery(null)
     if (editingMessageId) {
       editThoughtPartnerMessage(editingMessageId, text)
       setEditingMessageId(null)
@@ -125,11 +173,59 @@ export function ThoughtPartnerPanel() {
   }, [])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionQuery !== null && mentionResults.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setMentionIndex(i => Math.min(i + 1, mentionResults.length - 1))
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setMentionIndex(i => Math.max(i - 1, 0))
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        selectMention(mentionResults[mentionIndex])
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setMentionQuery(null)
+        return
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
-  }, [handleSend])
+  }, [handleSend, mentionQuery, mentionResults, mentionIndex, selectMention])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDraggingOver(false)
+    const data = e.dataTransfer.getData('application/cadmus-docref')
+    if (!data) return
+    try {
+      const doc = JSON.parse(data) as { id: string; title: string }
+      if (doc.id === activeDocumentId) return // already in conscious context
+      addThoughtPartnerReference({ id: doc.id, title: doc.title })
+    } catch { /* ignore malformed data */ }
+  }, [activeDocumentId, addThoughtPartnerReference])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('application/cadmus-docref')) {
+      e.preventDefault()
+      setIsDraggingOver(true)
+    }
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Only reset if leaving the container (not entering a child)
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDraggingOver(false)
+    }
+  }, [])
 
   const handleSuggestionClick = useCallback((prompt: string) => {
     sendThoughtPartnerMessage(prompt)
@@ -390,12 +486,12 @@ export function ThoughtPartnerPanel() {
                   <div key={op.id || i} className="text-xs space-y-1 border-t border-theme-subtle pt-1.5 mt-1.5">
                     <div className="text-theme-secondary italic">{op.why}</div>
                     {op.anchor?.textSnapshot && op.type === 'replace' && (
-                      <div className="bg-red-500/10 rounded px-2 py-1 line-through text-theme-tertiary">
+                      <div className="bg-red-500/20 border border-red-500/30 rounded px-2 py-1 line-through text-red-400/70">
                         {op.anchor.textSnapshot.slice(0, 100)}{op.anchor.textSnapshot.length > 100 ? '...' : ''}
                       </div>
                     )}
                     {op.content && (
-                      <div className="bg-green-500/10 rounded px-2 py-1 text-theme-primary">
+                      <div className="bg-green-500/20 border border-green-500/30 rounded px-2 py-1 text-theme-primary">
                         {op.content.slice(0, 200)}{op.content.length > 200 ? '...' : ''}
                       </div>
                     )}
@@ -439,18 +535,35 @@ export function ThoughtPartnerPanel() {
       {/* Input Area */}
       <div className="border-t border-theme-subtle px-3 py-2.5 space-y-2 bg-theme-header">
         {/* Context Chips */}
-        {(activeDoc && !excludeConscious || thoughtPartner.selectionContext) && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {activeDoc && !excludeConscious && (
-              <ContextChip
-                title={activeDoc.title}
-                onRemove={() => setExcludeConscious(true)}
-              />
-            )}
-            {thoughtPartner.selectionContext && (
-              <SelectionContextChip
-                text={thoughtPartner.selectionContext.text}
-                onRemove={() => clearThoughtPartnerSelectionContext()}
+        {(activeDoc && !excludeConscious || thoughtPartner.selectionContext || thoughtPartner.referencedDocuments.length > 0 || (thoughtPartner.useCursorContext && thoughtPartner.cursorContext)) && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {activeDoc && !excludeConscious && (
+                <ContextChip
+                  title={activeDoc.title}
+                  onRemove={() => setExcludeConscious(true)}
+                />
+              )}
+              {thoughtPartner.selectionContext && (
+                <SelectionContextChip
+                  text={thoughtPartner.selectionContext.text}
+                  onRemove={() => clearThoughtPartnerSelectionContext()}
+                />
+              )}
+              {thoughtPartner.referencedDocuments.map(ref => (
+                <ReferenceDocumentChip
+                  key={ref.id}
+                  title={ref.title}
+                  onRemove={() => removeThoughtPartnerReference(ref.id)}
+                />
+              ))}
+            </div>
+            {thoughtPartner.useCursorContext && thoughtPartner.cursorContext && (
+              <CursorContextChip
+                cursorContext={thoughtPartner.cursorContext}
+                radius={thoughtPartner.cursorContextRadius}
+                onRadiusChange={(r) => setCursorContextRadius(r)}
+                onRemove={() => toggleUseCursorContext()}
               />
             )}
           </div>
@@ -478,13 +591,38 @@ export function ThoughtPartnerPanel() {
           className={clsx(
             'relative flex flex-col rounded-lg bg-theme-elevated',
             'border transition-colors',
-            editingMessageId
-              ? 'border-[var(--accent-gold-border)]'
-              : thoughtPartner.agentMode
-                ? 'border-blue-500/30 focus-within:border-blue-400'
-                : 'border-theme-subtle focus-within:border-[var(--accent-gold-border)]'
+            isDraggingOver
+              ? 'border-sky-500/50 bg-sky-500/5'
+              : editingMessageId
+                ? 'border-[var(--accent-gold-border)]'
+                : thoughtPartner.agentMode
+                  ? 'border-blue-500/30 focus-within:border-blue-400'
+                  : 'border-theme-subtle focus-within:border-[var(--accent-gold-border)]'
           )}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
         >
+          {/* @mention popover */}
+          {mentionQuery !== null && mentionResults.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-theme-subtle bg-theme-elevated shadow-lg overflow-hidden z-10">
+              {mentionResults.map((doc, i) => (
+                <button
+                  key={doc.id}
+                  className={clsx(
+                    'w-full text-left px-3 py-1.5 text-sm transition-colors',
+                    i === mentionIndex
+                      ? 'bg-sky-500/15 text-sky-400'
+                      : 'text-theme-secondary hover:bg-theme-active'
+                  )}
+                  style={{ fontFamily: 'Calibri, "Segoe UI", system-ui, -apple-system, sans-serif' }}
+                  onMouseDown={(e) => { e.preventDefault(); selectMention(doc) }}
+                >
+                  {doc.title}
+                </button>
+              ))}
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             value={inputText}
@@ -531,6 +669,27 @@ export function ThoughtPartnerPanel() {
                   <span className="text-[10px] font-medium uppercase tracking-wider"
                         style={{ fontFamily: 'Calibri, "Segoe UI", system-ui, -apple-system, sans-serif' }}>
                     Auto
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => toggleUseCursorContext()}
+                className={clsx(
+                  'flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors',
+                  thoughtPartner.useCursorContext
+                    ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                    : 'text-theme-muted hover:text-theme-secondary hover:bg-theme-active'
+                )}
+                title={thoughtPartner.useCursorContext ? 'Focus ON — your cursor position is sent to the assistant' : 'Focus OFF — click to send cursor context to assistant'}
+              >
+                {thoughtPartner.useCursorContext
+                  ? <CursorClickFilled className="w-5 h-5" />
+                  : <CursorClickRegular className="w-5 h-5" />
+                }
+                {thoughtPartner.useCursorContext && (
+                  <span className="text-[10px] font-medium uppercase tracking-wider"
+                        style={{ fontFamily: 'Calibri, "Segoe UI", system-ui, -apple-system, sans-serif' }}>
+                    Focus
                   </span>
                 )}
               </button>

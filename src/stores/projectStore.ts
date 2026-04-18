@@ -1758,6 +1758,7 @@ interface ProjectState {
     autoAcceptEdits: boolean
     activeQuestion: any | null
     selectionContext: { text: string; documentId: string; documentTitle: string } | null
+    referencedDocuments: Array<{ id: string; title: string }>
     // Pipeline state
     usePipeline: boolean
     pipelineState: string
@@ -1769,6 +1770,10 @@ interface ProjectState {
     messageFeedback: Record<string, import('../../shared/behaviorPolicyTypes').FeedbackSignal>
     currentBehaviorVector: import('../../shared/behaviorPolicyTypes').BehaviorVector | null
     lastResponseMeta: { expressedDimensions?: Partial<Record<string, number>>; behaviorVectorUsed?: Record<string, number> } | null
+    // Cursor context (selection-aware focus window)
+    cursorContext: import('../../shared/cursorContextTypes').CursorContext | null
+    useCursorContext: boolean
+    cursorContextRadius: number
   }
 
   // Actions
@@ -1887,6 +1892,9 @@ interface ProjectState {
   skipThoughtPartnerQuestion: (questionId: string) => Promise<void>
   setThoughtPartnerSelectionContext: (context: { text: string; documentId: string; documentTitle: string } | null) => void
   clearThoughtPartnerSelectionContext: () => void
+  addThoughtPartnerReference: (doc: { id: string; title: string }) => void
+  removeThoughtPartnerReference: (docId: string) => void
+  clearThoughtPartnerReferences: () => void
   // Pipeline actions
   setThoughtPartnerUsePipeline: (enabled: boolean) => void
   updateDocumentBlockContext: (context: import('../../shared/thoughtPartnerPipelineTypes').DocumentBlockContext) => void
@@ -1908,6 +1916,10 @@ interface ProjectState {
   turnIdeaInto: (ideaCardId: string, targetType: 'scene' | 'mechanic') => Promise<void>
   mergeIdeas: (ideaCardIdA: string, ideaCardIdB: string) => Promise<void>
   discardIdea: (ideaCardId: string) => void
+  // Cursor context actions (selection-aware focus window)
+  updateCursorContext: (context: import('../../shared/cursorContextTypes').CursorContext | null) => void
+  toggleUseCursorContext: () => void
+  setCursorContextRadius: (radius: number) => void
   // Behavior policy actions (adaptive behavior layer)
   submitMessageFeedback: (messageId: string, signal: import('../../shared/behaviorPolicyTypes').FeedbackSignal) => Promise<void>
   loadBehaviorVector: () => Promise<void>
@@ -2141,6 +2153,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     autoAcceptEdits: false,
     activeQuestion: null as any | null,
     selectionContext: null as { text: string; documentId: string; documentTitle: string } | null,
+    referencedDocuments: [] as Array<{ id: string; title: string }>,
     // Pipeline state
     usePipeline: true,
     pipelineState: 'idle' as string,
@@ -2152,6 +2165,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     messageFeedback: {} as Record<string, import('../../shared/behaviorPolicyTypes').FeedbackSignal>,
     currentBehaviorVector: null as import('../../shared/behaviorPolicyTypes').BehaviorVector | null,
     lastResponseMeta: null as { expressedDimensions?: Partial<Record<string, number>>; behaviorVectorUsed?: Record<string, number> } | null,
+    // Cursor context (selection-aware focus window)
+    cursorContext: null as import('../../shared/cursorContextTypes').CursorContext | null,
+    useCursorContext: true,
+    cursorContextRadius: 1000,
   },
 
   // Writing Partner / Dramatic Critique initial state
@@ -2309,6 +2326,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           autoAcceptEdits: false,
           activeQuestion: null,
           selectionContext: null,
+          referencedDocuments: [],
           usePipeline: true,
           pipelineState: 'idle',
           documentBlockContext: null,
@@ -2318,6 +2336,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           messageFeedback: {},
           currentBehaviorVector: null,
           lastResponseMeta: null,
+          cursorContext: null,
+          useCursorContext: true,
+          cursorContextRadius: 1000,
         }
       })
 
@@ -2449,6 +2470,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         autoAcceptEdits: false,
         activeQuestion: null,
         selectionContext: null,
+        referencedDocuments: [],
         usePipeline: true,
         pipelineState: 'idle',
         documentBlockContext: null,
@@ -2458,6 +2480,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         messageFeedback: {},
         currentBehaviorVector: null,
         lastResponseMeta: null,
+        cursorContext: null,
+        useCursorContext: true,
+        cursorContextRadius: 1000,
       }
     })
   },
@@ -7145,6 +7170,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         contextDocument: currentState.thoughtPartner.contextDocument,
         agentMode: currentState.thoughtPartner.agentMode,
         selectionContext: currentState.thoughtPartner.selectionContext,
+        referencedDocuments: currentState.thoughtPartner.referencedDocuments.map(ref => {
+          const docState = state.documents[ref.id]
+          return {
+            id: ref.id,
+            title: ref.title,
+            content: docState?.content ? contentToPlainText(docState.content) : ''
+          }
+        }),
         // Pipeline fields
         usePipeline: currentState.thoughtPartner.usePipeline,
         documentBlockContext: currentState.thoughtPartner.documentBlockContext,
@@ -7155,6 +7188,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         consecutiveChatTurns: currentState.thoughtPartner.consecutiveChatTurns,
         // Behavior policy vector
         behaviorVector: currentState.thoughtPartner.currentBehaviorVector || undefined,
+        // Cursor context (only when Focus toggle is on)
+        cursorContext: currentState.thoughtPartner.useCursorContext && currentState.thoughtPartner.cursorContext
+          ? currentState.thoughtPartner.cursorContext
+          : undefined,
       })
 
       if (!response) {
@@ -7233,11 +7270,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }
 
         // Update consecutive chat turns streak counter
+        // Reset on edit actions OR question tool calls (both indicate active engagement, not passive chat)
         const hadEditActions = pipelineActions?.some((pa: any) => pa.type === 'edit')
+        const hadQuestions = questions && questions.length > 0
         set(prev => ({
           thoughtPartner: {
             ...prev.thoughtPartner,
-            consecutiveChatTurns: hadEditActions ? 0 : prev.thoughtPartner.consecutiveChatTurns + 1,
+            consecutiveChatTurns: (hadEditActions || hadQuestions) ? 0 : prev.thoughtPartner.consecutiveChatTurns + 1,
           }
         }))
       }
@@ -7758,7 +7797,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set(prev => ({
       thoughtPartner: {
         ...prev.thoughtPartner,
-        pendingEditorInsertion: null
+        pendingEditorInsertion: null,
+        pipelineState: prev.thoughtPartner.pipelineState === 'applying' ? 'idle' : prev.thoughtPartner.pipelineState
       }
     }))
   },
@@ -7878,6 +7918,66 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       thoughtPartner: {
         ...prev.thoughtPartner,
         selectionContext: null
+      }
+    }))
+  },
+
+  updateCursorContext: (context) => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        cursorContext: context
+      }
+    }))
+  },
+
+  toggleUseCursorContext: () => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        useCursorContext: !prev.thoughtPartner.useCursorContext,
+        // Clear computed context when toggling off
+        ...(!prev.thoughtPartner.useCursorContext ? {} : { cursorContext: null }),
+      }
+    }))
+  },
+
+  setCursorContextRadius: (radius) => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        cursorContextRadius: radius
+      }
+    }))
+  },
+
+  addThoughtPartnerReference: (doc) => {
+    set(prev => {
+      const already = prev.thoughtPartner.referencedDocuments.some(r => r.id === doc.id)
+      if (already) return prev
+      return {
+        thoughtPartner: {
+          ...prev.thoughtPartner,
+          referencedDocuments: [...prev.thoughtPartner.referencedDocuments, { id: doc.id, title: doc.title }]
+        }
+      }
+    })
+  },
+
+  removeThoughtPartnerReference: (docId) => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        referencedDocuments: prev.thoughtPartner.referencedDocuments.filter(r => r.id !== docId)
+      }
+    }))
+  },
+
+  clearThoughtPartnerReferences: () => {
+    set(prev => ({
+      thoughtPartner: {
+        ...prev.thoughtPartner,
+        referencedDocuments: []
       }
     }))
   },
@@ -8212,6 +8312,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         contextDocument: currentState.thoughtPartner.contextDocument,
         agentMode: currentState.thoughtPartner.agentMode,
         selectionContext: currentState.thoughtPartner.selectionContext,
+        referencedDocuments: currentState.thoughtPartner.referencedDocuments.map(ref => {
+          const docState = state.documents[ref.id]
+          return { id: ref.id, title: ref.title, content: docState?.content ? contentToPlainText(docState.content) : '' }
+        }),
       })
 
       if (response?.pipelineActions?.length > 0) {
@@ -8342,6 +8446,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         contextDocument: currentState.thoughtPartner.contextDocument,
         agentMode: currentState.thoughtPartner.agentMode,
         selectionContext: currentState.thoughtPartner.selectionContext,
+        referencedDocuments: currentState.thoughtPartner.referencedDocuments.map(ref => {
+          const docState = state.documents[ref.id]
+          return { id: ref.id, title: ref.title, content: docState?.content ? contentToPlainText(docState.content) : '' }
+        }),
       })
 
       if (response?.pipelineActions?.length > 0) {
@@ -8472,6 +8580,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         contextDocument: currentState.thoughtPartner.contextDocument,
         agentMode: currentState.thoughtPartner.agentMode,
         selectionContext: currentState.thoughtPartner.selectionContext,
+        referencedDocuments: currentState.thoughtPartner.referencedDocuments.map(ref => {
+          const docState = state.documents[ref.id]
+          return { id: ref.id, title: ref.title, content: docState?.content ? contentToPlainText(docState.content) : '' }
+        }),
       })
 
       if (response?.pipelineActions?.length > 0) {
@@ -8598,6 +8710,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         contextDocument: currentState.thoughtPartner.contextDocument,
         agentMode: currentState.thoughtPartner.agentMode,
         selectionContext: currentState.thoughtPartner.selectionContext,
+        referencedDocuments: currentState.thoughtPartner.referencedDocuments.map(ref => {
+          const docState = state.documents[ref.id]
+          return { id: ref.id, title: ref.title, content: docState?.content ? contentToPlainText(docState.content) : '' }
+        }),
       })
 
       if (response?.pipelineActions?.length > 0) {
@@ -8700,6 +8816,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         contextDocument: currentState.thoughtPartner.contextDocument,
         agentMode: currentState.thoughtPartner.agentMode,
         selectionContext: currentState.thoughtPartner.selectionContext,
+        referencedDocuments: currentState.thoughtPartner.referencedDocuments.map(ref => {
+          const docState = state.documents[ref.id]
+          return { id: ref.id, title: ref.title, content: docState?.content ? contentToPlainText(docState.content) : '' }
+        }),
       })
 
       if (response?.pipelineActions?.length > 0) {
@@ -8801,6 +8921,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         contextDocument: currentState.thoughtPartner.contextDocument,
         agentMode: currentState.thoughtPartner.agentMode,
         selectionContext: currentState.thoughtPartner.selectionContext,
+        referencedDocuments: currentState.thoughtPartner.referencedDocuments.map(ref => {
+          const docState = state.documents[ref.id]
+          return { id: ref.id, title: ref.title, content: docState?.content ? contentToPlainText(docState.content) : '' }
+        }),
       })
 
       if (response?.pipelineActions?.length > 0) {
@@ -8911,6 +9035,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         contextDocument: currentState.thoughtPartner.contextDocument,
         agentMode: currentState.thoughtPartner.agentMode,
         selectionContext: currentState.thoughtPartner.selectionContext,
+        referencedDocuments: currentState.thoughtPartner.referencedDocuments.map(ref => {
+          const docState = state.documents[ref.id]
+          return { id: ref.id, title: ref.title, content: docState?.content ? contentToPlainText(docState.content) : '' }
+        }),
       })
 
       if (response?.pipelineActions?.length > 0) {

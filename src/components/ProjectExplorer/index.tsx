@@ -165,6 +165,10 @@ export function ProjectExplorer() {
     dropTargetId: null,
     dropPosition: null
   })
+  const [noteDragState, setNoteDragState] = useState<{
+    dropTargetId: string | null
+    dropPosition: 'before' | 'after' | null
+  }>({ dropTargetId: null, dropPosition: null })
   const inputRef = useRef<HTMLInputElement>(null)
   const [scenesExpanded, setScenesExpanded] = useState(true)
 
@@ -419,6 +423,7 @@ export function ProjectExplorer() {
   const handleDragStart = (e: React.DragEvent, doc: ProjectDocument) => {
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', doc.id)
+    e.dataTransfer.setData('application/cadmus-docref', JSON.stringify({ id: doc.id, title: doc.title }))
     setDragState({
       draggedId: doc.id,
       draggedParentId: doc.parentId,
@@ -488,6 +493,48 @@ export function ProjectExplorer() {
       dropTargetId: null,
       dropPosition: null
     })
+    setNoteDragState({ dropTargetId: null, dropPosition: null })
+  }
+
+  // Note-section-specific drag handlers (for character/prop note reordering)
+  const handleNoteDragOver = (e: React.DragEvent, doc: ProjectDocument, sectionDocs: ProjectDocument[]) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (dragState.draggedId === doc.id) {
+      setNoteDragState({ dropTargetId: null, dropPosition: null })
+      return
+    }
+    // Only allow reorder within the same section
+    if (!dragState.draggedId || !sectionDocs.some(d => d.id === dragState.draggedId)) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const relativeY = e.clientY - rect.top
+    const position: 'before' | 'after' = relativeY / rect.height < 0.5 ? 'before' : 'after'
+    setNoteDragState({ dropTargetId: doc.id, dropPosition: position })
+  }
+
+  const handleNoteDrop = async (e: React.DragEvent, targetDoc: ProjectDocument, sectionDocs: ProjectDocument[]) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const draggedId = dragState.draggedId
+    if (!draggedId || draggedId === targetDoc.id) {
+      setNoteDragState({ dropTargetId: null, dropPosition: null })
+      return
+    }
+    if (!sectionDocs.some(d => d.id === draggedId)) {
+      setNoteDragState({ dropTargetId: null, dropPosition: null })
+      return
+    }
+    // Build reordered array
+    const ids = sectionDocs.map(d => d.id).filter(id => id !== draggedId)
+    const targetIdx = ids.indexOf(targetDoc.id)
+    const insertIdx = noteDragState.dropPosition === 'before' ? targetIdx : targetIdx + 1
+    ids.splice(insertIdx, 0, draggedId)
+    // Build full order: keep other docs in their current order, splice in reordered section
+    const otherDocs = currentProject!.documents.filter(d => !sectionDocs.some(s => s.id === d.id))
+    const allIds = [...otherDocs.map(d => d.id), ...ids]
+    await reorderDocuments(allIds)
+    setNoteDragState({ dropTargetId: null, dropPosition: null })
+    handleDragEnd()
   }
 
   const handleDrop = async (e: React.DragEvent, targetDoc: ProjectDocument) => {
@@ -1125,31 +1172,42 @@ export function ProjectExplorer() {
             {characterNoteDocs.map((doc) => {
               // Find the character this note belongs to for color
               const character = currentProject.characters?.find(c => c.id === doc.characterId)
-              
+              const isNoteDropTarget = noteDragState.dropTargetId === doc.id
+
               return (
                 <div
                   key={doc.id}
+                  data-doc-item
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, doc)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => handleNoteDragOver(e, doc, characterNoteDocs)}
+                  onDrop={(e) => handleNoteDrop(e, doc, characterNoteDocs)}
                   className={clsx(
-                    'list-item-modern flex items-center gap-2 px-2 py-1.5 cursor-pointer group',
-                    activeDocumentId === doc.id && 'active'
+                    'list-item-modern flex items-center gap-2 px-2 py-1.5 cursor-pointer group relative',
+                    activeDocumentId === doc.id && 'active',
+                    dragState.draggedId === doc.id && 'opacity-30'
                   )}
                   onClick={() => setActiveDocument(doc.id)}
                   onContextMenu={(e) => handleContextMenu(e, doc.id)}
                 >
+                  {isNoteDropTarget && noteDragState.dropPosition === 'before' && (
+                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-[var(--accent-gold)] rounded-full" />
+                  )}
                   {/* Character color indicator */}
-                  <div 
+                  <div
                     className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
                     style={{ backgroundColor: character?.color || '#fbbf24' }}
                   >
                     <PersonFilled className="w-3 h-3 text-slate-900" />
                   </div>
-                  
+
                   {/* Character name */}
-                  <span 
+                  <span
                     className={clsx(
                       'flex-1 text-sm truncate transition-colors duration-200',
-                      activeDocumentId === doc.id 
-                        ? 'text-theme-accent font-semibold' 
+                      activeDocumentId === doc.id
+                        ? 'text-theme-accent font-semibold'
                         : 'text-theme-secondary font-medium group-hover:text-theme-primary'
                     )}
                     style={{ fontFamily: workspaceConfig.editor.fontFamily }}
@@ -1157,6 +1215,9 @@ export function ProjectExplorer() {
                   >
                     {doc.title}
                   </span>
+                  {isNoteDropTarget && noteDragState.dropPosition === 'after' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--accent-gold)] rounded-full" />
+                  )}
                 </div>
               )
             })}
@@ -1183,30 +1244,41 @@ export function ProjectExplorer() {
               // Find the prop this note belongs to for icon
               const prop = currentProject.props?.find(p => p.id === doc.propId)
               const PropIcon = prop ? getPropIconComponent(prop.icon) : BoxRegular
-              
+              const isNoteDropTarget = noteDragState.dropTargetId === doc.id
+
               return (
                 <div
                   key={doc.id}
+                  data-doc-item
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, doc)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={(e) => handleNoteDragOver(e, doc, propNoteDocs)}
+                  onDrop={(e) => handleNoteDrop(e, doc, propNoteDocs)}
                   className={clsx(
-                    'list-item-modern flex items-center gap-2 px-2 py-1.5 cursor-pointer group',
-                    activeDocumentId === doc.id && 'active'
+                    'list-item-modern flex items-center gap-2 px-2 py-1.5 cursor-pointer group relative',
+                    activeDocumentId === doc.id && 'active',
+                    dragState.draggedId === doc.id && 'opacity-30'
                   )}
                   onClick={() => setActiveDocument(doc.id)}
                   onContextMenu={(e) => handleContextMenu(e, doc.id)}
                 >
+                  {isNoteDropTarget && noteDragState.dropPosition === 'before' && (
+                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-[var(--accent-gold)] rounded-full" />
+                  )}
                   {/* Prop icon indicator */}
-                  <div 
+                  <div
                     className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 bg-amber-400"
                   >
                     <PropIcon className="w-3 h-3 text-black" />
                   </div>
-                  
+
                   {/* Prop name */}
-                  <span 
+                  <span
                     className={clsx(
                       'flex-1 text-sm truncate transition-colors duration-200',
-                      activeDocumentId === doc.id 
-                        ? 'text-theme-accent font-semibold' 
+                      activeDocumentId === doc.id
+                        ? 'text-theme-accent font-semibold'
                         : 'text-theme-secondary font-medium group-hover:text-theme-primary'
                     )}
                     style={{ fontFamily: workspaceConfig.editor.fontFamily }}
@@ -1214,6 +1286,9 @@ export function ProjectExplorer() {
                   >
                     {doc.title}
                   </span>
+                  {isNoteDropTarget && noteDragState.dropPosition === 'after' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--accent-gold)] rounded-full" />
+                  )}
                 </div>
               )
             })}

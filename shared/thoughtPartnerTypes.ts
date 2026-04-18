@@ -126,6 +126,12 @@ export interface SelectionContext {
   documentTitle: string
 }
 
+export interface ReferencedDocument {
+  id: string
+  title: string
+  content: string
+}
+
 export interface SubconsciousContext {
   projectName: string
   templateType: string
@@ -143,6 +149,7 @@ export interface ThoughtPartnerRequest {
   contextDocument: ContextDocument
   agentMode?: boolean
   selectionContext?: SelectionContext | null
+  referencedDocuments?: ReferencedDocument[]
   // Pipeline fields (used when usePipeline=true)
   usePipeline?: boolean
   documentBlockContext?: import('./thoughtPartnerPipelineTypes').DocumentBlockContext | null
@@ -153,6 +160,8 @@ export interface ThoughtPartnerRequest {
   consecutiveChatTurns?: number
   // Behavior policy vector (adaptive behavior layer)
   behaviorVector?: import('./behaviorPolicyTypes').BehaviorVector
+  // Cursor context (selection-aware focus window)
+  cursorContext?: import('./cursorContextTypes').CursorContext | null
 }
 
 export interface ThoughtPartnerResponse {
