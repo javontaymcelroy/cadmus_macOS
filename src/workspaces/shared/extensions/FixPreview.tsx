@@ -102,14 +102,14 @@ function FixPreviewComponent({ node, extension, editor, getPos }: FixPreviewComp
 
   return (
     <NodeViewWrapper as="span" className="fix-preview-wrapper inline">
-      <span className="fix-preview inline-flex items-baseline gap-1 bg-ink-800/50 rounded px-0.5 py-0.5">
+      <span className="fix-preview inline-flex items-baseline gap-1 bg-theme-active rounded px-0.5 py-0.5">
         {/* Original text with strikethrough */}
-        <span className="line-through text-red-400/70 decoration-red-400">
+        <span className="fix-preview-original line-through text-red-400/70 decoration-red-400">
           {originalText}
         </span>
-        
+
         {/* Suggestion text highlighted */}
-        <span className="text-green-400 font-medium">
+        <span className="fix-preview-suggestion text-green-400 font-medium">
           {suggestionText}
         </span>
         
