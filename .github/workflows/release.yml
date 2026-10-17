@@ -34,12 +34,28 @@ jobs:
 
       - run: npm ci
 
+      # Import the certificate into a temporary keychain ourselves; electron-builder's own
+      # CSC_LINK import fails on the macOS runners (set-key-partition-list can't unlock it).
+      # electron-builder then signs with CSC_NAME from the keychain search list.
       - name: Load signing secrets
         if: env.HAS_SIGNING == 'true'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          kp=$(openssl rand -hex 16)
+          security create-keychain -p "$kp" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$kp" "$keychain"
+          echo "$CSC_LINK" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CSC_KEY_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          rm "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kp" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$keychain"
           {
-            echo "CSC_LINK=${{ secrets.CSC_LINK }}"
-            echo "CSC_KEY_PASSWORD=${{ secrets.CSC_KEY_PASSWORD }}"
+            echo "CSC_NAME=Javontay McElroy (M2L5UGJP7D)"
             echo "APPLE_ID=${{ secrets.APPLE_ID }}"
             echo "APPLE_APP_SPECIFIC_PASSWORD=${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"
             echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
