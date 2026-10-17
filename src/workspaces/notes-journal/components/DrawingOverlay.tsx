@@ -156,7 +156,7 @@ interface DrawingOverlayProps {
   containerRef: React.RefObject<HTMLDivElement | null>
 }
 
-export function DrawingOverlay({ documentId, containerRef }: DrawingOverlayProps) {
+export function DrawingOverlay({ documentId }: DrawingOverlayProps) {
   const {
     ui,
     saveDrawingPaths,

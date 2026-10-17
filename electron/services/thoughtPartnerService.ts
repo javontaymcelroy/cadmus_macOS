@@ -558,6 +558,7 @@ function buildPipelineConversationMessages(
   // System prompt with optional behavior policy addendum
   let systemPrompt = PIPELINE_SYSTEM_PROMPT
   if (request.behaviorVector) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires -- loaded lazily to avoid a circular import
     const { getBehaviorPolicyService } = require('./behaviorPolicyService')
     const policyService = getBehaviorPolicyService()
     const addendum = policyService.vectorToPromptAddendum(request.behaviorVector)
@@ -1080,7 +1081,7 @@ function parseResponseBlocks(responseText: string): ParsedResponse {
   // Parse action blocks
   actionBlockRegex.lastIndex = 0
   let match
-  let actionIdx = 0
+  const actionIdx = 0
 
   while ((match = actionBlockRegex.exec(text)) !== null) {
     const actionType = match[1] as ThoughtPartnerActionType
@@ -1423,6 +1424,7 @@ class ThoughtPartnerService {
 
     // Apply behavior-based tool policy adjustment
     if (request.behaviorVector) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires -- loaded lazily to avoid a circular import
       const { getBehaviorPolicyService } = require('./behaviorPolicyService')
       const policyService = getBehaviorPolicyService()
       const adjustedPolicy = policyService.adjustToolPolicy(classification.policy, request.behaviorVector)
@@ -1574,7 +1576,7 @@ class ThoughtPartnerService {
 
       // Process tool calls
       const pipelineActions: PipelineAction[] = []
-      let questions: ThoughtPartnerQuestion[] = []
+      const questions: ThoughtPartnerQuestion[] = []
       let patchExecuted = false // One-patch-per-turn: break after first edit/plan execution
       let ideasProposed = false // One-idea-batch-per-turn: skip duplicate propose_ideas calls
 
@@ -2613,7 +2615,7 @@ ${responseText}
       console.log('[ThoughtPartner] Stream complete — finishReason:', finishReason, 'toolCallName:', toolCallName, 'toolCallArgs length:', toolCallArgs.length, 'content length:', fullContent.length)
 
       // Parse tool call into a question if present
-      let questions: ThoughtPartnerQuestion[] = []
+      const questions: ThoughtPartnerQuestion[] = []
       if (toolCallName === 'ask_question' && toolCallArgs) {
         try {
           const parsed = JSON.parse(toolCallArgs)

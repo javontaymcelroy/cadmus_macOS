@@ -48,7 +48,6 @@ interface WorkspaceRouterProps {
  */
 export function WorkspaceRouter({ fallback }: WorkspaceRouterProps) {
   const currentProject = useProjectStore(state => state.currentProject)
-  const activeDocumentId = useProjectStore(state => state.activeDocumentId)
   
   // No project selected
   if (!currentProject) {

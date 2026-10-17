@@ -52,7 +52,7 @@ export class BehaviorPolicyService {
     const contextKey = this.contextKey(context)
 
     // Layer 1: Global baseline
-    let vector = { ...globalState.globalVector }
+    const vector = { ...globalState.globalVector }
 
     // Layer 2: Context-specific override (if enough samples)
     const ctxOverride = globalState.contextOverrides[contextKey]
@@ -203,7 +203,7 @@ export class BehaviorPolicyService {
   }
 
   private updateProjectState(projectPath: string, entry: FeedbackEntry): void {
-    let state = this.loadProjectState(projectPath) || createDefaultPolicyState()
+    const state = this.loadProjectState(projectPath) || createDefaultPolicyState()
     const reward = entry.signal === 'thumbs_up' ? 1 : 0
 
     for (const dim of ALL_DIMENSIONS) {

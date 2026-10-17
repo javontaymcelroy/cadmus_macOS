@@ -69,7 +69,7 @@ export function ScreenplayElementPicker({
         e.preventDefault()
         onClose()
         break
-      default:
+      default: {
         // Handle shortcuts for screenplay elements
         const shortcut = e.key.toUpperCase()
         const matchingIndex = SCREENPLAY_ELEMENTS.findIndex(el => el.shortcut === shortcut)
@@ -83,6 +83,7 @@ export function ScreenplayElementPicker({
           onSelect('prop')
         }
         break
+      }
     }
   }, [selectedIndex, onSelect, onClose])
 

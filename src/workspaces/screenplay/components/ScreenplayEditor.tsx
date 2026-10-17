@@ -15,6 +15,7 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { CheckmarkRegular, DismissRegular, BotSparkleFilled } from '@fluentui/react-icons'
 import type { JSONContent } from '@tiptap/core'
+import { TextSelection } from '@tiptap/pm/state'
 
 import { useProjectStore, getDocumentHierarchyType, getPageNumber, getParentDocument } from '../../../stores/projectStore'
 import { StoryboardPanel } from '../../../components/StoryboardPanel'
@@ -661,7 +662,7 @@ export function ScreenplayEditor() {
         if (!hasPreview) {
           // Use emitUpdate: false to prevent onUpdate callback from firing
           isProgrammaticUpdateRef.current = true
-          editor.commands.setContent(docState.content, false, { preserveWhitespace: 'full' })
+          editor.commands.setContent(docState.content, { emitUpdate: false, parseOptions: { preserveWhitespace: 'full' } })
           queueMicrotask(() => {
             isProgrammaticUpdateRef.current = false
           })
@@ -1641,7 +1642,7 @@ export function ScreenplayEditor() {
       tr.insertText(shotName, insertPos)
       // Set cursor position to end of inserted text
       const newCursorPos = insertPos + shotName.length
-      tr.setSelection(editor.state.selection.constructor.near(tr.doc.resolve(newCursorPos)))
+      tr.setSelection(TextSelection.near(tr.doc.resolve(newCursorPos)))
       editor.view.dispatch(tr)
       
       shotInsertPositionRef.current = null

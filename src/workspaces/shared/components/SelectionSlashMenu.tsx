@@ -267,13 +267,14 @@ export function SelectionSlashMenu({
             setActiveSubmenu(null)
             setSubmenuIndex(0)
             return
-          case 'Enter':
+          case 'Enter': {
             e.preventDefault()
             const toneOption = currentSubmenu[submenuIndex]
             if (toneOption) {
               executeCommandWithTone(currentItem, toneOption.id)
             }
             return
+          }
         }
         return
       }
@@ -310,7 +311,7 @@ export function SelectionSlashMenu({
           e.preventDefault()
           onClose()
           break
-        default:
+        default: {
           // Handle shortcut keys
           const shortcut = e.key.toUpperCase()
           const matchingIndex = items.findIndex(item => item.shortcut === shortcut)
@@ -325,6 +326,7 @@ export function SelectionSlashMenu({
               selectItem(matchingIndex)
             }
           }
+        }
       }
     }
 

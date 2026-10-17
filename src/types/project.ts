@@ -644,7 +644,7 @@ interface SupplementaryWritingContext {
   otherNotes?: Array<{ title: string; content: string }>
 }
 
-interface AIWritingRequest {
+export interface AIWritingRequest {
   command: AIWritingCommand
   context: string
   selection?: string
@@ -663,7 +663,7 @@ interface AIWritingRequest {
   customSystemPromptInstruction?: string
 }
 
-interface AIWritingResponse {
+export interface AIWritingResponse {
   text: string
   error?: string
   screenplayElements?: ScreenplayElement[]
@@ -746,124 +746,6 @@ export interface ConversationMeta {
 export interface ConversationIndex {
   activeConversationId: string | null
   conversations: ConversationMeta[]
-}
-
-// Electron API type declaration
-interface RecentProject {
-  name: string
-  path: string
-  templateId?: string
-}
-
-declare global {
-  interface Window {
-    api: {
-      project: {
-        create: (template: Template, name: string, basePath: string) => Promise<Project>
-        open: (projectPath: string) => Promise<Project>
-        import: (sourcePath: string, destinationBasePath: string) => Promise<Project>
-        export: (projectPath: string, destinationBasePath: string) => Promise<string>
-        save: (project: Project) => Promise<void>
-        getLastOpened: () => Promise<string | null>
-        setLastOpened: (path: string) => Promise<void>
-        getRecentProjects: () => Promise<RecentProject[]>
-        removeFromRecent: (projectPath: string) => Promise<void>
-        moveToTrash: (projectPath: string) => Promise<{ success: boolean; error?: string }>
-        // Living document methods
-        getLivingDocuments: () => Promise<LivingDocument[]>
-        updateLivingDocument: (projectPath: string, state: DocumentLifecycleState, stateNote?: string) => Promise<void>
-        removeLivingDocument: (projectPath: string) => Promise<void>
-      }
-      document: {
-        create: (projectPath: string, doc: Omit<ProjectDocument, 'createdAt' | 'updatedAt'>, templateId?: string, screenplayDocType?: 'title-page' | 'page' | 'break') => Promise<ProjectDocument>
-        save: (projectPath: string, docId: string, content: JSONContent) => Promise<void>
-        load: (projectPath: string, docId: string) => Promise<JSONContent>
-        delete: (projectPath: string, docId: string) => Promise<void>
-      }
-      asset: {
-        upload: (projectPath: string, filePath: string, fileName: string) => Promise<Asset>
-        uploadFromBuffer: (projectPath: string, buffer: ArrayBuffer, fileName: string, mimeType: string) => Promise<Asset>
-        delete: (projectPath: string, assetId: string) => Promise<void>
-        getPath: (projectPath: string, assetId: string) => Promise<string>
-      }
-      dialog: {
-        selectFolder: () => Promise<string | null>
-        selectFile: (filters?: { name: string; extensions: string[] }[]) => Promise<string | null>
-      }
-      build: {
-        run: (project: Project, documentContents: Record<string, JSONContent>) => Promise<BuildResult>
-      }
-      version: {
-        save: (projectPath: string, docId: string, content: JSONContent, label?: string) => Promise<DocumentVersion>
-        load: (projectPath: string, docId: string) => Promise<DocumentVersion[]>
-        delete: (projectPath: string, docId: string, versionId: string) => Promise<void>
-      }
-      utils: {
-        getPathForFile: (file: File) => string
-        getAssetUrl: (projectPath: string, assetPath: string) => string
-      }
-      agenda: {
-        getAgendaItems: () => Promise<AgendaItem[]>
-        updateAgendaItem: (projectPath: string, documentId: string, documentTitle: string, projectName: string, templateId: TemplateId, todos: TodoItem[]) => Promise<void>
-        updateAgendaState: (projectPath: string, documentId: string, state: DocumentLifecycleState, stateNote?: string) => Promise<void>
-        removeAgendaItem: (projectPath: string, documentId: string) => Promise<void>
-        toggleTodo: (projectPath: string, documentId: string, todoId: string, checked: boolean) => Promise<void>
-        markAllTodosDone: (projectPath: string, documentId: string) => Promise<void>
-      }
-      imageGeneration: {
-        generate: (prompt: string, options: ImageGenOptions) => Promise<GeneratedImageResult>
-        getSettings: () => Promise<ImageGenSettings>
-        setSettings: (settings: Partial<ImageGenSettings>) => Promise<void>
-        hasApiKey: () => Promise<boolean>
-        buildPrompt: (selectedText: string, contextSection: string, promptTemplate?: string) => Promise<string>
-      }
-      theme: {
-        get: () => Promise<'dark' | 'light'>
-        set: (theme: 'dark' | 'light') => Promise<void>
-      }
-      panelWidths: {
-        get: () => Promise<Record<string, number>>
-        set: (widths: Record<string, number>) => Promise<void>
-      }
-      aiSuggestions: {
-        generate: (documents: { id: string; title: string; content: string }[]) => Promise<Diagnostic[]>
-        hasApiKey: () => Promise<boolean>
-      }
-      documentGeneration: {
-        generateCharacter: (characterName: string, scriptContexts: ScriptContext[], supplementaryDocs?: SupplementaryDocument[]) => Promise<CharacterDocOutput | null>
-        generateProp: (propName: string, scriptContexts: ScriptContext[], supplementaryDocs?: SupplementaryDocument[]) => Promise<PropDocOutput | null>
-        generateLocation: (locationName: string, scriptContexts: ScriptContext[]) => Promise<LocationDocOutput | null>
-        generateActBreak: (actTitle: string, scriptContent: string) => Promise<ActBreakDocOutput | null>
-        hasApiKey: () => Promise<boolean>
-      }
-      dramaticCritique: {
-        generate: (screenplayText: string, entityDocs: { type: 'character' | 'prop' | 'location'; name: string; content: string }[], supplementaryDocs?: SupplementaryDocument[]) => Promise<CritiqueIssue[]>
-        hasApiKey: () => Promise<boolean>
-      }
-      aiWriting: {
-        generate: (request: AIWritingRequest) => Promise<AIWritingResponse>
-        hasApiKey: () => Promise<boolean>
-        getDefaultInstructions: () => Promise<{ prose: Record<string, string>; screenplay: Record<string, string> }>
-      }
-      gatedWriting: {
-        generate: (request: AIWritingRequest, storyFacts?: any, forceOverride?: boolean) => Promise<any>
-      }
-      thoughtPartner: {
-        sendMessage: (request: ThoughtPartnerRequest) => Promise<ThoughtPartnerResponse>
-        stopStreaming: () => Promise<void>
-        getSuggestions: (request: ThoughtPartnerSuggestionsRequest) => Promise<SuggestionCard[]>
-        loadConversationIndex: (projectPath: string) => Promise<ConversationIndex>
-        saveConversationIndex: (projectPath: string, index: ConversationIndex) => Promise<void>
-        loadConversation: (projectPath: string, conversationId: string) => Promise<ThoughtPartnerConversationData | null>
-        saveConversation: (projectPath: string, conversationId: string, data: ThoughtPartnerConversationData) => Promise<void>
-        createConversation: (projectPath: string, title?: string) => Promise<ConversationMeta>
-        deleteConversation: (projectPath: string, conversationId: string) => Promise<ConversationIndex>
-        hasApiKey: () => Promise<boolean>
-        onChunk: (callback: (chunk: string) => void) => () => void
-        onDone: (callback: (response: ThoughtPartnerResponse) => void) => () => void
-      }
-    }
-  }
 }
 
 export {}

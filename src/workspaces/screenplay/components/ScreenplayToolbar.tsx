@@ -34,7 +34,7 @@ function StoryboardToggleButton() {
 
   return (
     <button
-      onClick={() => setStoryboardMode(storyboardUI.mode === 'side' ? null : 'side')}
+      onClick={() => setStoryboardMode(!storyboardUI.mode)}
       className={clsx(
         'flex items-center justify-center w-8 h-8 shrink-0 self-center transition-colors',
         storyboardUI.mode

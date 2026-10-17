@@ -2,6 +2,7 @@ import { useRef, useCallback, useEffect } from 'react'
 import { useProjectStore } from '../../../stores/projectStore'
 import type { JSONContent } from '@tiptap/core'
 import type { Editor } from '@tiptap/react'
+import { getBlockIdAtPos } from '../extensions/UniqueID'
 
 // MIME type for citation metadata in clipboard
 export const CITATION_MIME_TYPE = 'application/x-cadmus-citation'
@@ -394,16 +395,10 @@ export function useEditorCitationClipboard(
       const selectedText = state.doc.textBetween(from, to, ' ')
       if (!selectedText.trim()) return
 
-      // Dynamic import to avoid circular dependency
-      import('./useEditorBase').then(({ getBlockIdAtPos }) => {
-        // This won't work - need to import from extensions
-      }).catch(() => {})
-
-      // For now, just set basic citation data without blockId
       const citationData: CitationClipboardData = {
         sourceDocumentId: activeDocumentId,
         sourceDocumentTitle: activeDocTitle,
-        sourceBlockId: '', // Would need to import getBlockIdAtPos
+        sourceBlockId: getBlockIdAtPos(state.doc, from) || '',
         text: selectedText
       }
 

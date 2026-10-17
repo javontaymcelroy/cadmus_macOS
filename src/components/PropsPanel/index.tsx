@@ -58,7 +58,8 @@ import {
   QuestionCircleFilled,
   EyeOffFilled,
   ProhibitedFilled,
-  CircleFilled
+  CircleFilled,
+  BoxRegular
 } from '@fluentui/react-icons'
 import type { FluentIcon } from '@fluentui/react-icons'
 

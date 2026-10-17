@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { useProjectStore, getDocumentHierarchyType, getPageNumber, canCreateSubDocument } from '../../stores/projectStore'
+import { useProjectStore, getDocumentHierarchyType, canCreateSubDocument } from '../../stores/projectStore'
 import { clsx } from 'clsx'
 import type { ProjectDocument } from '../../types/project'
 import { getWorkspaceConfig, getFirstBlockText } from '../../workspaces'
@@ -37,76 +37,6 @@ interface DragState {
   draggedParentId: string | undefined
   dropTargetId: string | null
   dropPosition: 'before' | 'after' | 'inside' | null
-}
-
-// Helper function to format dates in human-friendly relative time
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / (1000 * 60))
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-  
-  const dateHour = date.getHours()
-  const isToday = date.toDateString() === now.toDateString()
-  
-  const yesterday = new Date(now)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const isYesterday = date.toDateString() === yesterday.toDateString()
-  
-  // Time of day helpers
-  const getTimeOfDay = (hour: number): string => {
-    if (hour >= 0 && hour < 5) return 'middle of the night'
-    if (hour >= 5 && hour < 12) return 'morning'
-    if (hour >= 12 && hour < 17) return 'afternoon'
-    if (hour >= 17 && hour < 21) return 'evening'
-    return 'night'
-  }
-  
-  // Very recent - within last few minutes
-  if (diffMins < 5) {
-    return 'A moment ago'
-  }
-  
-  // Within the last hour
-  if (diffMins < 60) {
-    return `${diffMins} minutes ago`
-  }
-  
-  // Today
-  if (isToday) {
-    if (diffHours === 1) {
-      return 'An hour ago'
-    }
-    if (diffHours < 3) {
-      return `${diffHours} hours ago`
-    }
-    const timeOfDay = getTimeOfDay(dateHour)
-    return `This ${timeOfDay}`
-  }
-  
-  // Yesterday
-  if (isYesterday) {
-    const timeOfDay = getTimeOfDay(dateHour)
-    if (timeOfDay === 'middle of the night') {
-      return 'In the middle of the night yesterday'
-    }
-    if (timeOfDay === 'night') {
-      return 'Last night'
-    }
-    return `Yesterday ${timeOfDay}`
-  }
-  
-  // Within the last week
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays < 7) {
-    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' })
-    return dayName
-  }
-  
-  // Older than a week - show the date
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 export function ProjectExplorer() {
@@ -633,7 +563,6 @@ export function ProjectExplorer() {
     
     // Get hierarchy info for this document
     const hierarchyType = getDocumentHierarchyType(doc, currentProject.documents)
-    const pageNumber = hierarchyType === 'page' ? getPageNumber(doc, currentProject.documents) : 0
     
     // Derive title from first block content if enabled in workspace config
     const shouldDeriveTitle = workspaceConfig.features.deriveTitlesFromContent && doc.parentId

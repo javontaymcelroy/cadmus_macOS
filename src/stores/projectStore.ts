@@ -7607,7 +7607,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
       // Persist to disk for next session
       if (projectPath && result.length > 0) {
-        ;(window.api as any).thoughtPartner?.saveSuggestionsCache(projectPath, {
+        (window.api as any).thoughtPartner?.saveSuggestionsCache(projectPath, {
           contentHash: hashStr,
           suggestions: result,
           cachedAt: new Date().toISOString()

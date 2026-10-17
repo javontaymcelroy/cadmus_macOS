@@ -30,6 +30,7 @@ export const SelectionSlashCommand = Extension.create<SelectionSlashCommandOptio
   },
 
   addProseMirrorPlugins() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- the plugin callbacks below rebind `this`
     const extension = this
 
     return [

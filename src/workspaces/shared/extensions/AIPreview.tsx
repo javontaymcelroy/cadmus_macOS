@@ -10,7 +10,9 @@
  */
 
 import { Node, mergeAttributes } from '@tiptap/core'
+import type { Content } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
+import type { ReactNodeViewProps } from '@tiptap/react'
 import { CheckmarkRegular, DismissRegular } from '@fluentui/react-icons'
 import { clsx } from 'clsx'
 import { useState, useEffect, useRef } from 'react'
@@ -340,55 +342,7 @@ function buildScreenplayContent(
 }
 
 // React component for the AI preview node view
-interface AIPreviewComponentProps {
-  node: {
-    attrs: AIPreviewAttributes
-    nodeSize: number
-  }
-  extension: {
-    options: AIPreviewOptions
-  }
-  deleteNode: () => void
-  editor: {
-    chain: () => {
-      focus: () => {
-        deleteRange: (range: { from: number; to: number }) => {
-          insertContentAt: (pos: number, content: unknown) => {
-            run: () => boolean
-          }
-          run: () => boolean
-        }
-        insertContentAt: (pos: number, content: unknown) => {
-          run: () => boolean
-        }
-        command: (fn: (props: { tr: { delete: (from: number, to: number) => unknown; replaceWith: (from: number, to: number, node: unknown) => unknown }; state: { schema: { text: (s: string) => unknown } } }) => boolean) => {
-          run: () => boolean
-        }
-      }
-    }
-    view: {
-      state: {
-        schema: {
-          text: (content: string) => unknown
-          nodes: {
-            screenplayElement?: {
-              create: (attrs: { elementType: string }, content?: unknown) => unknown
-            }
-            paragraph?: {
-              create: (attrs?: unknown, content?: unknown) => unknown
-            }
-          }
-        }
-      }
-    }
-    extensionManager: {
-      extensions: Array<{ name: string }>
-    }
-  }
-  getPos: () => number
-}
-
-function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewComponentProps) {
+function AIPreviewComponent({ node, extension, editor, getPos }: ReactNodeViewProps) {
   const {
     previewId,
     generatedText,
@@ -402,8 +356,8 @@ function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewCompon
     patchOpId: _patchOpId,
     originalText: _originalText,
     opWhy,
-  } = node.attrs
-  const { onAccept, onReject } = extension.options
+  } = node.attrs as AIPreviewAttributes
+  const { onAccept, onReject } = extension.options as AIPreviewOptions
 
   // Parse screenplay elements and entity maps if available
   let parsedElements: ScreenplayElement[] | null = null
@@ -535,10 +489,11 @@ function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewCompon
     stopAnimation()
     
     const pos = getPos()
+    if (pos === undefined) return
     const nodeSize = node.nodeSize
     
     // Build the content to insert
-    let content: unknown
+    let content: Content
     
     if (parsedElements && parsedElements.length > 0 && hasScreenplayExtension) {
       // Build the TipTap content array for screenplay elements with mention parsing
@@ -624,6 +579,7 @@ function AIPreviewComponent({ node, extension, editor, getPos }: AIPreviewCompon
     // Remove the preview node entirely
     editor.chain().focus().command(({ tr }) => {
       const currentPos = getPos()
+      if (currentPos === undefined) return false
       const currentNodeSize = node.nodeSize
       tr.delete(currentPos, currentPos + currentNodeSize)
       return true

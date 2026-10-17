@@ -172,7 +172,7 @@ function getPlainText(content: JSONContent): string {
 export class FormattingPass implements Pass {
   id = 'formatting-lint'
   name = 'Formatting Lint'
-  kind: 'local' = 'local'
+  kind = 'local' as const
 
   async run(ctx: PassContext): Promise<PassResult> {
     const startTime = Date.now()

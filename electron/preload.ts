@@ -1,174 +1,48 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { JSONContent } from '@tiptap/core'
+import type {
+  ActBreakDocOutput,
+  AIWritingRequest,
+  AIWritingResponse,
+  AgendaItem,
+  Asset,
+  AssetReference,
+  BuildResult,
+  CharacterDocOutput,
+  ConversationIndex,
+  ConversationMeta,
+  CritiqueIssue,
+  Diagnostic,
+  DocumentLifecycleState,
+  DocumentVersion,
+  GeneratedImageResult,
+  ImageGenOptions,
+  ImageGenSettings,
+  LivingDocument,
+  LocationDocOutput,
+  Project,
+  ProjectDocument,
+  PropDocOutput,
+  ScriptContext,
+  StoryFacts,
+  SuggestionCard,
+  SupplementaryDocument,
+  Template,
+  TemplateId,
+  ThoughtPartnerConversationData,
+  ThoughtPartnerRequest,
+  ThoughtPartnerResponse,
+  ThoughtPartnerSuggestionsRequest,
+  TodoItem,
+} from '../src/types/project'
 
 // webUtils is available in Electron 22.1+
 let webUtils: { getPathForFile: (file: File) => string } | null = null
 try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires -- webUtils needs Electron 29+; require so older versions fall through to the catch
   webUtils = require('electron').webUtils
 } catch {
   console.warn('webUtils not available')
-}
-
-// Define types locally to avoid import issues during preload build
-interface Template {
-  id: string
-  name: string
-  description: string
-  icon: string
-  defaultStructure: {
-    folders: { name: string; path: string }[]
-    documents: { title: string; path: string }[]
-  }
-  enabledPasses: string[]
-  settings: {
-    citationStyle?: string
-    formattingRules: {
-      headingStyle: string
-      quotationStyle: string
-      enforceDoubleSpacing: boolean
-    }
-    enabledPasses: string[]
-  }
-}
-
-interface Project {
-  id: string
-  name: string
-  templateId: string
-  path: string
-  createdAt: string
-  updatedAt: string
-  documents: ProjectDocument[]
-  assets: Asset[]
-  settings: unknown
-  buildProfiles: unknown[]
-}
-
-interface ProjectDocument {
-  id: string
-  path: string
-  title: string
-  order: number
-  parentId?: string
-  type: 'document' | 'folder'
-  createdAt: string
-  updatedAt: string
-}
-
-interface AssetReference {
-  documentId: string
-  range?: { from: number; to: number }
-}
-
-interface Asset {
-  id: string
-  path: string
-  name: string
-  type: string
-  mimeType?: string
-  size: number
-  createdAt: string
-  references: AssetReference[]
-}
-
-// Build types
-interface Diagnostic {
-  id: string
-  passId: string
-  severity: 'error' | 'warning' | 'info'
-  title: string
-  message: string
-  documentId: string
-  range?: { from: number; to: number }
-  suggestions?: Array<{ label: string; replacement?: string; action?: string }>
-  source?: string
-}
-
-interface PassResult {
-  passId: string
-  diagnostics: Diagnostic[]
-  fixes?: unknown[]
-  timing: number
-}
-
-interface BuildResult {
-  success: boolean
-  diagnostics: Diagnostic[]
-  passResults: PassResult[]
-  totalTiming: number
-  artifacts?: unknown[]
-}
-
-// Version history type
-interface DocumentVersion {
-  id: string
-  documentId: string
-  timestamp: string
-  label?: string
-  content: unknown // JSONContent
-  wordCount: number
-}
-
-// Living document types
-type DocumentLifecycleState = 'active' | 'paused' | 'review' | 'completed' | 'archived'
-
-// Template IDs
-type TemplateId = 'basic-document' | 'notes-journal' | 'blog-post' | 'screenplay' | 'academic-paper'
-
-interface LivingDocument {
-  projectPath: string
-  projectName: string
-  templateId?: string
-  state: DocumentLifecycleState
-  stateNote?: string
-  lastStateChange: string
-  lastOpened: string
-}
-
-// Agenda item types (for NotesJournal todo tracking)
-interface TodoItem {
-  id: string
-  text: string
-  checked: boolean
-}
-
-interface AgendaItem {
-  projectPath: string
-  projectName: string
-  templateId: TemplateId
-  documentId: string
-  documentTitle: string
-  todos: TodoItem[]
-  state: DocumentLifecycleState
-  stateNote?: string
-  lastUpdated: string
-}
-
-// Image Generation types
-type ImageStyle = 'storyboard-sketch' | 'cinematic' | 'toon-boom' | 'custom'
-// gpt-image-1 supported sizes
-type ImageSize = '1024x1024' | '1536x1024' | '1024x1536'
-
-interface ImageGenSettings {
-  apiKey?: string
-  defaultPromptTemplate: string
-  defaultStyle: ImageStyle
-  defaultSize: ImageSize
-  useReferenceImages: boolean
-}
-
-interface ImageGenOptions {
-  style: ImageStyle
-  size: ImageSize
-  customPrompt?: string
-  projectPath: string
-  useReferenceImages?: boolean
-}
-
-interface GeneratedImageResult {
-  success: boolean
-  imageData?: ArrayBuffer
-  error?: string
-  errorCode?: number
 }
 
 // AI Suggestions types
@@ -178,175 +52,10 @@ interface DocumentContentForAI {
   content: string
 }
 
-// Document Generation types (AI-powered character/prop/location docs)
-interface ScriptContext {
-  sceneHeading: string
-  elementType: 'character' | 'dialogue' | 'action' | 'parenthetical'
-  content: string
-  surroundingContext?: string
-}
-
-interface CharacterDocOutput {
-  roleInStory: string
-  backstory: string
-  psychologyUnderStress: string
-  physicalDescription: string
-  wardrobeLogic: string
-  movementHabits: string
-  voiceSpeechPatterns: string
-  relationshipToEnvironment: string
-  arc: string
-}
-
-interface PropDocOutput {
-  functionInPlot: string
-  physicalDescription: string
-  condition: string
-  rulesLimitations: string
-  symbolicWeight: string
-  howUsedOnScreen: string
-}
-
-interface LocationDocOutput {
-  purpose: string
-  moodTone: string
-  visualLanguage: string
-  soundProfile: string
-  stateOfDecayOrOrder: string
-  rulesOfSpace: string
-  howCharactersBehaveHere: string
-}
-
-interface ActBreakDocOutput {
-  plotSummary: string
-  themes: string[]
-  characterArcs: string[]
-}
-
-// Supplementary document for additional context (notes, synopsis, etc.)
-interface SupplementaryDocument {
-  title: string
-  content: string  // Plain text content
-}
-
-// Dramatic Critique (Writing Partner) types
-type CritiqueOperator = 
-  | 'contradiction'
-  | 'missing_motivation'
-  | 'agency_drop'
-  | 'unclear_causality'
-  | 'timeline_impossibility'
-  | 'chekhov_unfired'
-  | 'stakes_drift'
-  | 'theme_repetition'
-
-type IssueSeverity = 'blocking' | 'warning' | 'optional'
-type IssueResolution = 'unresolved' | 'fixed' | 'intentional' | 'deferred'
-
-interface CritiqueEvidence {
-  sceneRef: string
-  blockId?: string
-  documentId: string
-  excerpt: string
-}
-
-interface CritiqueIssue {
-  id: string
-  operator: CritiqueOperator
-  confidence: number
-  severity: IssueSeverity
-  consequence: string
-  deadline: string | null
-  title: string
-  evidence: CritiqueEvidence[]
-  question: string
-  context: string
-  resolution: IssueResolution
-  resolvedAt?: number
-  resolutionNote?: string
-}
-
 interface EntityDoc {
   type: 'character' | 'prop' | 'location'
   name: string
   content: string
-}
-
-// AI Writing types (slash command generative and revision tools)
-type AIWritingCommand =
-  | 'continue' | 'dialogue' | 'setting' | 'expand' | 'pov' | 'negativeSpace'
-  | 'rework' | 'adjustTone' | 'shorten' | 'clearer' | 'elaborate'
-  | 'tension' | 'soften' | 'imagery' | 'pacing' | 'voice' | 'contradiction'
-  | 'scriptDoctor'
-  | 'fixGrammar' | 'makeLonger' | 'makeConcise' | 'actionItems' | 'extractQuestions' | 'summarize'
-  | 'customPrompt'
-  | 'ask'
-  | 'makeConsistent'
-
-type ScreenplayElementType = 
-  | 'scene-heading'
-  | 'action'
-  | 'character'
-  | 'dialogue'
-  | 'parenthetical'
-  | 'transition'
-  | 'shot'
-
-interface ScreenplayElement {
-  type: ScreenplayElementType
-  text: string
-}
-
-interface CharacterInfo {
-  id: string
-  name: string
-  color?: string
-}
-
-interface PropInfo {
-  id: string
-  name: string
-  icon?: string
-}
-
-interface SupplementaryWritingContext {
-  synopsis?: string
-  characterNotes?: Array<{ name: string; content: string }>
-  propNotes?: Array<{ name: string; content: string }>
-  otherNotes?: Array<{ title: string; content: string }>
-}
-
-interface SceneContext {
-  sceneHeading?: string
-  charactersInScene: string[]
-  precedingAction?: string
-}
-
-interface AIWritingRequest {
-  command: AIWritingCommand
-  context: string
-  selection?: string
-  characterName?: string
-  characters?: CharacterInfo[]
-  props?: PropInfo[]
-  settingHint?: string
-  documentTitle?: string
-  templateType?: string
-  toneOption?: string
-  customPromptText?: string
-  supplementaryContext?: SupplementaryWritingContext
-  sceneContext?: SceneContext
-  targetRuntimeMinutes?: number
-  userQuestion?: string
-}
-
-interface AIWritingResponse {
-  text: string
-  error?: string
-  screenplayElements?: ScreenplayElement[]
-  isScreenplay?: boolean
-  characterMap?: Record<string, CharacterInfo>
-  propMap?: Record<string, PropInfo>
 }
 
 // Gated Writing Pipeline types
@@ -409,175 +118,6 @@ interface PipelineResult {
   suggestion?: string
 }
 
-// StoryFacts for gated pipeline (simplified for preload)
-interface StoryFacts {
-  characters: Array<{
-    characterId: string
-    name: string
-    currentWants: string[]
-    promises: string[]
-    constraints: string[]
-    relationshipStates: { with: string; state: string; scene: string }[]
-    behaviorPattern: string[]
-  }>
-  props: Array<{
-    propId: string
-    name: string
-    introduced: { scene: string; context: string } | null
-    usages: { scene: string; how: string }[]
-    rules: string[]
-    symbolicSetup: string | null
-  }>
-  timeline: Array<{
-    scene: string
-    sceneNumber: number
-    characters: string[]
-    location: string
-    timeOfDay: string
-    impliedDuration: string | null
-    keyEvents: string[]
-  }>
-  establishedRules: string[]
-  openPromises: string[]
-}
-
-// Thought Partner types
-interface ThoughtPartnerMessage {
-  id: string
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  timestamp: string
-  actions?: ThoughtPartnerAction[]
-  questions?: ThoughtPartnerQuestion[]
-}
-
-interface ContextDocument {
-  decisions: string[]
-  openQuestions: string[]
-  ideas: string[]
-  risks: string[]
-  considerations: string[]
-  lastUpdated: string
-}
-
-interface SuggestionCard {
-  id: string
-  title: string
-  description: string
-  category: 'explore' | 'question' | 'risk' | 'idea'
-  prompt: string
-}
-
-interface ConsciousContext {
-  title: string
-  content: string
-}
-
-interface SubconsciousContext {
-  projectName: string
-  templateType: string
-  documents: { title: string; content: string; isActive: boolean }[]
-  characters?: { name: string; notes?: string }[]
-  props?: { name: string; notes?: string }[]
-  settings?: { synopsis?: string }
-}
-
-interface ThoughtPartnerRequest {
-  message: string
-  conversationHistory: ThoughtPartnerMessage[]
-  consciousContext: ConsciousContext | null
-  subconsciousContext: SubconsciousContext
-  contextDocument: ContextDocument
-  agentMode?: boolean
-}
-
-interface ThoughtPartnerActionBase {
-  id: string
-  type: 'insert-content' | 'replace-content' | 'create-character' | 'create-prop'
-  status: 'pending' | 'accepted' | 'rejected' | 'executing' | 'completed' | 'failed'
-  description: string
-}
-
-interface InsertContentAction extends ThoughtPartnerActionBase {
-  type: 'insert-content'
-  content: {
-    screenplayElements?: Array<{ type: string; text: string }>
-    text?: string
-    insertionPoint?: 'cursor' | 'end' | 'after-heading'
-    afterHeading?: string
-  }
-}
-
-interface ReplaceContentAction extends ThoughtPartnerActionBase {
-  type: 'replace-content'
-  content: {
-    targetHeading: string
-    screenplayElements?: Array<{ type: string; text: string }>
-    text?: string
-  }
-}
-
-interface CreateCharacterAction extends ThoughtPartnerActionBase {
-  type: 'create-character'
-  content: { name: string; color?: string }
-}
-
-interface CreatePropAction extends ThoughtPartnerActionBase {
-  type: 'create-prop'
-  content: { name: string; icon?: string }
-}
-
-type ThoughtPartnerAction = InsertContentAction | ReplaceContentAction | CreateCharacterAction | CreatePropAction
-
-interface ThoughtPartnerQuestionOption {
-  id: string
-  label: string
-  description?: string
-}
-
-interface ThoughtPartnerQuestion {
-  id: string
-  toolCallId: string
-  questionText: string
-  options: ThoughtPartnerQuestionOption[]
-  allowCustom: boolean
-  status: 'active' | 'answered' | 'skipped'
-  selectedOptionId?: string
-  customAnswer?: string
-  category?: 'tone' | 'structure' | 'character' | 'plot' | 'style' | 'general'
-}
-
-interface ThoughtPartnerResponse {
-  message: string
-  updatedContextDocument?: ContextDocument
-  actions?: ThoughtPartnerAction[]
-  questions?: ThoughtPartnerQuestion[]
-  error?: string
-}
-
-interface ThoughtPartnerSuggestionsRequest {
-  subconsciousContext: SubconsciousContext
-}
-
-interface ThoughtPartnerConversationData {
-  messages: ThoughtPartnerMessage[]
-  contextDocument: ContextDocument
-  lastUpdated: string
-}
-
-interface ConversationMeta {
-  id: string
-  title: string
-  createdAt: string
-  updatedAt: string
-  messageCount: number
-}
-
-interface ConversationIndex {
-  activeConversationId: string | null
-  conversations: ConversationMeta[]
-}
-
 interface SuggestionsCache {
   contentHash: string
   suggestions: SuggestionCard[]
@@ -638,7 +178,7 @@ const api = {
     save: (projectPath: string, docId: string, content: unknown): Promise<void> =>
       ipcRenderer.invoke('document:save', projectPath, docId, content),
     
-    load: (projectPath: string, docId: string): Promise<unknown> =>
+    load: (projectPath: string, docId: string): Promise<JSONContent> =>
       ipcRenderer.invoke('document:load', projectPath, docId),
     
     delete: (projectPath: string, docId: string): Promise<void> =>
