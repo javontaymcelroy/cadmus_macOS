@@ -30,6 +30,8 @@ module.exports = {
         }),
   },
   ...(hasSigningIdentity ? { afterSign: 'scripts/notarize.cjs' } : {}),
+  // electron-builder leaves DMGs unsigned by default; sign it too when signing the app.
+  ...(hasSigningIdentity ? { dmg: { sign: true } } : {}),
   directories: {
     output: 'dist',
     buildResources: 'resources',

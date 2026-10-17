@@ -1,10 +1,10 @@
-<<<<<<< HEAD
-# cadmus_macOS
-Writing IDE
-=======
 # Cadmus - Writing Compiler
 
 An IDE for writers that compiles your draft and surfaces errors like a linter: grammar, citations, continuity, facts, and formatting.
+
+## Install
+
+Download the latest `Cadmus-x.y.z-universal.dmg` from [Releases](https://github.com/javontaymcelroy/cadmus_macOS/releases), open it, and drag **Cadmus** into **Applications**. It runs on Apple Silicon and Intel Macs. Releases are signed with an Apple Developer ID and notarized by Apple, so it opens like any other app.
 
 ## Features (Phase 1 - POC)
 
@@ -85,4 +85,3 @@ npm run build:mac
 ## License
 
 MIT
->>>>>>> 90d7171 (initial commit)
