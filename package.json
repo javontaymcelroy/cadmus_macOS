@@ -1,6 +1,6 @@
 {
   "name": "cadmus",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An IDE for writing that compiles your draft and surfaces errors like a linter",
   "main": "out/main/index.js",
   "type": "module",
