@@ -1942,17 +1942,19 @@ function buildScreenplayUserPrompt(request: AIWritingRequest): string {
       prompt += `=== YOUR TASK ===\nDescribe the CURRENT SETTING - the location in the "CURRENT SCENE" section.\n\nWhat does the camera SEE in THIS place? 3-5 specific visual details max. No mood descriptions. Do NOT create a new scene heading. Output JSON with screenplay elements.`
       break
       
-    case 'expand':
+    case 'expand': {
       const textToExpand = selection || context.split('\n').slice(-3).join('\n')
       prompt += `Prompt to expand:\n---\n${textToExpand}\n---\n\n`
       prompt += `=== YOUR TASK ===\nExpand THIS moment with characters from "CURRENT SCENE" section.\n\nDo NOT create a new scene heading unless explicitly asked. Use ONLY characters listed in "CURRENT SCENE". Build visual beats: inciting action → reaction → result. 5-10 beats, staying in the current location. Output JSON with screenplay elements.`
       break
+    }
       
-    case 'pov':
+    case 'pov': {
       const povCharacter = characterName || (characters && characters.length > 0 ? characters[0].name : 'the main character')
       prompt += `Character POV: ${povCharacter}\n\n`
       prompt += `=== YOUR TASK ===\nShow ${povCharacter}'s perspective through BEHAVIOR in THIS scene.\n\nThe character must be in the "CURRENT SCENE" character list. Stay in the scene heading location. What do they DO, notice, avoid? "She counts the exits" not "She feels nervous." Let behavior imply psychology. Output JSON with screenplay elements.`
       break
+    }
       
     case 'negativeSpace':
       prompt += `=== YOUR TASK ===\nCreate a moment of NEGATIVE SPACE in this scene.\n\nRefer to the "CURRENT SCENE" section above. Stay in the location. Use only characters present.\n\nProduce a moment that does NOT:\n- Advance the plot\n- Reveal backstory\n- Introduce new characters\n- Resolve any tension\n- Set up or pay off anything\n\nInstead, create:\n- A pause, a breath, waiting\n- Environmental detail a character notices\n- Habitual behavior (how they hold their coffee, adjust a sleeve)\n- An awkward beat true to life\n- Texture that exists for texture's sake\n\nThink: what would a documentary camera capture if it kept rolling between takes?\n2-4 elements of pure texture. Output JSON with screenplay elements.`
@@ -2174,17 +2176,19 @@ function buildProseUserPrompt(request: AIWritingRequest): string {
       prompt += `=== YOUR TASK ===\nDescribe the setting in the SAME descriptive style as the writer. Match their level of detail.`
       break
       
-    case 'expand':
+    case 'expand': {
       const textToExpand = selection || context.split('\n').slice(-3).join('\n')
       prompt += `Prompt to expand:\n---\n${textToExpand}\n---\n\n`
       prompt += `=== YOUR TASK ===\nExpand this into a fuller scene, writing in the SAME style as the surrounding text. Use character knowledge.`
       break
+    }
       
-    case 'pov':
+    case 'pov': {
       const povName = characterName || (characters && characters.length > 0 ? characters[0].name : 'the main character')
       prompt += `Character: ${povName}\n\n`
       prompt += `=== YOUR TASK ===\nWrite from ${povName}'s perspective. Use their character notes to understand how they see the world. Match the existing writing style.`
       break
+    }
 
     case 'negativeSpace':
       prompt += `=== YOUR TASK ===\nCreate a moment of NEGATIVE SPACE.\n\nProduce a moment that does NOT:\n- Advance the plot\n- Reveal backstory\n- Introduce new characters\n- Resolve any tension\n- Set up or pay off anything\n\nInstead, create:\n- A pause, a breath, waiting\n- Environmental detail a character notices\n- Habitual behavior\n- An awkward beat true to life\n- Texture that exists for texture's sake\n\nMatch the writer's EXACT style. Output only the text.`

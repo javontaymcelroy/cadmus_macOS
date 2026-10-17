@@ -7,7 +7,7 @@ import {
   SendRegular,
 } from '@fluentui/react-icons'
 import { clsx } from 'clsx'
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import type { PipelineAction, ReflectionQuestion } from '../../../shared/thoughtPartnerPipelineTypes'
 
 interface ReflectionCardProps {
@@ -52,26 +52,26 @@ export function ReflectionCard({ action, onAccept, onEdit, onAnswer, textSize = 
   const hasQuestions =
     reflection.meaningQuestions.length > 0 || reflection.executionQuestions.length > 0
 
-  const handleEditStart = useCallback(() => {
+  const handleEditStart = () => {
     setEditedText(reflection.interpretation)
     setMode('editing')
-  }, [reflection.interpretation])
+  }
 
-  const handleEditSubmit = useCallback(() => {
+  const handleEditSubmit = () => {
     const text = editedText.trim()
     if (!text) return
     onEdit(reflection.id, text)
     setMode('default')
-  }, [editedText, reflection.id, onEdit])
+  }
 
-  const handleEditKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleEditSubmit()
     }
-  }, [handleEditSubmit])
+  }
 
-  const handleAnswerSubmit = useCallback(() => {
+  const handleAnswerSubmit = () => {
     const mAnswers: Array<{ questionText: string; answer: string }> = []
     const eAnswers: Array<{ questionText: string; answer: string }> = []
 
@@ -84,7 +84,7 @@ export function ReflectionCard({ action, onAccept, onEdit, onAnswer, textSize = 
 
     onAnswer(reflection.id, mAnswers, eAnswers)
     setMode('default')
-  }, [reflection, meaningAnswer, executionAnswer, onAnswer])
+  }
 
   const allQuestionsAnswered =
     (reflection.meaningQuestions.length === 0 || meaningAnswer !== null) &&

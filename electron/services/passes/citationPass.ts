@@ -179,7 +179,7 @@ function normalizeAuthor(author: string): string {
 export class CitationPass implements Pass {
   id = 'citation'
   name = 'Citation Validator'
-  kind: 'local' = 'local'
+  kind = 'local' as const
 
   async run(ctx: PassContext): Promise<PassResult> {
     const startTime = Date.now()

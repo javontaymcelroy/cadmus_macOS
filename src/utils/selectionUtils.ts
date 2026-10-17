@@ -570,7 +570,7 @@ export function extractSurroundingContext(
           }
           break
           
-        case 'action':
+        case 'action': {
           // Check for character introductions
           const intro = parseCharacterIntroduction(text, characters)
           if (intro) {
@@ -595,7 +595,7 @@ export function extractSurroundingContext(
                   }
                 }
               }
-              
+            
               charactersSeen.set(intro.name, {
                 name: intro.name,
                 id: intro.characterId,
@@ -604,12 +604,13 @@ export function extractSurroundingContext(
               })
             }
           }
-          
+        
           // Store recent action lines (most recent first)
           if (actionLines.length < maxActionLines) {
             actionLines.unshift(text)
           }
           break
+        }
       }
     }
     

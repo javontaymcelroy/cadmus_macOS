@@ -198,89 +198,9 @@ interface SupplementaryDocument {
   content: string
 }
 
-interface ElectronAPI {
-  project: {
-    create: (template: any, name: string, basePath: string) => Promise<any>
-    open: (projectPath: string) => Promise<any>
-    save: (project: any) => Promise<void>
-    getLastOpened: () => Promise<string | null>
-    setLastOpened: (path: string) => Promise<void>
-    getRecentProjects: () => Promise<RecentProject[]>
-    removeFromRecent: (projectPath: string) => Promise<void>
-    moveToTrash: (projectPath: string) => Promise<{ success: boolean; error?: string }>
-  }
-  document: {
-    create: (projectPath: string, doc: any) => Promise<any>
-    save: (projectPath: string, docId: string, content: unknown) => Promise<void>
-    load: (projectPath: string, docId: string) => Promise<unknown>
-    delete: (projectPath: string, docId: string) => Promise<void>
-  }
-  asset: {
-    upload: (projectPath: string, filePath: string, fileName: string) => Promise<any>
-    uploadFromBuffer: (projectPath: string, buffer: ArrayBuffer, fileName: string, mimeType: string) => Promise<any>
-    delete: (projectPath: string, assetId: string) => Promise<void>
-    getPath: (projectPath: string, assetId: string) => Promise<string>
-    updateReferences: (projectPath: string, assetId: string, references: AssetReferenceAPI[]) => Promise<void>
-    syncAllReferences: (projectPath: string, assetReferences: Record<string, AssetReferenceAPI[]>) => Promise<void>
-  }
-  dialog: {
-    selectFolder: () => Promise<string | null>
-    selectFile: (filters?: { name: string; extensions: string[] }[]) => Promise<string | null>
-  }
-  utils: {
-    getPathForFile: (file: File) => string
-    getAssetUrl: (projectPath: string, assetPath: string) => string
-  }
-  aiWriting: {
-    generate: (request: AIWritingRequest) => Promise<AIWritingResponse>
-    hasApiKey: () => Promise<boolean>
-    getDefaultInstructions: () => Promise<{ prose: Record<string, string>; screenplay: Record<string, string> }>
-  }
-  gatedWriting: {
-    generate: (request: AIWritingRequest, storyFacts?: any, forceOverride?: boolean) => Promise<PipelineResultAPI>
-  }
-  documentGeneration: {
-    generateCharacter: (characterName: string, scriptContexts: ScriptContext[], supplementaryDocs?: SupplementaryDocument[]) => Promise<CharacterDocOutput | null>
-    generateProp: (propName: string, scriptContexts: ScriptContext[], supplementaryDocs?: SupplementaryDocument[]) => Promise<PropDocOutput | null>
-    generateLocation: (locationName: string, scriptContexts: ScriptContext[]) => Promise<LocationDocOutput | null>
-    hasApiKey: () => Promise<boolean>
-  }
-  zoom: {
-    get: () => Promise<number>
-    set: (zoom: number) => Promise<void>
-  }
-  interfaceScale: {
-    get: () => Promise<number>
-    set: (scale: number) => Promise<void>
-  }
-  panelWidths?: {
-    get: () => Promise<Record<string, number>>
-    set: (widths: Record<string, number>) => Promise<void>
-  }
-  theme?: {
-    get: () => Promise<'dark' | 'light'>
-    set: (theme: 'dark' | 'light') => Promise<void>
-  }
-  window: {
-    onFullScreenChange: (callback: (isFullScreen: boolean) => void) => () => void
-  }
-  workspace?: {
-    load: (projectPath: string) => Promise<import('../shared/workspaceStateTypes').WorkspaceState | null>
-    saveLayout: (projectPath: string, layout: import('../shared/workspaceStateTypes').WorkspaceLayoutState) => Promise<void>
-    saveDocumentView: (projectPath: string, docId: string, viewState: import('../shared/workspaceStateTypes').DocumentViewState) => Promise<void>
-    removeDocumentView: (projectPath: string, docId: string) => Promise<void>
-  }
-  behaviorPolicy?: {
-    submitFeedback: (feedback: import('../shared/behaviorPolicyTypes').FeedbackSubmission) => Promise<{ updatedVector: import('../shared/behaviorPolicyTypes').BehaviorVector }>
-    getVector: (projectPath: string | null, context: import('../shared/behaviorPolicyTypes').InteractionContext) => Promise<import('../shared/behaviorPolicyTypes').BehaviorVector>
-    reset: (projectPath: string | null, level: 'global' | 'project' | 'session') => Promise<void>
-    getFeedbackSummary: (projectPath: string) => Promise<{ totalThumbsUp: number; totalThumbsDown: number; recentEntries: import('../shared/behaviorPolicyTypes').FeedbackEntry[] }>
-  }
-}
-
 declare global {
   interface Window {
-    api: ElectronAPI
+    api: import('../electron/preload').ElectronAPI
   }
 }
 

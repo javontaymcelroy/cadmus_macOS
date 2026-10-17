@@ -97,7 +97,7 @@ function mapSeverity(ruleCategory: string): 'error' | 'warning' | 'info' {
 export class SpellingGrammarPass implements Pass {
   id = 'spelling-grammar'
   name = 'Spelling & Grammar'
-  kind: 'local' = 'local'
+  kind = 'local' as const
 
   async run(ctx: PassContext): Promise<PassResult> {
     const startTime = Date.now()

@@ -167,9 +167,9 @@ export const SlashCommandMenu = forwardRef<SlashCommandMenuRef, SlashCommandMenu
       
       // Build scene context for AI
       const sceneContext = isScreenplay ? {
-        sceneHeading: surroundingContext.currentSceneHeading,
+        sceneHeading: surroundingContext.sceneHeading,
         charactersInScene: surroundingContext.recentCharacters.map(c => c.name),
-        precedingAction: surroundingContext.summary
+        precedingAction: surroundingContext.precedingAction
       } : undefined
 
       // Gather supplementary context from project documents

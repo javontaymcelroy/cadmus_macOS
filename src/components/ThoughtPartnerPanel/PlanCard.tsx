@@ -10,7 +10,7 @@ import {
   DismissCircleRegular,
 } from '@fluentui/react-icons'
 import { clsx } from 'clsx'
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import type { PipelineAction } from '../../../shared/thoughtPartnerPipelineTypes'
 
 interface PlanCardProps {
@@ -48,20 +48,20 @@ export function PlanCard({ action, onApprove, onRevise, onReject, textSize = 13 
   const isApproved = plan.status === 'approved'
   const isRejected = plan.status === 'rejected'
 
-  const handleReviseSubmit = useCallback(() => {
+  const handleReviseSubmit = () => {
     const text = reviseFeedback.trim()
     if (!text) return
     onRevise(plan.id, text)
     setReviseFeedback('')
     setReviseMode(false)
-  }, [reviseFeedback, plan.id, onRevise])
+  }
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleReviseSubmit()
     }
-  }, [handleReviseSubmit])
+  }
 
   return (
     <div

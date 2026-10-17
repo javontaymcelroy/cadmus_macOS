@@ -4,7 +4,7 @@ import { ArrowResetRegular, CheckmarkRegular, DismissRegular, ChevronDownRegular
 import { useProjectStore } from '../../stores/projectStore'
 import { FONT_FAMILIES } from '../../workspaces/shared/extensions/FontFamily'
 import { SLASH_COMMANDS_GENERATE, SLASH_COMMANDS_SELECTION, SLASH_COMMANDS_SELECTION_GENERAL } from '../../workspaces/shared/extensions/SlashCommand'
-import type { FormattingRules, HeadingTypography } from '../../types/project'
+import type { FormattingRules, HeadingTypography, Project } from '../../types/project'
 
 // Interface scale steps
 const INTERFACE_SCALE_STEPS = [75, 80, 90, 100, 110, 125, 150]
@@ -139,6 +139,7 @@ function ColorPicker({ value, onChange, label }: {
     <div className="relative" ref={pickerRef}>
       <button
         onClick={() => setShowPicker(!showPicker)}
+        aria-label={label}
         className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-theme-subtle hover:bg-theme-hover transition-colors"
       >
         <div
@@ -283,11 +284,16 @@ function getEditableCommands(isScreenplay: boolean) {
 }
 
 export function ProjectSettingsPanel() {
-  const { currentProject, updateProjectSettings, setSettingsPanelOpen } = useProjectStore()
-  const scrollRef = useRef<HTMLDivElement>(null)
-
+  const currentProject = useProjectStore(state => state.currentProject)
   const rules = currentProject?.settings?.formattingRules
   if (!currentProject || !rules) return null
+  return <ProjectSettingsForm currentProject={currentProject} rules={rules} />
+}
+
+// Split out so its hooks always run in the same order (the panel above returns early).
+function ProjectSettingsForm({ currentProject, rules }: { currentProject: Project; rules: FormattingRules }) {
+  const { updateProjectSettings, setSettingsPanelOpen } = useProjectStore()
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const isScreenplay = currentProject.templateId === 'screenplay'
 

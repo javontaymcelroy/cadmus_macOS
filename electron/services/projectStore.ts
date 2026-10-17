@@ -459,7 +459,7 @@ export class ProjectStore {
     const sourceProject: Project = JSON.parse(sourceContent)
 
     // Determine target folder name, handle conflicts
-    let targetName = sourceProject.name || basename(sourcePath)
+    const targetName = sourceProject.name || basename(sourcePath)
     let targetPath = join(destinationBasePath, targetName)
     let suffix = 1
     while (true) {
@@ -500,7 +500,7 @@ export class ProjectStore {
     const sourceProject: Project = JSON.parse(sourceContent)
 
     // Determine target folder name, handle conflicts
-    let targetName = sourceProject.name || basename(projectPath)
+    const targetName = sourceProject.name || basename(projectPath)
     let targetPath = join(destinationBasePath, targetName)
     let suffix = 1
     while (true) {

@@ -1,5 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
+import type { ReactNodeViewProps } from '@tiptap/react'
 import { CheckmarkRegular, DismissRegular } from '@fluentui/react-icons'
 
 export interface FixPreviewOptions {
@@ -34,45 +35,18 @@ declare module '@tiptap/core' {
 }
 
 // React component for the fix preview node view
-interface FixPreviewComponentProps {
-  node: {
-    attrs: FixPreviewAttributes
-    nodeSize: number
-  }
-  extension: {
-    options: FixPreviewOptions
-  }
-  deleteNode: () => void
-  editor: {
-    chain: () => {
-      focus: () => {
-        command: (fn: (props: { tr: unknown; state: unknown; dispatch: unknown }) => boolean) => {
-          run: () => boolean
-        }
-      }
-    }
-    view: {
-      state: {
-        schema: {
-          text: (content: string) => unknown
-        }
-      }
-    }
-  }
-  getPos: () => number
-}
-
-function FixPreviewComponent({ node, extension, editor, getPos }: FixPreviewComponentProps) {
-  const { diagnosticId, originalText, suggestionText } = node.attrs
-  const { onAccept, onReject } = extension.options
+function FixPreviewComponent({ node, extension, editor, getPos }: ReactNodeViewProps) {
+  const { diagnosticId, originalText, suggestionText } = node.attrs as FixPreviewAttributes
+  const { onAccept, onReject } = extension.options as FixPreviewOptions
 
   const handleAccept = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     
     // Use a single transaction to replace the node with suggestion text
-    editor.chain().focus().command(({ tr, state }: { tr: { replaceWith: (from: number, to: number, node: unknown) => unknown }; state: { schema: { text: (s: string) => unknown } } }) => {
+    editor.chain().focus().command(({ tr, state }) => {
       const pos = getPos()
+      if (pos === undefined) return false
       const nodeSize = node.nodeSize
       // Replace the fix preview node with the suggestion text in one atomic operation
       tr.replaceWith(pos, pos + nodeSize, state.schema.text(suggestionText))
@@ -88,8 +62,9 @@ function FixPreviewComponent({ node, extension, editor, getPos }: FixPreviewComp
     e.stopPropagation()
     
     // Use a single transaction to replace the node with original text
-    editor.chain().focus().command(({ tr, state }: { tr: { replaceWith: (from: number, to: number, node: unknown) => unknown }; state: { schema: { text: (s: string) => unknown } } }) => {
+    editor.chain().focus().command(({ tr, state }) => {
       const pos = getPos()
+      if (pos === undefined) return false
       const nodeSize = node.nodeSize
       // Replace the fix preview node with the original text in one atomic operation
       tr.replaceWith(pos, pos + nodeSize, state.schema.text(originalText))

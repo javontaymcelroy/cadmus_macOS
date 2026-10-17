@@ -50,13 +50,9 @@ export function AcademicToolbar({ editor }: AcademicToolbarProps) {
 
   const handleImageInsert = async () => {
     try {
-      const result = await window.api.dialog.showOpenDialog({
-        properties: ['openFile'],
-        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] }]
-      })
+      const filePath = await window.api.dialog.selectFile([{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] }])
 
-      if (!result.canceled && result.filePaths.length > 0) {
-        const filePath = result.filePaths[0]
+      if (filePath) {
         const assetUrl = `cadmus-asset://load?path=${encodeURIComponent(filePath)}`
         editor.chain().focus().setImage({ src: assetUrl }).run()
       }

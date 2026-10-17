@@ -3,9 +3,6 @@ import { useProjectStore } from '../../stores/projectStore'
 import { templates } from '../../workspaces'
 import type { Template, LivingDocument, DocumentLifecycleState, AgendaItem } from '../../types/project'
 import { TemplateCard } from './TemplateCard'
-import { RecentProjectCard } from './RecentProjectCard'
-import { AgendaItemCard } from './AgendaItemCard'
-import { AgendaProjectStack } from './AgendaProjectStack'
 import { LivingDocumentWithAgenda } from './LivingDocumentWithAgenda'
 import {
   DocumentRegular,
@@ -19,7 +16,6 @@ import {
   ChevronLeftRegular,
   FilterRegular,
   ChevronDownRegular,
-  TaskListLtrRegular,
   SettingsRegular,
   KeyRegular,
   CheckmarkCircleRegular,
@@ -132,21 +128,6 @@ export function TemplatePicker() {
   const visibleAgendaItems = useMemo(() => {
     return agendaItems.filter(item => item.state !== 'archived')
   }, [agendaItems])
-
-  // Group agenda items by project for stacked card display
-  const groupedAgendaItems = useMemo(() => {
-    const groups = new Map<string, AgendaItem[]>()
-    for (const item of visibleAgendaItems) {
-      const existing = groups.get(item.projectPath) || []
-      existing.push(item)
-      groups.set(item.projectPath, existing)
-    }
-    return Array.from(groups.entries()).map(([projectPath, items]) => ({
-      projectPath,
-      projectName: items[0].projectName,
-      items
-    }))
-  }, [visibleAgendaItems])
 
   // Filter and sort living documents
   const filteredDocuments = useMemo(() => {

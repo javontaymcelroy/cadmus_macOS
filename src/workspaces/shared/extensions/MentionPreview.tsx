@@ -1,5 +1,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
+import type { ReactNodeViewProps } from '@tiptap/react'
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { CheckmarkRegular, DismissRegular } from '@fluentui/react-icons'
 
 export interface MentionPreviewOptions {
@@ -45,31 +47,18 @@ declare module '@tiptap/core' {
 }
 
 // React component for the mention preview node view
-interface MentionPreviewComponentProps {
-  node: {
-    attrs: MentionPreviewAttributes
-    nodeSize: number
-  }
-  extension: {
-    options: MentionPreviewOptions
-  }
-  deleteNode: () => void
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  editor: any
-  getPos: () => number
-}
-
-function MentionPreviewComponent({ node, extension, editor, getPos }: MentionPreviewComponentProps) {
-  const { suggestionId, originalText, mentionLabel, mentionColor } = node.attrs
-  const { onAccept, onReject } = extension.options
+function MentionPreviewComponent({ node, extension, editor, getPos }: ReactNodeViewProps) {
+  const { suggestionId, originalText, mentionLabel, mentionColor } = node.attrs as MentionPreviewAttributes
+  const { onAccept, onReject } = extension.options as MentionPreviewOptions
 
   const handleAccept = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     
     // Replace with a mention node
-    editor.chain().focus().command(({ tr, state }: { tr: { replaceWith: (from: number, to: number, node: unknown) => unknown }; state: { schema: { nodes: { mention: { create: (attrs: object) => unknown } } } } }) => {
+    editor.chain().focus().command(({ tr, state }) => {
       const pos = getPos()
+      if (pos === undefined) return false
       const nodeSize = node.nodeSize
       
       // Create a mention node
@@ -94,8 +83,9 @@ function MentionPreviewComponent({ node, extension, editor, getPos }: MentionPre
     e.stopPropagation()
     
     // Replace with original text
-    editor.chain().focus().command(({ tr, state }: { tr: { replaceWith: (from: number, to: number, node: unknown) => unknown }; state: { schema: { text: (s: string) => unknown } } }) => {
+    editor.chain().focus().command(({ tr, state }) => {
       const pos = getPos()
+      if (pos === undefined) return false
       const nodeSize = node.nodeSize
       tr.replaceWith(pos, pos + nodeSize, state.schema.text(originalText))
       return true
@@ -288,7 +278,7 @@ export const MentionPreview = Node.create<MentionPreviewOptions>({
       acceptAllMentionPreviews:
         () =>
         ({ tr, state, dispatch }) => {
-          const nodesToReplace: { pos: number; node: typeof state.doc.type.prototype }[] = []
+          const nodesToReplace: { pos: number; node: ProseMirrorNode }[] = []
           
           state.doc.descendants((node, pos) => {
             if (node.type.name === this.name) {
@@ -320,7 +310,7 @@ export const MentionPreview = Node.create<MentionPreviewOptions>({
       rejectAllMentionPreviews:
         () =>
         ({ tr, state, dispatch }) => {
-          const nodesToReplace: { pos: number; node: typeof state.doc.type.prototype }[] = []
+          const nodesToReplace: { pos: number; node: ProseMirrorNode }[] = []
           
           state.doc.descendants((node, pos) => {
             if (node.type.name === this.name) {
