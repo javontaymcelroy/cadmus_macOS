@@ -1,0 +1,21 @@
+name: CI
+
+# Installs dependencies and builds the app on every push and pull request.
+# Lint and type checking aren't run yet: there is no ESLint config, and `tsc --noEmit`
+# currently reports type errors. Add `npm run lint` and `npx tsc --noEmit` here once they pass.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
