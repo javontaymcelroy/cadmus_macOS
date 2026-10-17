@@ -43,6 +43,32 @@ npm run build
 npm run build:mac
 ```
 
+### Releasing
+
+Releases are built by GitHub Actions (`.github/workflows/release.yml`) when a version tag is pushed.
+
+1. Bump `version` in `package.json` (for example with `npm version 0.1.2 --no-git-tag-version`), then commit and push to `main`.
+2. Tag the same version and push the tag:
+
+   ```bash
+   git tag v0.1.2
+   git push origin v0.1.2
+   ```
+
+The workflow checks that the tag matches `package.json`. It then builds a universal (Apple Silicon and Intel) `.dmg` and `.zip`, signs and notarizes them, and publishes them as a GitHub Release. It takes about 15 minutes, most of it waiting on Apple's notarization.
+
+Signing needs these repository secrets:
+
+| Secret | Value |
+|--------|-------|
+| `CSC_LINK` | Base64-encoded `.p12` with the Developer ID Application certificate and its private key |
+| `CSC_KEY_PASSWORD` | Password of that `.p12` |
+| `APPLE_ID` | Apple ID email of the developer account |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for that Apple ID ([appleid.apple.com](https://appleid.apple.com) → Sign-In and Security) |
+| `APPLE_TEAM_ID` | Apple Developer Team ID |
+
+Without `CSC_LINK`, the release is built unsigned, and its notes explain how to open it anyway.
+
 ## Project Structure
 
 ```
