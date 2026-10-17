@@ -94,6 +94,10 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10), 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
+/* Fix preview: red-400/green-400 are too pale on the light page */
+[data-theme="light"] .fix-preview-original { color: #b91c1c; text-decoration-color: #b91c1c; }
+[data-theme="light"] .fix-preview-suggestion { color: #15803d; }
+
 /* Theme-aware popover surfaces (replaces inline dark gradients) */
 .cadmus-popover {
   background: linear-gradient(135deg, rgba(26, 26, 26, 0.98) 0%, rgba(18, 18, 18, 0.99) 100%);

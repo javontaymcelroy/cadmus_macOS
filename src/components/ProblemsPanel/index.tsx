@@ -78,10 +78,10 @@ function ContextSnippet({ context, severity }: { context: { text: string; offset
   }[severity]
   
   return (
-    <code className="text-xs text-white/30 font-mono block truncate">
-      <span className="text-white/25">{before}</span>
+    <code className="text-xs text-theme-muted font-mono block truncate">
+      <span className="text-theme-muted">{before}</span>
       <span className={clsx('font-semibold rounded px-0.5', highlightColor)}>{issue}</span>
-      <span className="text-white/25">{after}</span>
+      <span className="text-theme-muted">{after}</span>
     </code>
   )
 }
@@ -105,7 +105,7 @@ function DiagnosticItem({ diagnostic, documentTitle, onNavigate, onApplyFix, onD
 
   return (
     <div
-      className="px-3 py-3 border-b border-white/[0.03] hover:bg-white/[0.02] cursor-pointer transition-all duration-200 group"
+      className="px-3 py-3 border-b border-theme-subtle hover:bg-theme-hover cursor-pointer transition-all duration-200 group"
       onClick={onNavigate}
     >
       <div className="flex items-center gap-3">
@@ -118,12 +118,12 @@ function DiagnosticItem({ diagnostic, documentTitle, onNavigate, onApplyFix, onD
         <div className="flex-1 min-w-0">
           {/* Title and pass */}
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium text-white/80 truncate group-hover:text-white/90 transition-colors">
+            <span className="text-sm font-medium text-theme-primary truncate group-hover:text-theme-primary transition-colors">
               {enhancedTitle}
             </span>
             <span className={clsx(
               'text-[10px] font-ui shrink-0 uppercase tracking-wide flex items-center gap-1',
-              isAISuggestion ? 'text-purple-400/70' : 'text-white/25'
+              isAISuggestion ? 'text-purple-400/70' : 'text-theme-muted'
             )}>
               {isAISuggestion && <SparkleRegular className="w-3 h-3" />}
               {passName}
@@ -137,13 +137,13 @@ function DiagnosticItem({ diagnostic, documentTitle, onNavigate, onApplyFix, onD
             </div>
           ) : (
             /* Fallback to message if no context */
-            <p className="text-xs text-white/40 line-clamp-1 mb-1">
+            <p className="text-xs text-theme-muted line-clamp-1 mb-1">
               {diagnostic.message}
             </p>
           )}
           
           {/* Location */}
-          <span className="text-[11px] text-white/30 font-ui">
+          <span className="text-[11px] text-theme-muted font-ui">
             {documentTitle}
           </span>
         </div>
@@ -157,7 +157,7 @@ function DiagnosticItem({ diagnostic, documentTitle, onNavigate, onApplyFix, onD
                 e.stopPropagation()
                 onNavigate()
               }}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-ui font-medium text-white/50 bg-white/[0.04] border border-white/[0.06] rounded-lg hover:bg-white/[0.06] hover:text-white/70 transition-all duration-200"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-ui font-medium text-theme-secondary bg-theme-hover border border-theme-subtle rounded-lg hover:bg-theme-hover hover:text-theme-primary transition-all duration-200"
               title="Go to issue location"
             >
               <LocationRegular className="w-4 h-4" />
@@ -172,7 +172,7 @@ function DiagnosticItem({ diagnostic, documentTitle, onNavigate, onApplyFix, onD
                 e.stopPropagation()
                 onApplyFix?.()
               }}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-ui font-medium text-gold-400/90 bg-gold-400/10 border border-gold-400/20 rounded-lg hover:bg-gold-400/15 hover:text-gold-400 hover:border-gold-400/30 transition-all duration-200"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-ui font-medium text-theme-accent bg-gold-400/10 border border-gold-400/20 rounded-lg hover:bg-gold-400/15 hover:text-theme-accent hover:border-gold-400/30 transition-all duration-200"
               title={diagnostic.suggestions![0].label}
             >
               <WrenchRegular className="w-4 h-4" />
@@ -186,7 +186,7 @@ function DiagnosticItem({ diagnostic, documentTitle, onNavigate, onApplyFix, onD
               e.stopPropagation()
               onDismiss()
             }}
-            className="p-2 text-white/30 hover:text-white/60 hover:bg-white/[0.04] rounded-lg transition-all duration-200"
+            className="p-2 text-theme-muted hover:text-theme-primary hover:bg-theme-hover rounded-lg transition-all duration-200"
             title="Dismiss this issue"
           >
             <DismissRegular className="w-4 h-4" />
@@ -310,8 +310,8 @@ export function ProblemsPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div ref={headerRef} className="flex items-center justify-between px-3 py-2 border-b border-white/[0.04]">
-        <h2 className="text-xs font-ui font-medium uppercase tracking-wider text-white/40">
+      <div ref={headerRef} className="flex items-center justify-between px-3 py-2 border-b border-theme-subtle">
+        <h2 className="text-xs font-ui font-medium uppercase tracking-wider text-theme-muted">
           Build Issues
         </h2>
         
@@ -440,7 +440,7 @@ export function ProblemsPanel() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-white/[0.03]">
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-theme-subtle">
         <button
           onClick={() => setFilterTab('all')}
           className={clsx(
@@ -494,7 +494,7 @@ export function ProblemsPanel() {
               onClick={() => setShowPassDropdown(!showPassDropdown)}
               className={clsx(
                 'tab-modern flex items-center gap-1',
-                filterPass && 'bg-gold-400/15 text-gold-400/90'
+                filterPass && 'bg-gold-400/15 text-theme-accent'
               )}
             >
               <FilterRegular className="w-3 h-3" />
@@ -511,7 +511,7 @@ export function ProblemsPanel() {
                   }}
                   className={clsx(
                     'menu-modern-item w-full px-3 py-1.5 text-left text-xs font-ui',
-                    !filterPass ? 'text-gold-400/90' : 'text-white/70'
+                    !filterPass ? 'text-theme-accent' : 'text-theme-secondary'
                   )}
                 >
                   All Passes
@@ -525,7 +525,7 @@ export function ProblemsPanel() {
                     }}
                     className={clsx(
                       'menu-modern-item w-full px-3 py-1.5 text-left text-xs font-ui',
-                      filterPass === passId ? 'text-gold-400/90' : 'text-white/70'
+                      filterPass === passId ? 'text-theme-accent' : 'text-theme-secondary'
                     )}
                   >
                     {PASS_NAMES[passId] || passId}
@@ -540,7 +540,7 @@ export function ProblemsPanel() {
       {/* Build status banner */}
       {lastBuildResult && !ui.isBuilding && (
         <div className={clsx(
-          'px-3 py-2 text-xs font-ui flex items-center gap-2 border-b border-white/[0.03]',
+          'px-3 py-2 text-xs font-ui flex items-center gap-2 border-b border-theme-subtle',
           lastBuildResult.success ? 'bg-green-500/8 text-green-400/80' : 'bg-red-500/8 text-red-400/80'
         )}>
           {lastBuildResult.success ? (
@@ -551,7 +551,7 @@ export function ProblemsPanel() {
           <span>
             {lastBuildResult.success ? 'Build completed' : 'Build completed with issues'}
           </span>
-          <span className="text-white/25 ml-auto">
+          <span className="text-theme-muted ml-auto">
             {lastBuildResult.totalTiming}ms
           </span>
         </div>
@@ -559,7 +559,7 @@ export function ProblemsPanel() {
 
       {/* Building indicator */}
       {ui.isBuilding && (
-        <div className="px-3 py-2 text-xs font-ui flex items-center gap-2 border-b border-white/[0.03] bg-gold-400/8 text-gold-400/80">
+        <div className="px-3 py-2 text-xs font-ui flex items-center gap-2 border-b border-theme-subtle bg-gold-400/8 text-theme-accent">
           <ArrowSyncRegular className="w-4 h-4 animate-spin" />
           <span>Building...</span>
         </div>
@@ -571,20 +571,20 @@ export function ProblemsPanel() {
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             {diagnostics.length === 0 ? (
               <>
-                <div className="w-12 h-12 rounded-full bg-white/[0.03] flex items-center justify-center mb-4">
-                  <CheckmarkCircleRegular className="w-6 h-6 text-white/20" />
+                <div className="w-12 h-12 rounded-full bg-theme-hover flex items-center justify-center mb-4">
+                  <CheckmarkCircleRegular className="w-6 h-6 text-theme-muted" />
                 </div>
-                <p className="text-sm text-white/40 font-ui mb-1">No problems detected</p>
-                <p className="text-xs text-white/25 font-ui">
+                <p className="text-sm text-theme-muted font-ui mb-1">No problems detected</p>
+                <p className="text-xs text-theme-muted font-ui">
                   Run a build to check your documents
                 </p>
               </>
             ) : (
               <>
-                <div className="w-10 h-10 rounded-full bg-white/[0.03] flex items-center justify-center mb-3">
-                  <FilterRegular className="w-5 h-5 text-white/20" />
+                <div className="w-10 h-10 rounded-full bg-theme-hover flex items-center justify-center mb-3">
+                  <FilterRegular className="w-5 h-5 text-theme-muted" />
                 </div>
-                <p className="text-sm text-white/40 font-ui">
+                <p className="text-sm text-theme-muted font-ui">
                   No matching problems
                 </p>
               </>
@@ -606,7 +606,7 @@ export function ProblemsPanel() {
 
       {/* Footer with counts */}
       {diagnostics.length > 0 && (
-        <div className="px-3 py-1.5 border-t border-white/[0.04] text-xs font-ui text-white/30 flex items-center gap-3">
+        <div className="px-3 py-1.5 border-t border-theme-subtle text-xs font-ui text-theme-muted flex items-center gap-3">
           <span className="flex items-center gap-1">
             <ErrorCircleRegular className="w-3 h-3 text-red-400/70" />
             {counts.error}
